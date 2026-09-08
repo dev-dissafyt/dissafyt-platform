@@ -64,34 +64,34 @@ A user can register, log in, be identified by the API and manage their own profi
 
 # Phase 3 — Authorization
 
-- [ ] Define roles
-- [ ] Define permissions
-- [ ] Implement backend authorization
-- [ ] Protect customer resources
-- [ ] Protect admin resources
-- [ ] Test ownership
-- [ ] Test customer vs admin access
+- [x] Define roles
+- [x] Define permissions
+- [x] Implement backend authorization
+- [x] Protect customer resources
+- [x] Protect admin resources
+- [x] Test ownership
+- [x] Test customer vs admin access
 
 Exit condition:
 
-The backend—not the frontend—controls access.
+The backend—not the frontend—controls access. (VERIFIED)
 
 ---
 
 # Phase 4 — Customer Application
 
-- [ ] Create Next.js customer app
-- [ ] Connect authentication
-- [ ] Create public navigation
-- [ ] Create login/register UI
-- [ ] Create account area
-- [ ] Create profile editing
-- [ ] Connect `/users/me`
-- [ ] Handle loading/error states
+- [x] Create Next.js customer app
+- [x] Connect authentication
+- [x] Create public navigation
+- [x] Create login/register UI
+- [x] Create account area
+- [x] Create profile editing
+- [x] Connect `/users/me`
+- [x] Handle loading/error states
 
 Exit condition:
 
-A real customer can use the platform through the web interface.
+A real customer can use the platform through the web interface. (VERIFIED)
 
 ---
 
