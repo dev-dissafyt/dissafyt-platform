@@ -115,7 +115,7 @@ export interface BarberService {
 
 export interface Staff {
   id: string;
-  user_id: string;
+  user_id?: string | null;
   display_name: string;
   bio?: string | null;
   is_active: boolean;
@@ -134,6 +134,12 @@ export interface Booking {
   notes?: string | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface BookingWithDetails extends Booking {
+  service?: BarberService;
+  staff?: Staff | null;
+  customer?: Profile | null;
 }
 
 // Payment types

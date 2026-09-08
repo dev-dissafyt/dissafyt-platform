@@ -112,18 +112,18 @@ An authorized administrator can operate the platform through a separate applicat
 
 # Phase 6 — Clothing MVP
 
-- [ ] Categories
-- [ ] Products
-- [ ] Variants
-- [ ] Inventory
-- [ ] Product browsing
-- [ ] Product detail
-- [ ] Cart
-- [ ] Checkout
-- [ ] Orders
-- [ ] Payment integration
-- [ ] Admin product management
-- [ ] Admin order management
+- [x] Categories
+- [x] Products
+- [x] Variants
+- [x] Inventory
+- [x] Product browsing
+- [x] Product detail
+- [x] Cart
+- [x] Checkout
+- [x] Orders
+- [x] Payment integration
+- [x] Admin product management
+- [x] Admin order management
 
 Exit condition:
 
@@ -133,21 +133,21 @@ A customer can purchase a product and the admin can manage the resulting order.
 
 # Phase 7 — Barbershop MVP
 
-- [ ] Services
-- [ ] Staff
-- [ ] Staff/service relationships
-- [ ] Availability
-- [ ] Booking creation
-- [ ] Booking validation
-- [ ] Booking management
-- [ ] Customer booking history
-- [ ] Admin booking management
-- [ ] Staff booking access
-- [ ] Notifications
+- [x] Services
+- [x] Staff
+- [x] Staff/service relationships
+- [x] Availability
+- [x] Booking creation
+- [x] Booking validation
+- [x] Booking management
+- [x] Customer booking history
+- [x] Admin booking management
+- [x] Staff booking access
+- [x] Notifications
 
 Exit condition:
 
-A customer can book a service and authorized staff can manage it.
+A customer can book a service and authorized staff can manage it. (VERIFIED)
 
 ---
 

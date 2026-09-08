@@ -6,3 +6,4 @@ export * from './admin/admin-barbershop-service';
 export * from './admin/admin-user-service';
 export * from './commerce/payfast-service';
 export * from './commerce/order-service';
+export * from './barbershop/barbershop-service';

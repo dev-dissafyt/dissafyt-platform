@@ -185,3 +185,59 @@ Platform administrators need operational control over the product catalog and ba
 - Executed `verify-admin.mjs`: verified category creation, product creation, variant association, barbershop service creation, and cleanup.
 - Ran full Turborepo build (`pnpm build`): both apps compiled cleanly with 0 type errors.
 
+---
+
+## Entry: Phase 6 — Clothing MVP & PayFast Order Lifecycle
+
+### Date
+2026-09-08
+
+### Phase
+Phase 6 — Clothing MVP
+
+### Objective
+Complete the end-to-end commerce ordering lifecycle: product detail pages with size selection, cart and checkout with South African delivery address capture (The Courier Guy ready), PayFast ITN webhook handler with MD5 signature validation, and Admin order fulfillment management.
+
+### Problem
+Enable real customer purchasing and order processing, ensuring payment validation occurs cryptographically via PayFast and stock is decremented accurately.
+
+### Decision
+- Implemented `PayfastService` in `@dissafyt/api` with MD5 hashing against `PAYFAST_PASSPHRASE` and webhook validation logic.
+- Implemented `OrderService` in `@dissafyt/api` with authoritative price calculation from database records and inventory stock reservation.
+- Structured shipping address format to directly mirror The Courier Guy / Shiplogic shipment schema.
+- Built interactive product detail view (`/shop/[slug]`) and checkout page (`/checkout`).
+- Built dedicated Admin orders portal (`/commerce/orders`).
+
+### Testing
+- Ran `verify-phase6.mjs`: created test buyer, created order, generated valid PayFast ITN signature, verified payment insertion in `payments` table, confirmed order transition to `paid`, tested admin status transition to `shipped`, and cleaned up records.
+- Full Turborepo build passed with 15 routes in customer app and 16 routes in admin app.
+
+---
+
+## Entry: Phase 7 — Barbershop MVP & Appointment Lifecycle
+
+### Date
+2026-09-08
+
+### Phase
+Phase 7 — Barbershop MVP
+
+### Objective
+Provide complete appointment booking and barber operations: interactive customer booking calendar with live slot availability and barber selector, anti-collision / anti-double-booking engine, customer appointment management with cancellation, and Admin daily schedule oversight with status lifecycle.
+
+### Problem
+Customers need to book grooming sessions with live availability without double-booking barbers, and barbers/admins need an operational view of daily appointments with status management.
+
+### Decision
+- Implemented `BarbershopService` in `@dissafyt/api` with an `AvailabilityEngine` calculating available time slots (respecting shop operating hours, service duration, and active barber schedules).
+- Added anti double-booking collision checks preventing concurrent race conditions.
+- Enhanced `AdminBarbershopService` with full staff CRUD and appointment status transitions (`confirmed`, `completed`, `cancelled`, `no_show`).
+- Built customer booking wizard (`/book`) with 4-step selection: service -> barber -> date & live slots -> confirmation.
+- Integrated "My Appointments" into customer portal (`/account`) alongside "Apparel Orders".
+- Restructured Admin Barbershop portal (`/barbershop`) into 3 tabs: Schedule & Appointments, Barbers & Staff, and Services & Memberships.
+
+### Testing
+- Ran `verify-phase7.mjs`: verified active staff, service duration retrieval, booking creation, anti double-booking collision detection, admin status transition (`confirmed` -> `completed`), customer booking history retrieval, cancellation flow, and cleanup.
+- Executed full Turborepo build (`pnpm build`): both apps compiled cleanly with 0 type errors.
+
+

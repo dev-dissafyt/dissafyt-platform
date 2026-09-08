@@ -12,6 +12,7 @@
   },
   "devDependencies": {
     "@dissafyt/tsconfig": "workspace:*",
+    "@types/node": "^22.20.1",
     "typescript": "^5.8.2"
   }
 }

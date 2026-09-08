@@ -38,13 +38,31 @@ interface Order {
   };
 }
 
+interface BookingItem {
+  id: string;
+  start_time: string;
+  end_time: string;
+  status: string;
+  total_amount: number;
+  notes?: string | null;
+  service?: {
+    name: string;
+    duration_minutes: number;
+  };
+  staff?: {
+    display_name: string;
+  } | null;
+}
+
 export default function AccountPage() {
   const router = useRouter();
   const [user, setUser] = useState<UserData | null>(null);
   const [token, setToken] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
+  const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
@@ -63,9 +81,10 @@ export default function AccountPage() {
       setToken(accessToken);
 
       try {
-        const [userRes, ordersRes] = await Promise.all([
+        const [userRes, ordersRes, bookingsRes] = await Promise.all([
           fetch('/api/users/me', { headers: { Authorization: `Bearer ${accessToken}` } }),
           fetch('/api/orders', { headers: { Authorization: `Bearer ${accessToken}` } }),
+          fetch('/api/bookings', { headers: { Authorization: `Bearer ${accessToken}` } }),
         ]);
 
         if (userRes.ok) {
@@ -87,6 +106,11 @@ export default function AccountPage() {
           const ordersData = await ordersRes.json();
           setOrders(ordersData);
         }
+
+        if (bookingsRes.ok) {
+          const bookingsData = await bookingsRes.json();
+          setBookings(bookingsData);
+        }
       } catch (e) {
         console.error('Error fetching account data:', e);
       } finally {
@@ -96,6 +120,30 @@ export default function AccountPage() {
 
     loadUser();
   }, [router]);
+
+  async function handleCancelBooking(bookingId: string) {
+    if (!token || !confirm('Are you sure you want to cancel this appointment?')) return;
+    setCancellingBookingId(bookingId);
+    try {
+      const res = await fetch(`/api/bookings/${bookingId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ action: 'cancel' }),
+      });
+      if (res.ok) {
+        // Refresh bookings
+        const refRes = await fetch('/api/bookings', { headers: { Authorization: `Bearer ${token}` } });
+        if (refRes.ok) setBookings(await refRes.json());
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setCancellingBookingId(null);
+    }
+  }
 
   async function handleUpdateProfile(e: React.FormEvent) {
     e.preventDefault();
@@ -216,6 +264,114 @@ export default function AccountPage() {
                   {updating ? 'Saving...' : 'Save Profile Changes'}
                 </Button>
               </form>
+            </CardContent>
+          </Card>
+
+          {/* Barbershop Appointments */}
+          <Card className="border-zinc-800 bg-zinc-900/60">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-xl text-white flex items-center">
+                  <Scissors className="mr-2 h-5 w-5 text-amber-500" />
+                  Barbershop Appointments ({bookings.length})
+                </CardTitle>
+                <CardDescription>Ace of Fyt grooming sessions and schedules</CardDescription>
+              </div>
+              <Link href="/book">
+                <Button variant="ghost" size="sm" className="text-amber-400 hover:text-amber-300">
+                  Book Session <ExternalLink className="ml-1 h-3.5 w-3.5" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent>
+              {bookings.length === 0 ? (
+                <div className="text-center py-8 text-sm text-zinc-500 space-y-2">
+                  <Clock className="mx-auto h-8 w-8 text-zinc-600" />
+                  <p>You haven&apos;t booked any grooming appointments yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {bookings.map((booking) => {
+                    const startDate = new Date(booking.start_time);
+                    const isPast = startDate < new Date();
+                    const isCancellable = (booking.status === 'confirmed' || booking.status === 'pending') && !isPast;
+
+                    return (
+                      <div
+                        key={booking.id}
+                        className="border border-zinc-800/80 rounded-lg p-4 bg-zinc-950/40 space-y-3"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-2">
+                          <div>
+                            <span className="font-bold text-white text-sm">
+                              {booking.service?.name || 'Grooming Service'}
+                            </span>
+                            <span className="text-xs text-zinc-400 ml-2">
+                              with {booking.staff?.display_name || 'Master Barber'}
+                            </span>
+                          </div>
+                          <div className="flex items-center space-x-2">
+                            <span
+                              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${
+                                booking.status === 'confirmed'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                  : booking.status === 'completed'
+                                  ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                  : booking.status === 'cancelled'
+                                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                                  : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                              }`}
+                            >
+                              {booking.status}
+                            </span>
+                            <span className="font-extrabold text-amber-400 text-sm">
+                              R {Number(booking.total_amount).toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+
+                        <div className="flex flex-wrap items-center justify-between text-xs text-zinc-400 pt-1">
+                          <div className="flex items-center space-x-3">
+                            <span className="flex items-center">
+                              <Clock className="mr-1 h-3.5 w-3.5 text-zinc-500" />
+                              {startDate.toLocaleDateString(undefined, {
+                                weekday: 'short',
+                                month: 'short',
+                                day: 'numeric',
+                              })}{' '}
+                              at{' '}
+                              {startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </span>
+                            {booking.service?.duration_minutes && (
+                              <span className="text-zinc-500">
+                                ({booking.service.duration_minutes} mins)
+                              </span>
+                            )}
+                          </div>
+
+                          {isCancellable && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              disabled={cancellingBookingId === booking.id}
+                              onClick={() => handleCancelBooking(booking.id)}
+                              className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs h-7 px-2"
+                            >
+                              {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel Appointment'}
+                            </Button>
+                          )}
+                        </div>
+
+                        {booking.notes && (
+                          <div className="text-[11px] text-zinc-500 italic">
+                            Notes: &ldquo;{booking.notes}&rdquo;
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
 

@@ -131,4 +131,146 @@ export class AdminBarbershopService {
     }
     return { success: true };
   }
+
+  /**
+   * Lists all barbershop staff.
+   */
+  static async listStaff(): Promise<any[]> {
+    const admin = getSupabaseAdminClient();
+    const { data, error } = await admin
+      .from('staff')
+      .select('*')
+      .order('display_name', { ascending: true });
+
+    if (error || !data) {
+      console.error('Failed to list staff:', error);
+      return [];
+    }
+    return data;
+  }
+
+  /**
+   * Creates a new staff/barber member.
+   */
+  static async createStaff(input: {
+    display_name: string;
+    bio?: string;
+    user_id?: string | null;
+    is_active?: boolean;
+  }): Promise<{ success: boolean; staff?: any; error?: string }> {
+    const admin = getSupabaseAdminClient();
+    const { data, error } = await admin
+      .from('staff')
+      .insert({
+        display_name: input.display_name,
+        bio: input.bio || '',
+        user_id: input.user_id || null,
+        is_active: input.is_active !== undefined ? input.is_active : true,
+      })
+      .select()
+      .single();
+
+    if (error || !data) {
+      return { success: false, error: error?.message || 'Failed to create staff' };
+    }
+    return { success: true, staff: data };
+  }
+
+  /**
+   * Updates an existing staff/barber member.
+   */
+  static async updateStaff(
+    id: string,
+    input: { display_name?: string; bio?: string; is_active?: boolean; user_id?: string | null }
+  ): Promise<{ success: boolean; staff?: any; error?: string }> {
+    const admin = getSupabaseAdminClient();
+    const { data, error } = await admin
+      .from('staff')
+      .update(input)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error || !data) {
+      return { success: false, error: error?.message || 'Failed to update staff' };
+    }
+    return { success: true, staff: data };
+  }
+
+  /**
+   * Deletes a staff/barber member.
+   */
+  static async deleteStaff(id: string): Promise<{ success: boolean; error?: string }> {
+    const admin = getSupabaseAdminClient();
+    const { error } = await admin.from('staff').delete().eq('id', id);
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  }
+
+  /**
+   * Lists all bookings across the platform with joined service, staff, and customer profile details.
+   */
+  static async listBookings(filters?: {
+    date?: string;
+    staffId?: string;
+    status?: string;
+  }): Promise<any[]> {
+    const admin = getSupabaseAdminClient();
+
+    let query = admin
+      .from('bookings')
+      .select(`
+        *,
+        service:services(*),
+        staff:staff(*),
+        customer:profiles(*)
+      `)
+      .order('start_time', { ascending: false });
+
+    if (filters?.date) {
+      const [year, month, day] = filters.date.split('-').map(Number);
+      const dayStart = new Date(Date.UTC(year, month - 1, day, 0, 0, 0)).toISOString();
+      const dayEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59)).toISOString();
+      query = query.gte('start_time', dayStart).lte('start_time', dayEnd);
+    }
+
+    if (filters?.staffId && filters.staffId !== 'all') {
+      query = query.eq('staff_id', filters.staffId);
+    }
+
+    if (filters?.status && filters.status !== 'all') {
+      query = query.eq('status', filters.status);
+    }
+
+    const { data, error } = await query;
+    if (error || !data) {
+      console.error('Failed to list bookings:', error);
+      return [];
+    }
+    return data;
+  }
+
+  /**
+   * Updates an appointment's status (confirmed, completed, cancelled, no_show).
+   */
+  static async updateBookingStatus(
+    id: string,
+    status: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const admin = getSupabaseAdminClient();
+    const { error } = await admin
+      .from('bookings')
+      .update({
+        status,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  }
 }
