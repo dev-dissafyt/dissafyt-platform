@@ -78,3 +78,43 @@ export function PayfastButton({
     </form>
   );
 }
+
+export function PayfastProductButton({
+  productName,
+  amount,
+  description,
+  receiver = DEFAULT_RECEIVER,
+  returnUrl = DEFAULT_SITE_URL,
+  cancelUrl = DEFAULT_SITE_URL,
+  notifyUrl = `${DEFAULT_SITE_URL}/api/payments/payfast-notify`,
+  className,
+}: {
+  productName: string;
+  amount: number | string;
+  description?: string;
+  receiver?: string;
+  returnUrl?: string;
+  cancelUrl?: string;
+  notifyUrl?: string;
+  className?: string;
+}) {
+  const formattedAmount = Number(amount).toFixed(2);
+  return (
+    <form action={PAYFAST_ACTION} method="post" className="w-full">
+      <input type="hidden" name="cmd" value="_paynow" />
+      <input type="hidden" name="receiver" value={receiver} />
+      <input type="hidden" name="return_url" value={returnUrl} />
+      <input type="hidden" name="cancel_url" value={cancelUrl} />
+      <input type="hidden" name="notify_url" value={notifyUrl} />
+      <input type="hidden" name="amount" value={formattedAmount} />
+      <input type="hidden" name="item_name" value={productName} />
+      <input type="hidden" name="item_description" value={description || productName} />
+      <Button
+        type="submit"
+        className={className || 'w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold'}
+      >
+        Buy with PayFast (R {formattedAmount})
+      </Button>
+    </form>
+  );
+}

@@ -106,6 +106,10 @@ export interface BarberService {
   duration_minutes: number;
   price: number;
   is_active: boolean;
+  is_subscription?: boolean;
+  plan_code?: string | null;
+  billing_frequency?: number;
+  billing_cycles?: number;
   created_at: string;
 }
 
