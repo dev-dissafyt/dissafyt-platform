@@ -152,3 +152,36 @@ Applied database migration `0001_initial_schema.sql` to Supabase PostgreSQL, con
 
 ### Lessons learned
 Automating profile provisioning via PostgreSQL triggers on `auth.users` prevents race conditions between auth and application data, ensuring an ironclad customer identity layer.
+
+---
+
+## Entry: Phase 5 — Admin Application Operations
+
+### Date
+2026-09-08
+
+### Phase
+Phase 5 — Admin Application
+
+### Objective
+Provide full operational back-office capabilities in `apps/admin`: manage commerce products with PayFast buy buttons, manage barbershop services & recurring subscriptions, and manage platform customer roles.
+
+### Problem
+Platform administrators need operational control over the product catalog and barbershop services without touching the database manually, while ensuring live sync to public customer storefronts.
+
+### Decision
+- Built decoupled service classes in `@dissafyt/api`: `AdminProductService`, `AdminBarbershopService`, and `AdminUserService`.
+- Exposed RESTful Next.js Route Handlers in `apps/admin/app/api/...` for products, categories, services, users, and admin bootstrapping.
+- Added `PayfastProductButton` to `@dissafyt/ui` so products feature live South African PayFast checkout.
+- Connected customer pages (`/shop` and `/book`) dynamically to database APIs.
+
+### Implementation
+- `apps/admin/app/commerce/page.tsx`: Product table, Add Product modal with category selection and variant stock, status toggle, delete.
+- `apps/admin/app/barbershop/page.tsx`: Barbershop services table, Add Service/Membership modal with recurring subscription parameters, status toggle, delete.
+- `apps/admin/app/customers/page.tsx`: Customer directory with role management (`admin`, `barber`, `staff`).
+- `apps/admin/app/settings/page.tsx`: System settings and "Bootstrap First Admin" utility.
+
+### Testing
+- Executed `verify-admin.mjs`: verified category creation, product creation, variant association, barbershop service creation, and cleanup.
+- Ran full Turborepo build (`pnpm build`): both apps compiled cleanly with 0 type errors.
+

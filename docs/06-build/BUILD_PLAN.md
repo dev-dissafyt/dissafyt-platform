@@ -97,12 +97,12 @@ A real customer can use the platform through the web interface.
 
 # Phase 5 — Admin Application
 
-- [ ] Create separate admin app
-- [ ] Connect shared authentication
-- [ ] Implement admin authorization
-- [ ] Create dashboard
-- [ ] Customer management
-- [ ] Basic settings
+- [x] Create separate admin app
+- [x] Connect shared authentication
+- [x] Implement admin authorization
+- [x] Create dashboard
+- [x] Customer management
+- [x] Basic settings
 
 Exit condition:
 
