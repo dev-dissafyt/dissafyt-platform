@@ -4,7 +4,8 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabaseBrowserClient } from '@dissafyt/database';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from '@dissafyt/ui';
-import { User, ShoppingBag, Scissors, LogOut, CheckCircle2, Shield } from 'lucide-react';
+import { User, ShoppingBag, Scissors, LogOut, CheckCircle2, Shield, Clock, Package, Truck, ExternalLink } from 'lucide-react';
+import Link from 'next/link';
 
 interface UserData {
   id: string;
@@ -15,10 +16,33 @@ interface UserData {
   roles: string[];
 }
 
+interface OrderItem {
+  id: string;
+  product_name: string;
+  unit_price: number;
+  quantity: number;
+  total_price: number;
+}
+
+interface Order {
+  id: string;
+  order_number: string;
+  status: string;
+  total: number;
+  created_at: string;
+  order_items: OrderItem[];
+  shipping_address?: {
+    city?: string;
+    province?: string;
+    street_address?: string;
+  };
+}
+
 export default function AccountPage() {
   const router = useRouter();
   const [user, setUser] = useState<UserData | null>(null);
   const [token, setToken] = useState<string | null>(null);
+  const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [fullName, setFullName] = useState('');
@@ -39,19 +63,17 @@ export default function AccountPage() {
       setToken(accessToken);
 
       try {
-        const res = await fetch('/api/users/me', {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        });
+        const [userRes, ordersRes] = await Promise.all([
+          fetch('/api/users/me', { headers: { Authorization: `Bearer ${accessToken}` } }),
+          fetch('/api/orders', { headers: { Authorization: `Bearer ${accessToken}` } }),
+        ]);
 
-        if (res.ok) {
-          const profileData: UserData = await res.json();
+        if (userRes.ok) {
+          const profileData: UserData = await userRes.json();
           setUser(profileData);
           setFullName(profileData.full_name || '');
           setPhone(profileData.phone || '');
         } else {
-          // Fallback to session user data
           setUser({
             id: data.session.user.id,
             email: data.session.user.email,
@@ -60,8 +82,13 @@ export default function AccountPage() {
           });
           setFullName(data.session.user.user_metadata?.full_name || '');
         }
+
+        if (ordersRes.ok) {
+          const ordersData = await ordersRes.json();
+          setOrders(ordersData);
+        }
       } catch (e) {
-        console.error('Error fetching /api/users/me:', e);
+        console.error('Error fetching account data:', e);
       } finally {
         setLoading(false);
       }
@@ -118,7 +145,7 @@ export default function AccountPage() {
   }
 
   return (
-    <div className="container mx-auto max-w-4xl px-4 py-12 space-y-8">
+    <div className="container mx-auto max-w-5xl px-4 py-12 space-y-8">
       {/* Profile Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
         <div>
@@ -154,7 +181,7 @@ export default function AccountPage() {
                 Profile Information
               </CardTitle>
               <CardDescription>
-                Updates here synchronize across your orders and appointment bookings.
+                Updates here synchronize across your apparel purchases and barbershop appointments.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -173,7 +200,7 @@ export default function AccountPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone (for appointment reminders)</Label>
+                  <Label htmlFor="phone">Phone (for appointment and Courier Guy delivery SMS)</Label>
                   <Input
                     id="phone"
                     value={phone}
@@ -192,34 +219,85 @@ export default function AccountPage() {
             </CardContent>
           </Card>
 
-          {/* Unified Activity Hub */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Card className="border-zinc-800 bg-zinc-900/40 p-5">
-              <div className="flex items-center space-x-3 mb-2">
-                <ShoppingBag className="h-5 w-5 text-amber-500" />
-                <h3 className="font-semibold text-white">Orders</h3>
+          {/* Unified Order History */}
+          <Card className="border-zinc-800 bg-zinc-900/60">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-xl text-white flex items-center">
+                  <ShoppingBag className="mr-2 h-5 w-5 text-amber-500" />
+                  Apparel Orders ({orders.length})
+                </CardTitle>
+                <CardDescription>Streetwear purchases and delivery progress</CardDescription>
               </div>
-              <p className="text-xs text-zinc-400 mb-4">
-                View your streetwear apparel purchases and delivery statuses.
-              </p>
-              <span className="inline-flex rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-400">
-                0 Active Orders
-              </span>
-            </Card>
+              <Link href="/shop">
+                <Button variant="ghost" size="sm" className="text-amber-400 hover:text-amber-300">
+                  Shop Catalog <ExternalLink className="ml-1 h-3.5 w-3.5" />
+                </Button>
+              </Link>
+            </CardHeader>
+            <CardContent>
+              {orders.length === 0 ? (
+                <div className="text-center py-8 text-sm text-zinc-500 space-y-2">
+                  <Package className="mx-auto h-8 w-8 text-zinc-600" />
+                  <p>You haven&apos;t placed any clothing orders yet.</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {orders.map((order) => (
+                    <div
+                      key={order.id}
+                      className="border border-zinc-800/80 rounded-lg p-4 bg-zinc-950/40 space-y-3"
+                    >
+                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-2">
+                        <div>
+                          <span className="font-mono font-bold text-white text-sm">
+                            {order.order_number}
+                          </span>
+                          <span className="text-xs text-zinc-500 ml-2">
+                            {new Date(order.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                        <div className="flex items-center space-x-2">
+                          <span
+                            className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${
+                              order.status === 'paid'
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                : order.status === 'shipped'
+                                ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                            }`}
+                          >
+                            {order.status.replace('_', ' ')}
+                          </span>
+                          <span className="font-extrabold text-amber-400 text-sm">
+                            R {Number(order.total).toFixed(2)}
+                          </span>
+                        </div>
+                      </div>
 
-            <Card className="border-zinc-800 bg-zinc-900/40 p-5">
-              <div className="flex items-center space-x-3 mb-2">
-                <Scissors className="h-5 w-5 text-amber-500" />
-                <h3 className="font-semibold text-white">Bookings</h3>
-              </div>
-              <p className="text-xs text-zinc-400 mb-4">
-                Upcoming barber appointments and styling sessions.
-              </p>
-              <span className="inline-flex rounded bg-zinc-800 px-2 py-1 text-xs text-zinc-400">
-                0 Active Bookings
-              </span>
-            </Card>
-          </div>
+                      <div className="text-xs text-zinc-400 space-y-1">
+                        {order.order_items?.map((item) => (
+                          <div key={item.id} className="flex justify-between">
+                            <span>
+                              {item.quantity}x {item.product_name}
+                            </span>
+                            <span>R {Number(item.total_price).toFixed(2)}</span>
+                          </div>
+                        ))}
+                      </div>
+
+                      {order.shipping_address && (
+                        <div className="text-[11px] text-zinc-500 flex items-center pt-1 border-t border-zinc-800/50">
+                          <Truck className="h-3 w-3 mr-1 text-zinc-400" />
+                          Delivery to: {order.shipping_address.street_address}, {order.shipping_address.city}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </CardContent>
+          </Card>
         </div>
 
         {/* Roles & Security Column */}
@@ -242,6 +320,17 @@ export default function AccountPage() {
                 </div>
               ))}
             </CardContent>
+          </Card>
+
+          {/* Quick shortcuts */}
+          <Card className="border-zinc-800 bg-zinc-900/60 p-4 space-y-3 text-sm">
+            <div className="font-semibold text-white">Quick Actions</div>
+            <Link href="/book" className="block text-zinc-400 hover:text-amber-400 text-xs">
+              &bull; Book Barber Appointment
+            </Link>
+            <Link href="/shop" className="block text-zinc-400 hover:text-amber-400 text-xs">
+              &bull; Explore Clothing Catalog
+            </Link>
           </Card>
         </div>
       </div>

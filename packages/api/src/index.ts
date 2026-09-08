@@ -4,3 +4,5 @@ export * from './validators/user-schema';
 export * from './admin/admin-product-service';
 export * from './admin/admin-barbershop-service';
 export * from './admin/admin-user-service';
+export * from './commerce/payfast-service';
+export * from './commerce/order-service';

@@ -48,7 +48,14 @@ export default function AdminLayout({
                 className="flex items-center space-x-3 rounded-md px-3 py-2 text-stone-300 hover:bg-stone-800 hover:text-white transition-colors"
               >
                 <ShoppingBag className="h-4 w-4 text-amber-500" />
-                <span>Commerce</span>
+                <span>Products & Catalog</span>
+              </Link>
+              <Link
+                href="/commerce/orders"
+                className="flex items-center space-x-3 rounded-md px-3 py-2 text-stone-300 hover:bg-stone-800 hover:text-white transition-colors pl-6 text-xs"
+              >
+                <span className="text-amber-400">&bull;</span>
+                <span>Customer Orders</span>
               </Link>
               <Link
                 href="/barbershop"

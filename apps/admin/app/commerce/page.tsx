@@ -1,8 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input, Label } from '@dissafyt/ui';
-import { ShoppingBag, Plus, Trash2, CheckCircle, XCircle, Tag, Layers, RefreshCw } from 'lucide-react';
+import { ShoppingBag, Plus, Trash2, CheckCircle, XCircle, Tag, Layers, RefreshCw, Package } from 'lucide-react';
 
 interface Variant {
   id?: string;
@@ -170,6 +171,15 @@ export default function AdminCommercePage() {
         </div>
 
         <div className="flex items-center space-x-3">
+          <Link href="/commerce/orders">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10 font-semibold"
+            >
+              <Package className="mr-2 h-4 w-4" /> View Customer Orders
+            </Button>
+          </Link>
           <Button
             variant="outline"
             size="sm"

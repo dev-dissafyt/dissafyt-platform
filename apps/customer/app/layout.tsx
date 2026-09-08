@@ -42,6 +42,12 @@ export default function RootLayout({
 
             <div className="flex items-center space-x-3">
               <Link
+                href="/checkout"
+                className="inline-flex h-9 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900/60 px-3 text-sm font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+              >
+                Cart
+              </Link>
+              <Link
                 href="/auth/login"
                 className="inline-flex h-9 items-center justify-center rounded-md border border-zinc-700 bg-zinc-900 px-4 text-sm font-medium text-zinc-200 transition-colors hover:bg-zinc-800"
               >
