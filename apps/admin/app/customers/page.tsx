@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input } from '@dissafyt/ui';
 import { Users, Shield, UserCheck, RefreshCw, Search } from 'lucide-react';
+import { adminFetch } from '../../lib/operator';
 
 interface UserItem {
   id: string;
@@ -22,7 +23,7 @@ export default function AdminCustomersPage() {
   async function loadUsers() {
     setLoading(true);
     try {
-      const res = await fetch('/api/users');
+      const res = await adminFetch('/api/users');
       if (res.ok) setUsers(await res.json());
     } catch (e) {
       console.error(e);
@@ -38,7 +39,7 @@ export default function AdminCustomersPage() {
   async function handleToggleRole(userId: string, role: string, currentlyHas: boolean) {
     setStatusMsg(null);
     try {
-      const res = await fetch('/api/users', {
+      const res = await adminFetch('/api/users', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

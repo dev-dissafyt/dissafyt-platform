@@ -1,4 +1,5 @@
 import { getSupabaseAdminClient, BarberService } from '@dissafyt/database';
+import { AuditService } from '../audit/audit-service';
 
 export interface CreateServiceInput {
   name: string;
@@ -72,6 +73,7 @@ export class AdminBarbershopService {
 
     try {
       const { data, error } = await admin.from('services').insert(payload).select().single();
+      let createdService = data;
       if (error) {
         // Fall back without subscription fields if schema hasn't run migration 0002 yet
         if (error.code === 'PGRST204') {
@@ -86,23 +88,40 @@ export class AdminBarbershopService {
             .single();
 
           if (fallbackError) return { success: false, error: fallbackError.message };
-          return { success: true, service: fallbackData };
+          createdService = fallbackData;
+        } else {
+          return { success: false, error: error.message };
         }
-        return { success: false, error: error.message };
       }
-      return { success: true, service: data };
+
+      // Invisible Audit Trail
+      await AuditService.recordLog({
+        action: 'service.create',
+        entity_type: 'service',
+        entity_id: createdService.id,
+        entity_name: createdService.name,
+        changes: createdService,
+      });
+
+      return { success: true, service: createdService };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
   }
 
   /**
-   * Updates an existing service.
+   * Updates an existing service with invisible audit logging.
    */
-  static async updateService(id: string, input: UpdateServiceInput): Promise<{ success: boolean; service?: BarberService; error?: string }> {
+  static async updateService(
+    id: string,
+    input: UpdateServiceInput,
+    actor?: { email?: string; role?: string }
+  ): Promise<{ success: boolean; service?: BarberService; error?: string }> {
     const admin = getSupabaseAdminClient();
     try {
+      const { data: beforeData } = await admin.from('services').select('*').eq('id', id).single();
       const payload: any = { ...input };
+      let updatedService: any;
       const { data, error } = await admin.from('services').update(payload).eq('id', id).select().single();
       if (error) {
         if (error.code === 'PGRST204') {
@@ -110,26 +129,65 @@ export class AdminBarbershopService {
           delete payload.plan_code;
           const { data: fbData, error: fbError } = await admin.from('services').update(payload).eq('id', id).select().single();
           if (fbError) return { success: false, error: fbError.message };
-          return { success: true, service: fbData };
+          updatedService = fbData;
+        } else {
+          return { success: false, error: error.message };
         }
-        return { success: false, error: error.message };
+      } else {
+        updatedService = data;
       }
-      return { success: true, service: data };
+
+      // Invisible Audit Trail
+      await AuditService.recordLog({
+        actor_email: actor?.email || 'admin@dissafyt.com',
+        actor_role: actor?.role || 'admin',
+        action: 'service.update',
+        entity_type: 'service',
+        entity_id: id,
+        entity_name: updatedService?.name || beforeData?.name,
+        changes: {
+          before: beforeData,
+          after: updatedService,
+          updated_fields: input,
+        },
+      });
+
+      return { success: true, service: updatedService };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
   }
 
   /**
-   * Deletes a service by ID.
+   * Deletes a service by ID with invisible audit logging.
    */
-  static async deleteService(id: string): Promise<{ success: boolean; error?: string }> {
+  static async deleteService(
+    id: string,
+    actor?: { email?: string; role?: string }
+  ): Promise<{ success: boolean; error?: string }> {
     const admin = getSupabaseAdminClient();
-    const { error } = await admin.from('services').delete().eq('id', id);
-    if (error) {
-      return { success: false, error: error.message };
+    try {
+      const { data: existing } = await admin.from('services').select('*').eq('id', id).single();
+      const { error } = await admin.from('services').delete().eq('id', id);
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      // Invisible Audit Trail
+      await AuditService.recordLog({
+        actor_email: actor?.email || 'admin@dissafyt.com',
+        actor_role: actor?.role || 'admin',
+        action: 'service.delete',
+        entity_type: 'service',
+        entity_id: id,
+        entity_name: existing?.name || id,
+        changes: existing,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
-    return { success: true };
   }
 
   /**
@@ -150,14 +208,17 @@ export class AdminBarbershopService {
   }
 
   /**
-   * Creates a new staff/barber member.
+   * Creates a new staff/barber member with invisible audit logging.
    */
-  static async createStaff(input: {
-    display_name: string;
-    bio?: string;
-    user_id?: string | null;
-    is_active?: boolean;
-  }): Promise<{ success: boolean; staff?: any; error?: string }> {
+  static async createStaff(
+    input: {
+      display_name: string;
+      bio?: string;
+      user_id?: string | null;
+      is_active?: boolean;
+    },
+    actor?: { email?: string; role?: string }
+  ): Promise<{ success: boolean; staff?: any; error?: string }> {
     const admin = getSupabaseAdminClient();
     const { data, error } = await admin
       .from('staff')
@@ -173,40 +234,94 @@ export class AdminBarbershopService {
     if (error || !data) {
       return { success: false, error: error?.message || 'Failed to create staff' };
     }
+
+    // Invisible Audit Trail
+    await AuditService.recordLog({
+      actor_email: actor?.email || 'admin@dissafyt.com',
+      actor_role: actor?.role || 'admin',
+      action: 'staff.create',
+      entity_type: 'staff',
+      entity_id: data.id,
+      entity_name: data.display_name,
+      changes: data,
+    });
+
     return { success: true, staff: data };
   }
 
   /**
-   * Updates an existing staff/barber member.
+   * Updates an existing staff/barber member with invisible audit logging.
    */
   static async updateStaff(
     id: string,
-    input: { display_name?: string; bio?: string; is_active?: boolean; user_id?: string | null }
+    input: { display_name?: string; bio?: string; phone?: string; avatar_url?: string; working_hours?: any; is_active?: boolean; user_id?: string | null },
+    actor?: { email?: string; role?: string }
   ): Promise<{ success: boolean; staff?: any; error?: string }> {
     const admin = getSupabaseAdminClient();
-    const { data, error } = await admin
-      .from('staff')
-      .update(input)
-      .eq('id', id)
-      .select()
-      .single();
+    try {
+      const { data: beforeData } = await admin.from('staff').select('*').eq('id', id).single();
+      const { data, error } = await admin
+        .from('staff')
+        .update(input)
+        .eq('id', id)
+        .select()
+        .single();
 
-    if (error || !data) {
-      return { success: false, error: error?.message || 'Failed to update staff' };
+      if (error || !data) {
+        return { success: false, error: error?.message || 'Failed to update staff' };
+      }
+
+      // Invisible Audit Trail
+      await AuditService.recordLog({
+        actor_email: actor?.email || 'admin@dissafyt.com',
+        actor_role: actor?.role || 'admin',
+        action: 'staff.update',
+        entity_type: 'staff',
+        entity_id: id,
+        entity_name: data.display_name,
+        changes: {
+          before: beforeData,
+          after: data,
+          updated_fields: input,
+        },
+      });
+
+      return { success: true, staff: data };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
-    return { success: true, staff: data };
   }
 
   /**
-   * Deletes a staff/barber member.
+   * Deletes a staff/barber member with invisible audit logging.
    */
-  static async deleteStaff(id: string): Promise<{ success: boolean; error?: string }> {
+  static async deleteStaff(
+    id: string,
+    actor?: { email?: string; role?: string }
+  ): Promise<{ success: boolean; error?: string }> {
     const admin = getSupabaseAdminClient();
-    const { error } = await admin.from('staff').delete().eq('id', id);
-    if (error) {
-      return { success: false, error: error.message };
+    try {
+      const { data: existing } = await admin.from('staff').select('*').eq('id', id).single();
+      const { error } = await admin.from('staff').delete().eq('id', id);
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      // Invisible Audit Trail
+      await AuditService.recordLog({
+        actor_email: actor?.email || 'admin@dissafyt.com',
+        actor_role: actor?.role || 'admin',
+        action: 'staff.delete',
+        entity_type: 'staff',
+        entity_id: id,
+        entity_name: existing?.display_name || id,
+        changes: existing,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
-    return { success: true };
   }
 
   /**

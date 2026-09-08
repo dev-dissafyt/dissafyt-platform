@@ -1,4 +1,5 @@
 import { getSupabaseAdminClient, Product, ProductVariant, ProductCategory } from '@dissafyt/database';
+import { AuditService } from '../audit/audit-service';
 
 export interface CreateProductInput {
   name: string;
@@ -24,6 +25,7 @@ export interface UpdateProductInput {
   base_price?: number;
   is_active?: boolean;
   images?: string[];
+  stock_quantity?: number;
 }
 
 export class AdminProductService {
@@ -61,9 +63,12 @@ export class AdminProductService {
   }
 
   /**
-   * Creates a new product and initial variant in PostgreSQL.
+   * Creates a new product and initial variant in PostgreSQL with invisible audit logging.
    */
-  static async createProduct(input: CreateProductInput): Promise<{ success: boolean; product?: Product; error?: string }> {
+  static async createProduct(
+    input: CreateProductInput,
+    actor?: { email?: string; role?: string; id?: string }
+  ): Promise<{ success: boolean; product?: Product; error?: string }> {
     const admin = getSupabaseAdminClient();
     const slug = input.slug || input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
 
@@ -107,6 +112,18 @@ export class AdminProductService {
 
       await admin.from('product_variants').insert(variantsToInsert);
 
+      // Invisible Audit Trail
+      await AuditService.recordLog({
+        actor_id: actor?.id,
+        actor_email: actor?.email || 'admin@dissafyt.com',
+        actor_role: actor?.role || 'admin',
+        action: 'product.create',
+        entity_type: 'product',
+        entity_id: product.id,
+        entity_name: product.name,
+        changes: product,
+      });
+
       return { success: true, product };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -114,15 +131,24 @@ export class AdminProductService {
   }
 
   /**
-   * Updates an existing product.
+   * Updates an existing product with invisible audit logging and stock updates.
    */
-  static async updateProduct(id: string, input: UpdateProductInput): Promise<{ success: boolean; product?: Product; error?: string }> {
+  static async updateProduct(
+    id: string,
+    input: UpdateProductInput,
+    actor?: { email?: string; role?: string; id?: string }
+  ): Promise<{ success: boolean; product?: Product; error?: string }> {
     const admin = getSupabaseAdminClient();
     try {
+      // Fetch current snapshot before update for diff
+      const { data: beforeData } = await admin.from('products').select('*').eq('id', id).single();
+
+      const { stock_quantity, ...productFields } = input;
+
       const { data, error } = await admin
         .from('products')
         .update({
-          ...input,
+          ...productFields,
           updated_at: new Date().toISOString(),
         })
         .eq('id', id)
@@ -132,6 +158,31 @@ export class AdminProductService {
       if (error) {
         return { success: false, error: error.message };
       }
+
+      // Update variant stock if stock_quantity was supplied
+      if (stock_quantity !== undefined) {
+        await admin
+          .from('product_variants')
+          .update({ stock_quantity: Math.max(0, stock_quantity) })
+          .eq('product_id', id);
+      }
+
+      // Invisible Audit Trail
+      await AuditService.recordLog({
+        actor_id: actor?.id,
+        actor_email: actor?.email || 'admin@dissafyt.com',
+        actor_role: actor?.role || 'admin',
+        action: 'product.update',
+        entity_type: 'product',
+        entity_id: id,
+        entity_name: data.name,
+        changes: {
+          before: beforeData,
+          after: data,
+          updated_fields: input,
+        },
+      });
+
       return { success: true, product: data };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -139,15 +190,37 @@ export class AdminProductService {
   }
 
   /**
-   * Deletes a product by ID.
+   * Deletes a product by ID with invisible audit logging.
    */
-  static async deleteProduct(id: string): Promise<{ success: boolean; error?: string }> {
+  static async deleteProduct(
+    id: string,
+    actor?: { email?: string; role?: string; id?: string }
+  ): Promise<{ success: boolean; error?: string }> {
     const admin = getSupabaseAdminClient();
-    const { error } = await admin.from('products').delete().eq('id', id);
-    if (error) {
-      return { success: false, error: error.message };
+    try {
+      const { data: existing } = await admin.from('products').select('*').eq('id', id).single();
+
+      const { error } = await admin.from('products').delete().eq('id', id);
+      if (error) {
+        return { success: false, error: error.message };
+      }
+
+      // Invisible Audit Trail
+      await AuditService.recordLog({
+        actor_id: actor?.id,
+        actor_email: actor?.email || 'admin@dissafyt.com',
+        actor_role: actor?.role || 'admin',
+        action: 'product.delete',
+        entity_type: 'product',
+        entity_id: id,
+        entity_name: existing?.name || id,
+        changes: existing,
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
     }
-    return { success: true };
   }
 
   /**

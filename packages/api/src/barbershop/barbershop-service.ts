@@ -1,4 +1,5 @@
-import { getSupabaseAdminClient, BarberService, Booking, BookingWithDetails, Staff, BookingStatus } from '@dissafyt/database';
+import { getSupabaseAdminClient, BarberService, Booking, BookingWithDetails, Staff, BookingStatus, BarbershopLocation } from '@dissafyt/database';
+import { AuditService } from '../audit/audit-service';
 
 export const SAST_TIMEZONE = 'Africa/Johannesburg';
 export const SAST_OFFSET = '+02:00';
@@ -61,21 +62,6 @@ export function getEffectiveDurationMinutes(durationMinutes: number): number {
   return Math.ceil(Math.max(1, durationMinutes) / SLOT_STEP_MINUTES) * SLOT_STEP_MINUTES;
 }
 
-export interface BarbershopLocation {
-  id: string;
-  name: string;
-  slug: string;
-  address: string;
-  city: string;
-  province: string;
-  country: string;
-  phone: string;
-  is_flagship: boolean;
-  is_active: boolean;
-  capacity_chairs: number;
-  operating_hours_display: string;
-}
-
 export const DEFAULT_LOCATIONS: BarbershopLocation[] = [
   {
     id: 'loc-jhb-flagship',
@@ -92,6 +78,9 @@ export const DEFAULT_LOCATIONS: BarbershopLocation[] = [
     operating_hours_display: 'Mon-Fri: 09:00 - 18:00 | Sat: 09:00 - 17:00 | Sun: Closed',
   },
 ];
+
+// Runtime store for real-time location mutations
+let RUNTIME_LOCATIONS: BarbershopLocation[] = [...DEFAULT_LOCATIONS];
 
 export interface AvailableSlot {
   time: string; // e.g. "09:00"
@@ -111,10 +100,141 @@ export interface CreateBookingInput {
 
 export class BarbershopService {
   /**
-   * Lists all barbershop physical locations / studios.
+   * Lists all barbershop physical locations / studios from DB or runtime fallback.
    */
   static async listLocations(): Promise<BarbershopLocation[]> {
-    return DEFAULT_LOCATIONS;
+    const admin = getSupabaseAdminClient();
+    try {
+      const { data, error } = await admin
+        .from('locations')
+        .select('*')
+        .order('is_flagship', { ascending: false });
+
+      if (!error && data && data.length > 0) {
+        // Sync runtime locations
+        RUNTIME_LOCATIONS = data;
+        return data;
+      }
+    } catch {
+      // Fallback
+    }
+
+    return RUNTIME_LOCATIONS;
+  }
+
+  /**
+   * Registers a new studio location with invisible audit logging.
+   */
+  static async createLocation(
+    input: Omit<BarbershopLocation, 'id'>,
+    actor?: { email?: string; role?: string }
+  ): Promise<{ success: boolean; location?: BarbershopLocation; error?: string }> {
+    const admin = getSupabaseAdminClient();
+    const id = `loc-${input.slug || Date.now()}`;
+    const newLoc: BarbershopLocation = {
+      ...input,
+      id,
+    };
+
+    try {
+      await admin.from('locations').insert(newLoc);
+    } catch {
+      // Fallback
+    }
+
+    // Update in-memory runtime store
+    RUNTIME_LOCATIONS.push(newLoc);
+
+    // Invisible Audit Trail
+    await AuditService.recordLog({
+      actor_email: actor?.email || 'admin@dissafyt.com',
+      actor_role: actor?.role || 'admin',
+      action: 'location.create',
+      entity_type: 'location',
+      entity_id: id,
+      entity_name: newLoc.name,
+      changes: newLoc,
+    });
+
+    return { success: true, location: newLoc };
+  }
+
+  /**
+   * Updates an existing studio location with invisible audit logging.
+   */
+  static async updateLocation(
+    id: string,
+    input: Partial<BarbershopLocation>,
+    actor?: { email?: string; role?: string }
+  ): Promise<{ success: boolean; location?: BarbershopLocation; error?: string }> {
+    const admin = getSupabaseAdminClient();
+    const existing = RUNTIME_LOCATIONS.find((l) => l.id === id);
+
+    try {
+      await admin.from('locations').update({ ...input, updated_at: new Date().toISOString() }).eq('id', id);
+    } catch {
+      // Fallback
+    }
+
+    // Update runtime store
+    const idx = RUNTIME_LOCATIONS.findIndex((l) => l.id === id);
+    if (idx !== -1) {
+      RUNTIME_LOCATIONS[idx] = { ...RUNTIME_LOCATIONS[idx], ...input };
+    }
+
+    const updated = RUNTIME_LOCATIONS.find((l) => l.id === id) || { ...input, id } as BarbershopLocation;
+
+    // Invisible Audit Trail
+    await AuditService.recordLog({
+      actor_email: actor?.email || 'admin@dissafyt.com',
+      actor_role: actor?.role || 'admin',
+      action: 'location.update',
+      entity_type: 'location',
+      entity_id: id,
+      entity_name: updated.name,
+      changes: {
+        before: existing,
+        after: updated,
+      },
+    });
+
+    return { success: true, location: updated };
+  }
+
+  /**
+   * Deletes a studio location with invisible audit logging.
+   */
+  static async deleteLocation(
+    id: string,
+    actor?: { email?: string; role?: string }
+  ): Promise<{ success: boolean; error?: string }> {
+    const admin = getSupabaseAdminClient();
+    const existing = RUNTIME_LOCATIONS.find((l) => l.id === id);
+
+    if (existing?.is_flagship) {
+      return { success: false, error: 'Cannot delete primary flagship studio location' };
+    }
+
+    try {
+      await admin.from('locations').delete().eq('id', id);
+    } catch {
+      // Fallback
+    }
+
+    RUNTIME_LOCATIONS = RUNTIME_LOCATIONS.filter((l) => l.id !== id);
+
+    // Invisible Audit Trail
+    await AuditService.recordLog({
+      actor_email: actor?.email || 'admin@dissafyt.com',
+      actor_role: actor?.role || 'admin',
+      action: 'location.delete',
+      entity_type: 'location',
+      entity_id: id,
+      entity_name: existing?.name || id,
+      changes: existing,
+    });
+
+    return { success: true };
   }
 
   /**

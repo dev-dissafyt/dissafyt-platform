@@ -3,6 +3,7 @@ import Link from 'next/link';
 import Image from 'next/image';
 import './globals.css';
 import { LayoutDashboard, Users, ShoppingBag, Scissors, Settings, ShieldAlert, DollarSign } from 'lucide-react';
+import { OperatorSwitcher } from '../components/operator-switcher';
 
 export const metadata: Metadata = {
   title: 'Dissafyt Platform Administration',
@@ -102,8 +103,11 @@ export default function AdminLayout({
             <div className="text-sm font-semibold text-stone-300">
               Platform Administration
             </div>
-            <div className="text-xs text-stone-500 font-mono">
-              Port: 3001 &bull; API: Shared Platform
+            <div className="flex items-center space-x-4">
+              <OperatorSwitcher />
+              <div className="text-xs text-stone-500 font-mono hidden md:block">
+                Port: 3001 &bull; API: Shared Platform
+              </div>
             </div>
           </header>
           <main className="flex-1 p-8 overflow-auto">{children}</main>

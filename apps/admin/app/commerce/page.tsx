@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input, Label } from '@dissafyt/ui';
-import { ShoppingBag, Plus, Trash2, CheckCircle, XCircle, Tag, Layers, RefreshCw, Package } from 'lucide-react';
+import { ShoppingBag, Plus, Trash2, CheckCircle, XCircle, Tag, Layers, RefreshCw, Package, Pencil } from 'lucide-react';
+import { adminFetch } from '../../lib/operator';
 
 interface Variant {
   id?: string;
@@ -19,6 +20,7 @@ interface Product {
   slug: string;
   description: string;
   base_price: number;
+  category_id?: string;
   category_name?: string;
   is_active: boolean;
   images: string[];
@@ -37,6 +39,17 @@ export default function AdminCommercePage() {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+
+  // Edit Product State
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editSlug, setEditSlug] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editBasePrice, setEditBasePrice] = useState('');
+  const [editCategoryId, setEditCategoryId] = useState('');
+  const [editStockQuantity, setEditStockQuantity] = useState('25');
+  const [editIsActive, setEditIsActive] = useState(true);
+  const [editSubmitting, setEditSubmitting] = useState(false);
 
   // Form State
   const [name, setName] = useState('');
@@ -133,9 +146,57 @@ export default function AdminCommercePage() {
     }
   }
 
+  function openEditModal(prod: Product) {
+    setEditingProduct(prod);
+    setEditName(prod.name);
+    setEditSlug(prod.slug);
+    setEditDescription(prod.description || '');
+    setEditBasePrice(String(prod.base_price));
+    const matchedCat = categories.find((c) => c.name === prod.category_name || c.id === prod.category_id);
+    setEditCategoryId(matchedCat ? matchedCat.id : '');
+    const stock = prod.variants?.reduce((acc, v) => acc + (v.stock_quantity || 0), 0) ?? 25;
+    setEditStockQuantity(String(stock));
+    setEditIsActive(prod.is_active);
+  }
+
+  async function handleSaveEditedProduct(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingProduct) return;
+    setEditSubmitting(true);
+    setStatusMsg(null);
+    try {
+      const res = await adminFetch(`/api/products/${editingProduct.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editName,
+          slug: editSlug,
+          description: editDescription,
+          base_price: parseFloat(editBasePrice) || 0,
+          category_id: editCategoryId || null,
+          stock_quantity: parseInt(editStockQuantity, 10) || 0,
+          is_active: editIsActive,
+        }),
+      });
+
+      if (res.ok) {
+        setStatusMsg(`Product "${editName}" updated successfully in catalog & logged to audit trail.`);
+        setEditingProduct(null);
+        loadData();
+      } else {
+        const data = await res.json();
+        setStatusMsg(data.error || 'Failed to update product');
+      }
+    } catch {
+      setStatusMsg('Network error while updating product');
+    } finally {
+      setEditSubmitting(false);
+    }
+  }
+
   async function toggleProductStatus(product: Product) {
     try {
-      await fetch(`/api/products/${product.id}`, {
+      await adminFetch(`/api/products/${product.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: !product.is_active }),
@@ -149,7 +210,13 @@ export default function AdminCommercePage() {
   async function handleDeleteProduct(id: string) {
     if (!confirm('Are you sure you want to delete this product?')) return;
     try {
-      await fetch(`/api/products/${id}`, { method: 'DELETE' });
+      const res = await adminFetch(`/api/products/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json();
+        setStatusMsg(err.error || 'Failed to delete product');
+        return;
+      }
+      setStatusMsg('Product removed from catalog and logged to audit trail.');
       loadData();
     } catch (e) {
       console.error(e);
@@ -334,6 +401,130 @@ export default function AdminCommercePage() {
         </Card>
       )}
 
+      {/* Edit Product Modal Form */}
+      {editingProduct && (
+        <Card className="border-amber-500/50 bg-stone-900/95 p-6 border shadow-2xl">
+          <CardHeader className="p-0 mb-6">
+            <CardTitle className="text-xl text-white flex items-center">
+              <Pencil className="mr-2 h-5 w-5 text-amber-500" />
+              Edit Product: {editingProduct.name}
+            </CardTitle>
+            <CardDescription>
+              Updates to pricing, category, and inventory are tracked in the database audit log.
+            </CardDescription>
+          </CardHeader>
+
+          <form onSubmit={handleSaveEditedProduct} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-1">
+              <Label>Product Name</Label>
+              <Input
+                value={editName}
+                onChange={(e) => setEditName(e.target.value)}
+                placeholder="e.g. Dissafyt Heavyweight Hoodie"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label>URL Slug</Label>
+              <Input
+                value={editSlug}
+                onChange={(e) => setEditSlug(e.target.value)}
+                placeholder="e.g. dissafyt-heavyweight-hoodie"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Category</Label>
+              <select
+                value={editCategoryId}
+                onChange={(e) => setEditCategoryId(e.target.value)}
+                className="w-full rounded-md border border-stone-700 bg-stone-950 px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+              >
+                <option value="">Uncategorized</option>
+                {categories.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="space-y-1">
+              <Label>Base Price (ZAR)</Label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={editBasePrice}
+                onChange={(e) => setEditBasePrice(e.target.value)}
+                placeholder="e.g. 550.00"
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Inventory Stock Quantity</Label>
+              <Input
+                type="number"
+                min="0"
+                value={editStockQuantity}
+                onChange={(e) => setEditStockQuantity(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-1">
+              <Label>Status</Label>
+              <div className="flex items-center space-x-4 pt-2">
+                <label className="flex items-center space-x-2 text-sm text-stone-200 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={editIsActive}
+                    onChange={() => setEditIsActive(true)}
+                    className="accent-amber-500"
+                  />
+                  <span>Active (Live on Store)</span>
+                </label>
+                <label className="flex items-center space-x-2 text-sm text-stone-200 cursor-pointer">
+                  <input
+                    type="radio"
+                    checked={!editIsActive}
+                    onChange={() => setEditIsActive(false)}
+                    className="accent-amber-500"
+                  />
+                  <span>Inactive (Draft / Hidden)</span>
+                </label>
+              </div>
+            </div>
+
+            <div className="space-y-1 md:col-span-2">
+              <Label>Description</Label>
+              <Input
+                value={editDescription}
+                onChange={(e) => setEditDescription(e.target.value)}
+                placeholder="Fabric weight, embroidery details, sizing fit..."
+              />
+            </div>
+
+            <div className="md:col-span-2 flex justify-end space-x-3 pt-4 border-t border-stone-800">
+              <Button type="button" variant="ghost" onClick={() => setEditingProduct(null)}>
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={editSubmitting}
+                className="bg-amber-500 hover:bg-amber-400 text-black font-semibold"
+              >
+                {editSubmitting ? 'Saving Changes...' : 'Save Changes'}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+
+
       {/* Products Table */}
       <Card className="border-stone-800 bg-stone-900/50">
         <CardHeader>
@@ -419,12 +610,22 @@ export default function AdminCommercePage() {
                             )}
                           </button>
                         </td>
-                        <td className="py-3 px-4 text-right space-x-2">
+                        <td className="py-3 px-4 text-right space-x-1">
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => openEditModal(product)}
+                            className="text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                            title="Edit Product Details"
+                          >
+                            <Pencil className="h-4 w-4" />
+                          </Button>
                           <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => handleDeleteProduct(product.id)}
                             className="text-red-400 hover:text-red-300 hover:bg-red-500/10"
+                            title="Delete Product"
                           >
                             <Trash2 className="h-4 w-4" />
                           </Button>

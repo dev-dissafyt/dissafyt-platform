@@ -31,7 +31,9 @@ import {
   Filter,
   MapPin,
   Building2,
+  Pencil,
 } from 'lucide-react';
+import { adminFetch } from '../../lib/operator';
 
 interface Service {
   id: string;
@@ -48,6 +50,7 @@ interface StaffMember {
   id: string;
   display_name: string;
   bio?: string | null;
+  phone?: string | null;
   is_active: boolean;
   created_at: string;
 }
@@ -124,6 +127,39 @@ export default function AdminBarbershopPage() {
   const [newLocPhone, setNewLocPhone] = useState('');
   const [newLocChairs, setNewLocChairs] = useState('2');
 
+  // --- EDIT MODAL STATES ---
+  // 1. Staff Edit State
+  const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
+  const [editStaffName, setEditStaffName] = useState('');
+  const [editStaffBio, setEditStaffBio] = useState('');
+  const [editStaffPhone, setEditStaffPhone] = useState('');
+  const [editStaffActive, setEditStaffActive] = useState(true);
+  const [editStaffSubmitting, setEditStaffSubmitting] = useState(false);
+
+  // 2. Service Edit State
+  const [editingService, setEditingService] = useState<Service | null>(null);
+  const [editServiceName, setEditServiceName] = useState('');
+  const [editServiceDescription, setEditServiceDescription] = useState('');
+  const [editServiceDuration, setEditServiceDuration] = useState('30');
+  const [editServicePrice, setEditServicePrice] = useState('');
+  const [editServiceIsSubscription, setEditServiceIsSubscription] = useState(false);
+  const [editServicePlanCode, setEditServicePlanCode] = useState('solo');
+  const [editServiceActive, setEditServiceActive] = useState(true);
+  const [editServiceSubmitting, setEditServiceSubmitting] = useState(false);
+
+  // 3. Location Edit State
+  const [editingLocation, setEditingLocation] = useState<BarbershopLocation | null>(null);
+  const [editLocName, setEditLocName] = useState('');
+  const [editLocAddress, setEditLocAddress] = useState('');
+  const [editLocCity, setEditLocCity] = useState('');
+  const [editLocProvince, setEditLocProvince] = useState('');
+  const [editLocPhone, setEditLocPhone] = useState('');
+  const [editLocChairs, setEditLocChairs] = useState('2');
+  const [editLocHours, setEditLocHours] = useState('');
+  const [editLocFlagship, setEditLocFlagship] = useState(false);
+  const [editLocActive, setEditLocActive] = useState(true);
+  const [editLocSubmitting, setEditLocSubmitting] = useState(false);
+
   // --- LOAD DATA ---
   async function loadBookings() {
     setLoadingBookings(true);
@@ -133,7 +169,7 @@ export default function AdminBarbershopPage() {
       if (filterStaffId !== 'all') params.set('staffId', filterStaffId);
       if (filterStatus !== 'all') params.set('status', filterStatus);
 
-      const res = await fetch(`/api/bookings?${params.toString()}`);
+      const res = await adminFetch(`/api/bookings?${params.toString()}`);
       if (res.ok) setBookings(await res.json());
     } catch (e) {
       console.error(e);
@@ -145,7 +181,7 @@ export default function AdminBarbershopPage() {
   async function loadStaff() {
     setLoadingStaff(true);
     try {
-      const res = await fetch('/api/staff');
+      const res = await adminFetch('/api/staff');
       if (res.ok) setStaffList(await res.json());
     } catch (e) {
       console.error(e);
@@ -157,7 +193,7 @@ export default function AdminBarbershopPage() {
   async function loadServices() {
     setLoadingServices(true);
     try {
-      const res = await fetch('/api/services');
+      const res = await adminFetch('/api/services');
       if (res.ok) setServices(await res.json());
     } catch (e) {
       console.error(e);
@@ -169,7 +205,7 @@ export default function AdminBarbershopPage() {
   async function loadLocations() {
     setLoadingLocations(true);
     try {
-      const res = await fetch('/api/locations');
+      const res = await adminFetch('/api/locations');
       if (res.ok) setLocations(await res.json());
     } catch (e) {
       console.error(e);
@@ -178,32 +214,44 @@ export default function AdminBarbershopPage() {
     }
   }
 
-  function handleCreateLocation(e: React.FormEvent) {
+  async function handleCreateLocation(e: React.FormEvent) {
     e.preventDefault();
     if (!newLocName || !newLocAddress) return;
 
-    const newLocation: BarbershopLocation = {
-      id: `loc-${Date.now()}`,
-      name: newLocName,
-      slug: newLocName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-      address: newLocAddress,
-      city: newLocCity || 'Johannesburg',
-      province: 'Gauteng',
-      country: 'South Africa',
-      phone: newLocPhone || '+27 11 000 0000',
-      is_flagship: false,
-      is_active: true,
-      capacity_chairs: parseInt(newLocChairs || '2', 10),
-      operating_hours_display: 'Mon-Fri: 09:00 - 18:00 | Sat: 09:00 - 17:00 | Sun: Closed',
-    };
+    try {
+      const res = await adminFetch('/api/locations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newLocName,
+          slug: newLocName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          address: newLocAddress,
+          city: newLocCity || 'Johannesburg',
+          province: 'Gauteng',
+          country: 'South Africa',
+          phone: newLocPhone || '+27 11 000 0000',
+          is_flagship: false,
+          is_active: true,
+          capacity_chairs: parseInt(newLocChairs || '2', 10),
+          operating_hours_display: 'Mon-Fri: 09:00 - 18:00 | Sat: 09:00 - 17:00 | Sun: Closed',
+        }),
+      });
 
-    setLocations((prev) => [...prev, newLocation]);
-    setShowAddLocationModal(false);
-    setNewLocName('');
-    setNewLocAddress('');
-    setNewLocCity('');
-    setNewLocPhone('');
-    setStatusMsg(`Branch location "${newLocation.name}" registered successfully.`);
+      if (res.ok) {
+        setShowAddLocationModal(false);
+        setNewLocName('');
+        setNewLocAddress('');
+        setNewLocCity('');
+        setNewLocPhone('');
+        setStatusMsg(`Branch location "${newLocName}" registered and logged to audit trail.`);
+        loadLocations();
+      } else {
+        const err = await res.json();
+        setStatusMsg(err.error || 'Failed to register location');
+      }
+    } catch {
+      setStatusMsg('Network error while registering location.');
+    }
   }
 
   useEffect(() => {
@@ -219,7 +267,7 @@ export default function AdminBarbershopPage() {
   // --- APPOINTMENT ACTIONS ---
   async function handleUpdateBookingStatus(id: string, status: string) {
     try {
-      const res = await fetch('/api/bookings', {
+      const res = await adminFetch('/api/bookings', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, status }),
@@ -238,13 +286,52 @@ export default function AdminBarbershopPage() {
   }
 
   // --- STAFF ACTIONS ---
+  function openEditStaffModal(staff: StaffMember) {
+    setEditingStaff(staff);
+    setEditStaffName(staff.display_name);
+    setEditStaffBio(staff.bio || '');
+    setEditStaffPhone(staff.phone || '');
+    setEditStaffActive(staff.is_active);
+  }
+
+  async function handleSaveEditedStaff(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingStaff) return;
+    setEditStaffSubmitting(true);
+    setStatusMsg(null);
+    try {
+      const res = await adminFetch(`/api/staff/${editingStaff.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          display_name: editStaffName,
+          bio: editStaffBio,
+          phone: editStaffPhone,
+          is_active: editStaffActive,
+        }),
+      });
+      if (res.ok) {
+        setStatusMsg(`Barber "${editStaffName}" updated successfully & logged to audit trail.`);
+        setEditingStaff(null);
+        loadStaff();
+      } else {
+        const data = await res.json();
+        setStatusMsg(data.error || 'Failed to update barber');
+      }
+    } catch {
+      setStatusMsg('Network error while updating barber.');
+    } finally {
+      setEditStaffSubmitting(false);
+    }
+  }
+
   async function handleCreateStaff(e: React.FormEvent) {
     e.preventDefault();
     setStaffSubmitting(true);
     setStatusMsg(null);
 
     try {
-      const res = await fetch('/api/staff', {
+      const res = await adminFetch('/api/staff', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -255,7 +342,7 @@ export default function AdminBarbershopPage() {
       });
 
       if (res.ok) {
-        setStatusMsg(`Barber ${staffDisplayName} added successfully!`);
+        setStatusMsg(`Barber ${staffDisplayName} added successfully & logged to audit trail!`);
         setStaffDisplayName('');
         setStaffBio('');
         setShowAddStaffModal(false);
@@ -273,7 +360,7 @@ export default function AdminBarbershopPage() {
 
   async function handleToggleStaffStatus(staff: StaffMember) {
     try {
-      await fetch(`/api/staff/${staff.id}`, {
+      await adminFetch(`/api/staff/${staff.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: !staff.is_active }),
@@ -287,7 +374,13 @@ export default function AdminBarbershopPage() {
   async function handleDeleteStaff(id: string) {
     if (!confirm('Are you sure you want to remove this staff member?')) return;
     try {
-      await fetch(`/api/staff/${id}`, { method: 'DELETE' });
+      const res = await adminFetch(`/api/staff/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json();
+        setStatusMsg(err.error || 'Failed to delete barber');
+        return;
+      }
+      setStatusMsg('Barber removed and logged to audit trail.');
       loadStaff();
     } catch (e) {
       console.error(e);
@@ -295,13 +388,58 @@ export default function AdminBarbershopPage() {
   }
 
   // --- SERVICE ACTIONS ---
+  function openEditServiceModal(service: Service) {
+    setEditingService(service);
+    setEditServiceName(service.name);
+    setEditServiceDescription(service.description || '');
+    setEditServiceDuration(String(service.duration_minutes));
+    setEditServicePrice(String(service.price));
+    setEditServiceIsSubscription(Boolean(service.is_subscription));
+    setEditServicePlanCode(service.plan_code || 'solo');
+    setEditServiceActive(service.is_active);
+  }
+
+  async function handleSaveEditedService(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingService) return;
+    setEditServiceSubmitting(true);
+    setStatusMsg(null);
+    try {
+      const res = await adminFetch(`/api/services/${editingService.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editServiceName,
+          description: editServiceDescription,
+          duration_minutes: parseInt(editServiceDuration, 10) || 30,
+          price: parseFloat(editServicePrice) || 0,
+          is_subscription: editServiceIsSubscription,
+          plan_code: editServiceIsSubscription ? editServicePlanCode : null,
+          is_active: editServiceActive,
+        }),
+      });
+      if (res.ok) {
+        setStatusMsg(`Service "${editServiceName}" updated successfully & logged to audit trail.`);
+        setEditingService(null);
+        loadServices();
+      } else {
+        const data = await res.json();
+        setStatusMsg(data.error || 'Failed to update service');
+      }
+    } catch {
+      setStatusMsg('Network error while updating service.');
+    } finally {
+      setEditServiceSubmitting(false);
+    }
+  }
+
   async function handleCreateService(e: React.FormEvent) {
     e.preventDefault();
     setServiceSubmitting(true);
     setStatusMsg(null);
 
     try {
-      const res = await fetch('/api/services', {
+      const res = await adminFetch('/api/services', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -318,7 +456,7 @@ export default function AdminBarbershopPage() {
       });
 
       if (res.ok) {
-        setStatusMsg('Service / Subscription created successfully!');
+        setStatusMsg('Service created successfully & logged to audit trail!');
         setServiceName('');
         setServiceDescription('');
         setServicePrice('');
@@ -337,7 +475,7 @@ export default function AdminBarbershopPage() {
 
   async function toggleServiceStatus(service: Service) {
     try {
-      await fetch(`/api/services/${service.id}`, {
+      await adminFetch(`/api/services/${service.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ is_active: !service.is_active }),
@@ -351,10 +489,82 @@ export default function AdminBarbershopPage() {
   async function handleDeleteService(id: string) {
     if (!confirm('Are you sure you want to delete this service?')) return;
     try {
-      await fetch(`/api/services/${id}`, { method: 'DELETE' });
+      const res = await adminFetch(`/api/services/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json();
+        setStatusMsg(err.error || 'Failed to delete service');
+        return;
+      }
+      setStatusMsg('Service removed and logged to audit trail.');
       loadServices();
     } catch (e) {
       console.error(e);
+    }
+  }
+
+  // --- LOCATION ACTIONS ---
+  function openEditLocationModal(loc: BarbershopLocation) {
+    setEditingLocation(loc);
+    setEditLocName(loc.name);
+    setEditLocAddress(loc.address);
+    setEditLocCity(loc.city);
+    setEditLocProvince(loc.province);
+    setEditLocPhone(loc.phone || '');
+    setEditLocChairs(String(loc.capacity_chairs));
+    setEditLocHours(loc.operating_hours_display);
+    setEditLocFlagship(loc.is_flagship);
+    setEditLocActive(loc.is_active);
+  }
+
+  async function handleSaveEditedLocation(e: React.FormEvent) {
+    e.preventDefault();
+    if (!editingLocation) return;
+    setEditLocSubmitting(true);
+    setStatusMsg(null);
+    try {
+      const res = await adminFetch(`/api/locations/${editingLocation.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editLocName,
+          address: editLocAddress,
+          city: editLocCity,
+          province: editLocProvince,
+          phone: editLocPhone,
+          capacity_chairs: parseInt(editLocChairs, 10) || 2,
+          operating_hours_display: editLocHours,
+          is_flagship: editLocFlagship,
+          is_active: editLocActive,
+        }),
+      });
+      if (res.ok) {
+        setStatusMsg(`Studio "${editLocName}" updated successfully & logged to audit trail.`);
+        setEditingLocation(null);
+        loadLocations();
+      } else {
+        const data = await res.json();
+        setStatusMsg(data.error || 'Failed to update location');
+      }
+    } catch {
+      setStatusMsg('Network error while updating location.');
+    } finally {
+      setEditLocSubmitting(false);
+    }
+  }
+
+  async function handleDeleteLocation(id: string) {
+    if (!confirm('Are you sure you want to delete this studio location?')) return;
+    try {
+      const res = await adminFetch(`/api/locations/${id}`, { method: 'DELETE' });
+      if (!res.ok) {
+        const err = await res.json();
+        setStatusMsg(err.error || 'Failed to delete location');
+        return;
+      }
+      setStatusMsg('Studio location deleted and logged to audit trail.');
+      loadLocations();
+    } catch {
+      setStatusMsg('Network error while deleting location.');
     }
   }
 
@@ -852,6 +1062,93 @@ export default function AdminBarbershopPage() {
             </Card>
           )}
 
+          {/* Edit Staff Modal Form */}
+          {editingStaff && (
+            <Card className="border-amber-500/50 bg-stone-900/95 p-6 shadow-2xl">
+              <CardHeader className="p-0 mb-4">
+                <CardTitle className="text-xl text-white flex items-center">
+                  <Pencil className="mr-2 h-5 w-5 text-amber-500" />
+                  Edit Barber: {editingStaff.display_name}
+                </CardTitle>
+                <CardDescription>
+                  Update barber information or availability. Changes are logged to the database audit trail.
+                </CardDescription>
+              </CardHeader>
+
+              <form onSubmit={handleSaveEditedStaff} className="space-y-4">
+                <div className="space-y-1">
+                  <Label>Barber Display Name</Label>
+                  <Input
+                    value={editStaffName}
+                    onChange={(e) => setEditStaffName(e.target.value)}
+                    placeholder="e.g. Ace (Lead Barber)"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Bio / Specialties</Label>
+                  <Input
+                    value={editStaffBio}
+                    onChange={(e) => setEditStaffBio(e.target.value)}
+                    placeholder="e.g. Hot towel specialist, razor lineups"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Direct Phone Number</Label>
+                  <Input
+                    value={editStaffPhone}
+                    onChange={(e) => setEditStaffPhone(e.target.value)}
+                    placeholder="+27 82 123 4567"
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Status</Label>
+                  <div className="flex items-center space-x-4 pt-2">
+                    <label className="flex items-center space-x-2 text-sm text-stone-200 cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={editStaffActive}
+                        onChange={() => setEditStaffActive(true)}
+                        className="accent-amber-500"
+                      />
+                      <span>Active (Accepting Bookings)</span>
+                    </label>
+                    <label className="flex items-center space-x-2 text-sm text-stone-200 cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={!editStaffActive}
+                        onChange={() => setEditStaffActive(false)}
+                        className="accent-amber-500"
+                      />
+                      <span>Unavailable (Off Schedule)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-3 border-t border-stone-800">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setEditingStaff(null)}
+                    className="text-stone-400"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={editStaffSubmitting}
+                    className="bg-amber-500 hover:bg-amber-400 text-black font-semibold"
+                  >
+                    {editStaffSubmitting ? 'Saving Changes...' : 'Save Changes'}
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          )}
+
           {/* Staff List Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {staffList.map((staff) => (
@@ -894,20 +1191,32 @@ export default function AdminBarbershopPage() {
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-stone-800 flex items-center justify-between">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => handleToggleStaffStatus(staff)}
-                    className="text-xs border-stone-700 text-stone-300"
-                  >
-                    {staff.is_active ? 'Set Inactive' : 'Set Active'}
-                  </Button>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleToggleStaffStatus(staff)}
+                      className="text-xs border-stone-700 text-stone-300"
+                    >
+                      {staff.is_active ? 'Set Inactive' : 'Set Active'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditStaffModal(staff)}
+                      className="text-xs border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                      title="Edit Barber Details"
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                    </Button>
+                  </div>
 
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDeleteStaff(staff.id)}
                     className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                    title="Delete Barber"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -1042,6 +1351,152 @@ export default function AdminBarbershopPage() {
             </Card>
           )}
 
+          {/* Edit Service Modal Form */}
+          {editingService && (
+            <Card className="border-amber-500/50 bg-stone-900/95 p-6 shadow-2xl">
+              <CardHeader className="p-0 mb-6">
+                <CardTitle className="text-xl text-white flex items-center">
+                  <Pencil className="mr-2 h-5 w-5 text-amber-500" />
+                  Edit Service: {editingService.name}
+                </CardTitle>
+                <CardDescription>
+                  Modify service pricing, duration, or membership tier. Changes are recorded in the audit trail.
+                </CardDescription>
+              </CardHeader>
+
+              <form onSubmit={handleSaveEditedService} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1">
+                  <Label>Service / Plan Name</Label>
+                  <Input
+                    value={editServiceName}
+                    onChange={(e) => setEditServiceName(e.target.value)}
+                    placeholder="e.g. Classic Haircut"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Price (ZAR)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    value={editServicePrice}
+                    onChange={(e) => setEditServicePrice(e.target.value)}
+                    placeholder="e.g. 180.00"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Duration (Minutes)</Label>
+                  <Input
+                    type="number"
+                    value={editServiceDuration}
+                    onChange={(e) => setEditServiceDuration(e.target.value)}
+                    placeholder="e.g. 30"
+                    required
+                  />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Service Type</Label>
+                  <div className="flex items-center space-x-4 pt-2">
+                    <label className="flex items-center space-x-2 text-sm text-stone-200 cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={!editServiceIsSubscription}
+                        onChange={() => setEditServiceIsSubscription(false)}
+                        className="accent-amber-500"
+                      />
+                      <span>Regular Service</span>
+                    </label>
+                    <label className="flex items-center space-x-2 text-sm text-stone-200 cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={editServiceIsSubscription}
+                        onChange={() => setEditServiceIsSubscription(true)}
+                        className="accent-amber-500"
+                      />
+                      <span>PayFast Monthly Membership</span>
+                    </label>
+                  </div>
+                </div>
+
+                {editServiceIsSubscription && (
+                  <div className="space-y-1 md:col-span-2 bg-stone-800/40 p-3 rounded-lg border border-stone-800">
+                    <Label className="text-amber-400">PayFast Plan Identifier</Label>
+                    <div className="flex gap-4 pt-1">
+                      {['solo', 'twice', 'father-son'].map((code) => (
+                        <label key={code} className="flex items-center space-x-1.5 text-xs text-stone-300">
+                          <input
+                            type="radio"
+                            name="editPlanCode"
+                            value={code}
+                            checked={editServicePlanCode === code}
+                            onChange={(e) => setEditServicePlanCode(e.target.value)}
+                            className="accent-amber-500"
+                          />
+                          <span>{code}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="space-y-1 md:col-span-2">
+                  <Label>Status</Label>
+                  <div className="flex items-center space-x-4 pt-2">
+                    <label className="flex items-center space-x-2 text-sm text-stone-200 cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={editServiceActive}
+                        onChange={() => setEditServiceActive(true)}
+                        className="accent-amber-500"
+                      />
+                      <span>Active (Available for booking)</span>
+                    </label>
+                    <label className="flex items-center space-x-2 text-sm text-stone-200 cursor-pointer">
+                      <input
+                        type="radio"
+                        checked={!editServiceActive}
+                        onChange={() => setEditServiceActive(false)}
+                        className="accent-amber-500"
+                      />
+                      <span>Deactivated (Hidden)</span>
+                    </label>
+                  </div>
+                </div>
+
+                <div className="space-y-1 md:col-span-2">
+                  <Label>Description</Label>
+                  <Input
+                    value={editServiceDescription}
+                    onChange={(e) => setEditServiceDescription(e.target.value)}
+                    placeholder="Brief description of grooming steps..."
+                  />
+                </div>
+
+                <div className="md:col-span-2 flex justify-end space-x-3 pt-4 border-t border-stone-800">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setEditingService(null)}
+                    className="text-stone-400"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={editServiceSubmitting}
+                    className="bg-amber-500 hover:bg-amber-400 text-black font-semibold"
+                  >
+                    {editServiceSubmitting ? 'Saving Changes...' : 'Save Changes'}
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          )}
+
           {/* Services List */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {services.map((service) => (
@@ -1093,20 +1548,32 @@ export default function AdminBarbershopPage() {
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-stone-800 flex items-center justify-between">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => toggleServiceStatus(service)}
-                    className="text-xs border-stone-700 text-stone-300"
-                  >
-                    {service.is_active ? 'Deactivate' : 'Activate'}
-                  </Button>
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => toggleServiceStatus(service)}
+                      className="text-xs border-stone-700 text-stone-300"
+                    >
+                      {service.is_active ? 'Deactivate' : 'Activate'}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditServiceModal(service)}
+                      className="text-xs border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                      title="Edit Service Details"
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                    </Button>
+                  </div>
 
                   <Button
                     variant="ghost"
                     size="sm"
                     onClick={() => handleDeleteService(service.id)}
                     className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                    title="Delete Service"
                   >
                     <Trash2 className="h-4 w-4" />
                   </Button>
@@ -1211,6 +1678,139 @@ export default function AdminBarbershopPage() {
             </Card>
           )}
 
+          {/* Edit Location Modal Form */}
+          {editingLocation && (
+            <Card className="border-amber-500/50 bg-stone-900/95 p-6 shadow-2xl">
+              <div className="flex items-center justify-between border-b border-stone-800 pb-3 mb-4">
+                <h2 className="text-lg font-bold text-white flex items-center">
+                  <Pencil className="mr-2 h-5 w-5 text-amber-500" /> Edit Studio Location: {editingLocation.name}
+                </h2>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditingLocation(null)}
+                  className="text-stone-400"
+                >
+                  Cancel
+                </Button>
+              </div>
+
+              <form onSubmit={handleSaveEditedLocation} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Studio / Branch Name</Label>
+                    <Input
+                      value={editLocName}
+                      onChange={(e) => setEditLocName(e.target.value)}
+                      placeholder="e.g. Ace of Fyt - Sandton City Branch"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>City</Label>
+                    <Input
+                      value={editLocCity}
+                      onChange={(e) => setEditLocCity(e.target.value)}
+                      placeholder="e.g. Johannesburg"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Physical Address</Label>
+                    <Input
+                      value={editLocAddress}
+                      onChange={(e) => setEditLocAddress(e.target.value)}
+                      placeholder="e.g. Shop 42, Rivonia Rd, Sandton, 2196"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Province</Label>
+                    <Input
+                      value={editLocProvince}
+                      onChange={(e) => setEditLocProvince(e.target.value)}
+                      placeholder="e.g. Gauteng or Western Cape"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Contact Phone</Label>
+                    <Input
+                      value={editLocPhone}
+                      onChange={(e) => setEditLocPhone(e.target.value)}
+                      placeholder="+27 11 000 0000"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Barber Chair Capacity</Label>
+                    <Input
+                      type="number"
+                      min="1"
+                      value={editLocChairs}
+                      onChange={(e) => setEditLocChairs(e.target.value)}
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Operating Hours Display</Label>
+                  <Input
+                    value={editLocHours}
+                    onChange={(e) => setEditLocHours(e.target.value)}
+                    placeholder="Mon-Fri: 09:00 - 18:00 | Sat: 09:00 - 17:00 | Sun: Closed"
+                    required
+                  />
+                </div>
+
+                <div className="flex items-center space-x-6 pt-2">
+                  <label className="flex items-center space-x-2 text-sm text-stone-200 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editLocFlagship}
+                      onChange={(e) => setEditLocFlagship(e.target.checked)}
+                      className="accent-amber-500 rounded"
+                    />
+                    <span>Flagship Studio Designation</span>
+                  </label>
+                  <label className="flex items-center space-x-2 text-sm text-stone-200 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={editLocActive}
+                      onChange={(e) => setEditLocActive(e.target.checked)}
+                      className="accent-amber-500 rounded"
+                    />
+                    <span>Operational & Active for Bookings</span>
+                  </label>
+                </div>
+
+                <div className="flex justify-end space-x-3 pt-3 border-t border-stone-800">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => setEditingLocation(null)}
+                    className="text-stone-400"
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={editLocSubmitting}
+                    className="bg-amber-500 hover:bg-amber-400 text-black font-semibold"
+                  >
+                    {editLocSubmitting ? 'Saving Changes...' : 'Save Changes'}
+                  </Button>
+                </div>
+              </form>
+            </Card>
+          )}
+
           {/* Locations Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {locations.map((loc) => (
@@ -1267,8 +1867,33 @@ export default function AdminBarbershopPage() {
                 </div>
 
                 <div className="pt-3 border-t border-stone-800 flex items-center justify-between text-xs text-stone-500">
-                  <span>City: {loc.city}, {loc.province}</span>
-                  <span>Contact: {loc.phone}</span>
+                  <div className="space-x-3">
+                    <span>City: {loc.city}, {loc.province}</span>
+                    <span>Contact: {loc.phone}</span>
+                  </div>
+
+                  <div className="flex items-center space-x-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditLocationModal(loc)}
+                      className="text-xs border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                      title="Edit Studio Details"
+                    >
+                      <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                    </Button>
+                    {!loc.is_flagship && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => handleDeleteLocation(loc.id)}
+                        className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                        title="Delete Studio Location"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    )}
+                  </div>
                 </div>
               </Card>
             ))}

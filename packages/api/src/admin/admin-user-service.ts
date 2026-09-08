@@ -1,4 +1,5 @@
 import { getSupabaseAdminClient, AppRole, UserWithProfile } from '@dissafyt/database';
+import { AuditService } from '../audit/audit-service';
 
 export class AdminUserService {
   /**
@@ -31,13 +32,29 @@ export class AdminUserService {
   }
 
   /**
-   * Assigns a role to a specific user.
+   * Assigns a role to a specific user with invisible audit logging.
    */
-  static async assignRole(userId: string, role: AppRole): Promise<{ success: boolean; error?: string }> {
+  static async assignRole(
+    userId: string,
+    role: AppRole,
+    actor?: { email?: string; role?: string }
+  ): Promise<{ success: boolean; error?: string }> {
     const admin = getSupabaseAdminClient();
     try {
       const { error } = await admin.from('user_roles').upsert({ user_id: userId, role }, { onConflict: 'user_id, role' });
       if (error) return { success: false, error: error.message };
+
+      // Invisible Audit Trail
+      await AuditService.recordLog({
+        actor_email: actor?.email || 'admin@dissafyt.com',
+        actor_role: actor?.role || 'admin',
+        action: 'role.assign',
+        entity_type: 'user_role',
+        entity_id: userId,
+        entity_name: `Role: ${role}`,
+        changes: { user_id: userId, assigned_role: role },
+      });
+
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };
@@ -45,13 +62,29 @@ export class AdminUserService {
   }
 
   /**
-   * Revokes a role from a user.
+   * Revokes a role from a user with invisible audit logging.
    */
-  static async revokeRole(userId: string, role: AppRole): Promise<{ success: boolean; error?: string }> {
+  static async revokeRole(
+    userId: string,
+    role: AppRole,
+    actor?: { email?: string; role?: string }
+  ): Promise<{ success: boolean; error?: string }> {
     const admin = getSupabaseAdminClient();
     try {
       const { error } = await admin.from('user_roles').delete().match({ user_id: userId, role });
       if (error) return { success: false, error: error.message };
+
+      // Invisible Audit Trail
+      await AuditService.recordLog({
+        actor_email: actor?.email || 'admin@dissafyt.com',
+        actor_role: actor?.role || 'admin',
+        action: 'role.revoke',
+        entity_type: 'user_role',
+        entity_id: userId,
+        entity_name: `Role: ${role}`,
+        changes: { user_id: userId, revoked_role: role },
+      });
+
       return { success: true };
     } catch (err: any) {
       return { success: false, error: err.message };

@@ -164,3 +164,64 @@ export interface Payment {
   created_at: string;
   updated_at: string;
 }
+
+// Location / Studio types
+export interface BarbershopLocation {
+  id: string;
+  name: string;
+  slug: string;
+  address: string;
+  city: string;
+  province: string;
+  country: string;
+  phone: string;
+  is_flagship: boolean;
+  is_active: boolean;
+  capacity_chairs: number;
+  operating_hours_display: string;
+  created_at?: string;
+  updated_at?: string;
+}
+
+// Audit Trail types (Invisible Audit Trail in DB)
+export type AuditAction =
+  | 'product.create'
+  | 'product.update'
+  | 'product.delete'
+  | 'service.create'
+  | 'service.update'
+  | 'service.delete'
+  | 'staff.create'
+  | 'staff.update'
+  | 'staff.delete'
+  | 'location.create'
+  | 'location.update'
+  | 'location.delete'
+  | 'role.assign'
+  | 'role.revoke'
+  | 'order.status_change'
+  | 'booking.status_change';
+
+export type AuditEntityType =
+  | 'product'
+  | 'service'
+  | 'staff'
+  | 'location'
+  | 'user_role'
+  | 'order'
+  | 'booking';
+
+export interface AuditLog {
+  id: string;
+  actor_id?: string | null;
+  actor_email: string;
+  actor_role: string;
+  action: AuditAction | string;
+  entity_type: AuditEntityType | string;
+  entity_id: string;
+  entity_name?: string;
+  changes?: Record<string, any>;
+  ip_address?: string;
+  created_at: string;
+}
+
