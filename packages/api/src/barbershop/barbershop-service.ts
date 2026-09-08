@@ -315,4 +315,95 @@ export class BarbershopService {
     }
     return { success: true };
   }
+
+  /**
+   * Reschedules an existing appointment to a new date/time slot.
+   * Enforces shop operating hours and anti-collision double-booking checks.
+   */
+  static async rescheduleBooking(params: {
+    bookingId: string;
+    customerId?: string;
+    newStartTime: string; // ISO string
+    newStaffId?: string | null;
+    isAdmin?: boolean;
+  }): Promise<{ success: boolean; booking?: Booking; error?: string }> {
+    const admin = getSupabaseAdminClient();
+
+    // 1. Fetch the existing booking
+    const { data: existing, error: eErr } = await admin
+      .from('bookings')
+      .select('*, service:services(*)')
+      .eq('id', params.bookingId)
+      .single();
+
+    if (eErr || !existing) {
+      return { success: false, error: 'Appointment not found.' };
+    }
+
+    if (existing.status === 'cancelled') {
+      return { success: false, error: 'Cancelled appointments cannot be rescheduled. Please make a new booking.' };
+    }
+
+    if (!params.isAdmin && params.customerId && existing.customer_id !== params.customerId) {
+      return { success: false, error: 'Unauthorized to reschedule this appointment.' };
+    }
+
+    const duration = existing.service?.duration_minutes || 30;
+    const startTime = new Date(params.newStartTime);
+    const endTime = new Date(startTime.getTime() + duration * 60 * 1000);
+
+    // Validate shop operating hours
+    const dayOfWeek = startTime.getUTCDay();
+    if (dayOfWeek === 0) {
+      return { success: false, error: 'Ace of Fyt is closed on Sundays.' };
+    }
+    const openHour = 9;
+    const closeHour = dayOfWeek === 6 ? 17 : 18;
+    const startHour = startTime.getUTCHours() + startTime.getUTCMinutes() / 60;
+    const endHour = endTime.getUTCHours() + endTime.getUTCMinutes() / 60;
+    if (startHour < openHour || endHour > closeHour) {
+      return { success: false, error: `Appointments must fall within operating hours (09:00 - ${closeHour}:00).` };
+    }
+
+    const targetStaffId = params.newStaffId || existing.staff_id;
+
+    // Check collision for target barber, excluding current booking
+    if (targetStaffId) {
+      const { data: collisions } = await admin
+        .from('bookings')
+        .select('id')
+        .eq('staff_id', targetStaffId)
+        .neq('id', params.bookingId)
+        .neq('status', 'cancelled')
+        .lt('start_time', endTime.toISOString())
+        .gt('end_time', startTime.toISOString());
+
+      if (collisions && collisions.length > 0) {
+        return {
+          success: false,
+          error: 'The barber is already booked for this selected time slot. Please choose another time.',
+        };
+      }
+    }
+
+    // Update the booking
+    const { data: updated, error: uErr } = await admin
+      .from('bookings')
+      .update({
+        start_time: startTime.toISOString(),
+        end_time: endTime.toISOString(),
+        staff_id: targetStaffId,
+        status: 'confirmed',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', params.bookingId)
+      .select()
+      .single();
+
+    if (uErr || !updated) {
+      return { success: false, error: uErr?.message || 'Failed to reschedule appointment.' };
+    }
+
+    return { success: true, booking: updated as Booking };
+  }
 }

@@ -4,7 +4,22 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabaseBrowserClient } from '@dissafyt/database';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from '@dissafyt/ui';
-import { User, ShoppingBag, Scissors, LogOut, CheckCircle2, Shield, Clock, Package, Truck, ExternalLink } from 'lucide-react';
+import {
+  User,
+  ShoppingBag,
+  Scissors,
+  LogOut,
+  CheckCircle2,
+  Shield,
+  Clock,
+  Package,
+  Truck,
+  ExternalLink,
+  Bell,
+  Calendar,
+  RefreshCw,
+  AlertCircle,
+} from 'lucide-react';
 import Link from 'next/link';
 
 interface UserData {
@@ -40,18 +55,28 @@ interface Order {
 
 interface BookingItem {
   id: string;
+  service_id: string;
+  staff_id?: string | null;
   start_time: string;
   end_time: string;
   status: string;
   total_amount: number;
   notes?: string | null;
   service?: {
+    id: string;
     name: string;
     duration_minutes: number;
   };
   staff?: {
+    id: string;
     display_name: string;
   } | null;
+}
+
+interface AvailableSlot {
+  time: string;
+  startTime: string;
+  endTime: string;
 }
 
 export default function AccountPage() {
@@ -66,6 +91,35 @@ export default function AccountPage() {
   const [fullName, setFullName] = useState('');
   const [phone, setPhone] = useState('');
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+
+  // Notification Preferences
+  const [notifOrderEmail, setNotifOrderEmail] = useState(true);
+  const [notifBookingSMS, setNotifBookingSMS] = useState(true);
+  const [notifDropAlerts, setNotifDropAlerts] = useState(false);
+  const [notifSavedMsg, setNotifSavedMsg] = useState<string | null>(null);
+
+  // Reschedule state
+  const [reschedulingBooking, setReschedulingBooking] = useState<BookingItem | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleSlots, setRescheduleSlots] = useState<AvailableSlot[]>([]);
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [selectedRescheduleSlot, setSelectedRescheduleSlot] = useState<string | null>(null);
+  const [isSubmittingReschedule, setIsSubmittingReschedule] = useState(false);
+
+  useEffect(() => {
+    // Load notification preferences from localStorage
+    const saved = localStorage.getItem('dissafyt_notifs');
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        setNotifOrderEmail(parsed.orderEmail ?? true);
+        setNotifBookingSMS(parsed.bookingSMS ?? true);
+        setNotifDropAlerts(parsed.dropAlerts ?? false);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
 
   useEffect(() => {
     async function loadUser() {
@@ -134,15 +188,92 @@ export default function AccountPage() {
         body: JSON.stringify({ action: 'cancel' }),
       });
       if (res.ok) {
-        // Refresh bookings
         const refRes = await fetch('/api/bookings', { headers: { Authorization: `Bearer ${token}` } });
         if (refRes.ok) setBookings(await refRes.json());
+        setStatusMsg('Appointment cancelled successfully.');
       }
     } catch (e) {
       console.error(e);
     } finally {
       setCancellingBookingId(null);
     }
+  }
+
+  async function openRescheduleModal(booking: BookingItem) {
+    setReschedulingBooking(booking);
+    // Default reschedule date to tomorrow
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    const dateStr = tomorrow.toISOString().split('T')[0];
+    setRescheduleDate(dateStr);
+    setSelectedRescheduleSlot(null);
+    fetchRescheduleSlots(booking, dateStr);
+  }
+
+  async function fetchRescheduleSlots(booking: BookingItem, date: string) {
+    if (!booking.service_id) return;
+    setLoadingSlots(true);
+    try {
+      const staffParam = booking.staff_id ? `&staffId=${booking.staff_id}` : '';
+      const res = await fetch(`/api/bookings/availability?date=${date}&serviceId=${booking.service_id}${staffParam}`);
+      if (res.ok) {
+        const data = await res.json();
+        setRescheduleSlots(data.slots || []);
+      } else {
+        setRescheduleSlots([]);
+      }
+    } catch (e) {
+      console.error('Failed to load slots:', e);
+    } finally {
+      setLoadingSlots(false);
+    }
+  }
+
+  async function handleConfirmReschedule() {
+    if (!token || !reschedulingBooking || !selectedRescheduleSlot) return;
+    setIsSubmittingReschedule(true);
+    try {
+      const res = await fetch(`/api/bookings/${reschedulingBooking.id}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          action: 'reschedule',
+          newStartTime: selectedRescheduleSlot,
+          newStaffId: reschedulingBooking.staff_id,
+        }),
+      });
+
+      const data = await res.json();
+      if (res.ok) {
+        // Refresh bookings
+        const refRes = await fetch('/api/bookings', { headers: { Authorization: `Bearer ${token}` } });
+        if (refRes.ok) setBookings(await refRes.json());
+        setReschedulingBooking(null);
+        setStatusMsg('Appointment successfully rescheduled!');
+      } else {
+        alert(data.error || 'Failed to reschedule');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Error connecting to reschedule service');
+    } finally {
+      setIsSubmittingReschedule(false);
+    }
+  }
+
+  function handleSaveNotifications(e: React.FormEvent) {
+    e.preventDefault();
+    const prefs = {
+      orderEmail: notifOrderEmail,
+      bookingSMS: notifBookingSMS,
+      dropAlerts: notifDropAlerts,
+    };
+    localStorage.setItem('dissafyt_notifs', JSON.stringify(prefs));
+    setNotifSavedMsg('Preferences saved.');
+    setTimeout(() => setNotifSavedMsg(null), 3000);
   }
 
   async function handleUpdateProfile(e: React.FormEvent) {
@@ -199,7 +330,7 @@ export default function AccountPage() {
         <div>
           <h1 className="text-3xl font-bold text-white">My Account</h1>
           <p className="text-sm text-zinc-400">
-            One unified identity across Dissafyt commerce and Ace of Fyt barbershop.
+            One unified identity across Dissafyt Streetwear and Ace of Fyt Barbershop.
           </p>
         </div>
         <Button
@@ -219,9 +350,104 @@ export default function AccountPage() {
         </div>
       )}
 
+      {/* Reschedule Modal / Slide-down */}
+      {reschedulingBooking && (
+        <div className="border border-amber-500/40 bg-zinc-900/90 rounded-xl p-6 shadow-2xl space-y-4">
+          <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+            <div>
+              <h2 className="text-lg font-bold text-white flex items-center">
+                <Calendar className="mr-2 h-5 w-5 text-amber-500" />
+                Reschedule: {reschedulingBooking.service?.name}
+              </h2>
+              <p className="text-xs text-zinc-400">
+                Current appointment: {new Date(reschedulingBooking.start_time).toLocaleString('en-ZA')}
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setReschedulingBooking(null)}
+              className="text-zinc-400 hover:text-white text-xs"
+            >
+              Cancel
+            </Button>
+          </div>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="rescheduleDate" className="text-xs text-zinc-300">
+                Choose New Date
+              </Label>
+              <Input
+                id="rescheduleDate"
+                type="date"
+                min={new Date().toISOString().split('T')[0]}
+                value={rescheduleDate}
+                onChange={(e) => {
+                  setRescheduleDate(e.target.value);
+                  setSelectedRescheduleSlot(null);
+                  if (reschedulingBooking) {
+                    fetchRescheduleSlots(reschedulingBooking, e.target.value);
+                  }
+                }}
+                className="max-w-xs mt-1"
+              />
+            </div>
+
+            <div>
+              <Label className="text-xs text-zinc-300 mb-2 block">
+                Select New 30-Minute Slot
+              </Label>
+              {loadingSlots ? (
+                <div className="text-xs text-zinc-500 py-4">Checking barber availability...</div>
+              ) : rescheduleSlots.length === 0 ? (
+                <div className="text-xs text-amber-400/80 py-4">
+                  No slots available on this date (Sundays closed, or all slots booked). Please select another date.
+                </div>
+              ) : (
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                  {rescheduleSlots.map((slot) => (
+                    <button
+                      key={slot.startTime}
+                      type="button"
+                      onClick={() => setSelectedRescheduleSlot(slot.startTime)}
+                      className={`py-2 px-3 rounded text-xs font-semibold border transition-all ${
+                        selectedRescheduleSlot === slot.startTime
+                          ? 'bg-amber-500 text-black border-amber-400'
+                          : 'bg-zinc-950/60 border-zinc-800 text-zinc-300 hover:border-zinc-600'
+                      }`}
+                    >
+                      {slot.time}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <div className="flex gap-3 pt-2">
+              <Button
+                disabled={!selectedRescheduleSlot || isSubmittingReschedule}
+                onClick={handleConfirmReschedule}
+                className="bg-amber-500 hover:bg-amber-400 text-black font-semibold"
+              >
+                {isSubmittingReschedule ? 'Saving...' : 'Confirm Rescheduled Appointment'}
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => setReschedulingBooking(null)}
+                className="border-zinc-800 text-zinc-300"
+              >
+                Keep Original Time
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Profile Details Column */}
+        {/* Main Content Column */}
         <div className="md:col-span-2 space-y-6">
+          {/* Profile Details */}
           <Card className="border-zinc-800 bg-zinc-900/60">
             <CardHeader>
               <CardTitle className="text-xl text-white flex items-center">
@@ -229,7 +455,7 @@ export default function AccountPage() {
                 Profile Information
               </CardTitle>
               <CardDescription>
-                Updates here synchronize across your apparel purchases and barbershop appointments.
+                Synchronized across streetwear checkout and barbershop reservations.
               </CardDescription>
             </CardHeader>
             <CardContent>
@@ -248,7 +474,7 @@ export default function AccountPage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <Label htmlFor="phone">Phone (for appointment and Courier Guy delivery SMS)</Label>
+                  <Label htmlFor="phone">Phone Number (Courier Guy SMS & Booking Updates)</Label>
                   <Input
                     id="phone"
                     value={phone}
@@ -294,7 +520,8 @@ export default function AccountPage() {
                   {bookings.map((booking) => {
                     const startDate = new Date(booking.start_time);
                     const isPast = startDate < new Date();
-                    const isCancellable = (booking.status === 'confirmed' || booking.status === 'pending') && !isPast;
+                    const isModifiable =
+                      (booking.status === 'confirmed' || booking.status === 'pending') && !isPast;
 
                     return (
                       <div
@@ -332,9 +559,9 @@ export default function AccountPage() {
 
                         <div className="flex flex-wrap items-center justify-between text-xs text-zinc-400 pt-1">
                           <div className="flex items-center space-x-3">
-                            <span className="flex items-center">
-                              <Clock className="mr-1 h-3.5 w-3.5 text-zinc-500" />
-                              {startDate.toLocaleDateString(undefined, {
+                            <span className="flex items-center text-zinc-200">
+                              <Clock className="mr-1 h-3.5 w-3.5 text-amber-500" />
+                              {startDate.toLocaleDateString('en-ZA', {
                                 weekday: 'short',
                                 month: 'short',
                                 day: 'numeric',
@@ -349,16 +576,27 @@ export default function AccountPage() {
                             )}
                           </div>
 
-                          {isCancellable && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              disabled={cancellingBookingId === booking.id}
-                              onClick={() => handleCancelBooking(booking.id)}
-                              className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs h-7 px-2"
-                            >
-                              {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel Appointment'}
-                            </Button>
+                          {isModifiable && (
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={() => openRescheduleModal(booking)}
+                                className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 text-xs h-7 px-2"
+                              >
+                                <Calendar className="mr-1 h-3 w-3" />
+                                Reschedule
+                              </Button>
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                disabled={cancellingBookingId === booking.id}
+                                onClick={() => handleCancelBooking(booking.id)}
+                                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs h-7 px-2"
+                              >
+                                {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel'}
+                              </Button>
+                            </div>
                           )}
                         </div>
 
@@ -375,7 +613,7 @@ export default function AccountPage() {
             </CardContent>
           </Card>
 
-          {/* Unified Order History */}
+          {/* Apparel Orders with Tracking Visualization */}
           <Card className="border-zinc-800 bg-zinc-900/60">
             <CardHeader className="flex flex-row items-center justify-between">
               <div>
@@ -383,7 +621,7 @@ export default function AccountPage() {
                   <ShoppingBag className="mr-2 h-5 w-5 text-amber-500" />
                   Apparel Orders ({orders.length})
                 </CardTitle>
-                <CardDescription>Streetwear purchases and delivery progress</CardDescription>
+                <CardDescription>Streetwear purchases and delivery tracking</CardDescription>
               </div>
               <Link href="/shop">
                 <Button variant="ghost" size="sm" className="text-amber-400 hover:text-amber-300">
@@ -398,93 +636,200 @@ export default function AccountPage() {
                   <p>You haven&apos;t placed any clothing orders yet.</p>
                 </div>
               ) : (
-                <div className="space-y-4">
-                  {orders.map((order) => (
-                    <div
-                      key={order.id}
-                      className="border border-zinc-800/80 rounded-lg p-4 bg-zinc-950/40 space-y-3"
-                    >
-                      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-2">
-                        <div>
-                          <span className="font-mono font-bold text-white text-sm">
-                            {order.order_number}
-                          </span>
-                          <span className="text-xs text-zinc-500 ml-2">
-                            {new Date(order.created_at).toLocaleDateString()}
-                          </span>
-                        </div>
-                        <div className="flex items-center space-x-2">
-                          <span
-                            className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${
-                              order.status === 'paid'
-                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                : order.status === 'shipped'
-                                ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                                : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                            }`}
-                          >
-                            {order.status.replace('_', ' ')}
-                          </span>
-                          <span className="font-extrabold text-amber-400 text-sm">
-                            R {Number(order.total).toFixed(2)}
-                          </span>
-                        </div>
-                      </div>
+                <div className="space-y-6">
+                  {orders.map((order) => {
+                    const status = order.status.toLowerCase();
+                    const isPaid = status === 'paid' || status === 'processing' || status === 'shipped' || status === 'delivered';
+                    const isProcessing = status === 'processing' || status === 'shipped' || status === 'delivered';
+                    const isShipped = status === 'shipped' || status === 'delivered';
+                    const isDelivered = status === 'delivered';
 
-                      <div className="text-xs text-zinc-400 space-y-1">
-                        {order.order_items?.map((item) => (
-                          <div key={item.id} className="flex justify-between">
-                            <span>
-                              {item.quantity}x {item.product_name}
+                    return (
+                      <div
+                        key={order.id}
+                        className="border border-zinc-800/80 rounded-lg p-5 bg-zinc-950/40 space-y-4"
+                      >
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-3">
+                          <div>
+                            <span className="font-mono font-bold text-white text-sm">
+                              {order.order_number}
                             </span>
-                            <span>R {Number(item.total_price).toFixed(2)}</span>
+                            <span className="text-xs text-zinc-500 ml-2">
+                              {new Date(order.created_at).toLocaleDateString()}
+                            </span>
                           </div>
-                        ))}
-                      </div>
-
-                      {order.shipping_address && (
-                        <div className="text-[11px] text-zinc-500 flex items-center pt-1 border-t border-zinc-800/50">
-                          <Truck className="h-3 w-3 mr-1 text-zinc-400" />
-                          Delivery to: {order.shipping_address.street_address}, {order.shipping_address.city}
+                          <div className="flex items-center space-x-2">
+                            <span
+                              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${
+                                order.status === 'paid'
+                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                  : order.status === 'shipped'
+                                  ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                  : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                              }`}
+                            >
+                              {order.status.replace('_', ' ')}
+                            </span>
+                            <span className="font-extrabold text-amber-400 text-sm">
+                              R {Number(order.total).toFixed(2)}
+                            </span>
+                          </div>
                         </div>
-                      )}
-                    </div>
-                  ))}
+
+                        {/* 4-Step Fulfillment Tracker */}
+                        <div className="py-2">
+                          <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">
+                            Fulfillment Journey
+                          </div>
+                          <div className="grid grid-cols-4 gap-2 text-center text-[11px]">
+                            <div className="space-y-1">
+                              <div className="h-1.5 rounded-full bg-amber-500" />
+                              <span className="text-amber-400 font-medium">Placed</span>
+                            </div>
+                            <div className="space-y-1">
+                              <div
+                                className={`h-1.5 rounded-full ${isPaid ? 'bg-emerald-500' : 'bg-zinc-800'}`}
+                              />
+                              <span className={isPaid ? 'text-emerald-400 font-medium' : 'text-zinc-500'}>
+                                Paid (PayFast)
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              <div
+                                className={`h-1.5 rounded-full ${isShipped ? 'bg-blue-500' : 'bg-zinc-800'}`}
+                              />
+                              <span className={isShipped ? 'text-blue-400 font-medium' : 'text-zinc-500'}>
+                                Courier Guy
+                              </span>
+                            </div>
+                            <div className="space-y-1">
+                              <div
+                                className={`h-1.5 rounded-full ${isDelivered ? 'bg-emerald-400' : 'bg-zinc-800'}`}
+                              />
+                              <span className={isDelivered ? 'text-emerald-300 font-medium' : 'text-zinc-500'}>
+                                Delivered
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-xs text-zinc-400 space-y-1 bg-zinc-900/40 p-3 rounded">
+                          {order.order_items?.map((item) => (
+                            <div key={item.id} className="flex justify-between">
+                              <span>
+                                {item.quantity}x {item.product_name}
+                              </span>
+                              <span className="font-mono">R {Number(item.total_price).toFixed(2)}</span>
+                            </div>
+                          ))}
+                        </div>
+
+                        {order.shipping_address && (
+                          <div className="text-[11px] text-zinc-500 flex items-center pt-1">
+                            <Truck className="h-3.5 w-3.5 mr-1.5 text-zinc-400" />
+                            Waybill Destination: {order.shipping_address.street_address},{' '}
+                            {order.shipping_address.city}
+                          </div>
+                        )}
+                      </div>
+                    );
+                  })}
                 </div>
               )}
             </CardContent>
           </Card>
         </div>
 
-        {/* Roles & Security Column */}
+        {/* Sidebar Column: Roles, Notifications, Quick Actions */}
         <div className="space-y-6">
+          {/* Notification Preferences */}
           <Card className="border-zinc-800 bg-zinc-900/60">
-            <CardHeader>
-              <CardTitle className="text-lg text-white flex items-center">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base text-white flex items-center">
+                <Bell className="mr-2 h-4 w-4 text-amber-500" />
+                Notification Preferences
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Manage alerts for bookings and drops
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSaveNotifications} className="space-y-3 text-xs">
+                <label className="flex items-center space-x-2 text-zinc-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifOrderEmail}
+                    onChange={(e) => setNotifOrderEmail(e.target.checked)}
+                    className="rounded border-zinc-700 bg-zinc-950 text-amber-500 focus:ring-amber-500"
+                  />
+                  <span>Email order status updates</span>
+                </label>
+                <label className="flex items-center space-x-2 text-zinc-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifBookingSMS}
+                    onChange={(e) => setNotifBookingSMS(e.target.checked)}
+                    className="rounded border-zinc-700 bg-zinc-950 text-amber-500 focus:ring-amber-500"
+                  />
+                  <span>SMS/WhatsApp appointment reminders</span>
+                </label>
+                <label className="flex items-center space-x-2 text-zinc-300 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={notifDropAlerts}
+                    onChange={(e) => setNotifDropAlerts(e.target.checked)}
+                    className="rounded border-zinc-700 bg-zinc-950 text-amber-500 focus:ring-amber-500"
+                  />
+                  <span>VIP streetwear drops & early access</span>
+                </label>
+
+                <div className="pt-2">
+                  <Button
+                    type="submit"
+                    variant="outline"
+                    size="sm"
+                    className="w-full border-zinc-700 text-zinc-300 hover:bg-zinc-800 text-xs"
+                  >
+                    Save Preferences
+                  </Button>
+                  {notifSavedMsg && (
+                    <div className="text-[11px] text-emerald-400 mt-1 text-center font-medium">
+                      {notifSavedMsg}
+                    </div>
+                  )}
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+
+          {/* Assigned Roles */}
+          <Card className="border-zinc-800 bg-zinc-900/60">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base text-white flex items-center">
                 <Shield className="mr-2 h-4 w-4 text-amber-500" />
-                Assigned Roles
+                Assigned Platform Roles
               </CardTitle>
             </CardHeader>
-            <CardContent className="space-y-3">
+            <CardContent className="space-y-2">
               {user?.roles?.map((role) => (
                 <div
                   key={role}
-                  className="flex items-center justify-between rounded-md bg-zinc-800/80 px-3 py-2 text-sm"
+                  className="flex items-center justify-between rounded-md bg-zinc-800/80 px-3 py-1.5 text-xs"
                 >
                   <span className="capitalize font-medium text-zinc-200">{role}</span>
-                  <CheckCircle2 className="h-4 w-4 text-emerald-400" />
+                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
                 </div>
               ))}
             </CardContent>
           </Card>
 
-          {/* Quick shortcuts */}
-          <Card className="border-zinc-800 bg-zinc-900/60 p-4 space-y-3 text-sm">
-            <div className="font-semibold text-white">Quick Actions</div>
-            <Link href="/book" className="block text-zinc-400 hover:text-amber-400 text-xs">
+          {/* Quick Shortcuts */}
+          <Card className="border-zinc-800 bg-zinc-900/60 p-4 space-y-2 text-xs">
+            <div className="font-semibold text-white">Platform Shortcuts</div>
+            <Link href="/book" className="block text-zinc-400 hover:text-amber-400">
               &bull; Book Barber Appointment
             </Link>
-            <Link href="/shop" className="block text-zinc-400 hover:text-amber-400 text-xs">
+            <Link href="/shop" className="block text-zinc-400 hover:text-amber-400">
               &bull; Explore Clothing Catalog
             </Link>
           </Card>

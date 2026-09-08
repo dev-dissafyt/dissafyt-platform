@@ -35,6 +35,23 @@ export async function PATCH(
       return NextResponse.json({ success: true, message: 'Appointment cancelled successfully' });
     }
 
+    if (action === 'reschedule') {
+      const { newStartTime, newStaffId } = body;
+      if (!newStartTime) {
+        return NextResponse.json({ error: 'newStartTime is required to reschedule' }, { status: 400 });
+      }
+      const result = await BarbershopService.rescheduleBooking({
+        bookingId: params.id,
+        customerId: authCtx.userId,
+        newStartTime,
+        newStaffId,
+      });
+      if (!result.success) {
+        return NextResponse.json({ error: result.error || 'Failed to reschedule appointment' }, { status: 400 });
+      }
+      return NextResponse.json({ success: true, message: 'Appointment rescheduled successfully', booking: result.booking });
+    }
+
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
   } catch (error: any) {
     console.error('Failed to update booking:', error);

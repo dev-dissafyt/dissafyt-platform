@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
 import './globals.css';
-import { LayoutDashboard, Users, ShoppingBag, Scissors, Settings, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, Users, ShoppingBag, Scissors, Settings, ShieldAlert, DollarSign } from 'lucide-react';
 
 export const metadata: Metadata = {
   title: 'Dissafyt Platform Administration',
@@ -70,6 +70,13 @@ export default function AdminLayout({
               >
                 <Scissors className="h-4 w-4 text-amber-500" />
                 <span>Barbershop</span>
+              </Link>
+              <Link
+                href="/finance"
+                className="flex items-center space-x-3 rounded-md px-3 py-2 text-stone-300 hover:bg-stone-800 hover:text-white transition-colors"
+              >
+                <DollarSign className="h-4 w-4 text-amber-500" />
+                <span>Finance & Payments</span>
               </Link>
               <Link
                 href="/settings"

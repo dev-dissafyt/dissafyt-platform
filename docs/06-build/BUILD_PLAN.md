@@ -153,12 +153,16 @@ A customer can book a service and authorized staff can manage it. (VERIFIED)
 
 # Phase 8 — Platform Integration
 
-- [ ] Unified customer dashboard
-- [ ] Orders + bookings visible under one account
-- [ ] Notification preferences
-- [ ] Shared payment records
-- [ ] Audit-sensitive operations
-- [ ] Operational reporting
+- [x] Unified customer dashboard
+- [x] Orders + bookings visible under one account
+- [x] Notification preferences
+- [x] Shared payment records
+- [x] Audit-sensitive operations
+- [x] Operational reporting
+
+Exit condition:
+
+Commerce and Barbershop operations are unified into a single reporting and customer management engine. (VERIFIED)
 
 ---
 
