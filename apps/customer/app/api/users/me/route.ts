@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AuthService, UserService } from '@dissafyt/api';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * GET /api/users/me
  * Retrieves current authenticated user profile and roles

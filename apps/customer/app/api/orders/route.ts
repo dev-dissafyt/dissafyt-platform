@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AuthService, OrderService, PayfastService } from '@dissafyt/api';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * GET /api/orders
  * Retrieves orders for the authenticated user

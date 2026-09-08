@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AdminProductService } from '@dissafyt/api';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   const categories = await AdminProductService.listCategories();
   return NextResponse.json(categories);

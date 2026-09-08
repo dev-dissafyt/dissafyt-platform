@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AdminUserService } from '@dissafyt/api';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 export async function GET() {
   const users = await AdminUserService.listUsers();
   return NextResponse.json(users);

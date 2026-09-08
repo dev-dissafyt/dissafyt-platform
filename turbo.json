@@ -1,5 +1,21 @@
 {
   "$schema": "https://turbo.build/schema.json",
+  "globalEnv": [
+    "NEXT_PUBLIC_SUPABASE_URL",
+    "NEXT_PUBLIC_SUPABASE_ANON_KEY",
+    "SUPABASE_SERVICE_ROLE_KEY",
+    "PROJECT_URL",
+    "API_KEY",
+    "PAYFAST_MERCHANT_ID",
+    "PAYFAST_MERCHANT_KEY",
+    "PAYFAST_PASSPHRASE",
+    "PAYFAST_ENV",
+    "NEXT_PUBLIC_PAYFAST_MERCHANT_ID",
+    "NEXT_PUBLIC_SITE_URL",
+    "COURIER_GUY_API_KEY",
+    "DATABASE_URL",
+    "RESEND_API_KEY"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],

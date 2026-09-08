@@ -1,6 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PayfastService, PayfastNotifyPayload } from '@dissafyt/api';
 
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+
 /**
  * POST /api/payments/payfast-notify
  * PayFast Instant Transaction Notification (ITN) webhook handler.

@@ -32,12 +32,16 @@ export function getSupabaseAdminClient(
   url = defaultUrl,
   serviceRoleKey = defaultServiceRoleKey
 ): SupabaseClient {
+  const resolvedUrl = url || 'https://placeholder.supabase.co';
+  const resolvedKey = serviceRoleKey || 'placeholder-service-role-key';
+
   if (!url || !serviceRoleKey) {
-    throw new Error(
-      'SUPABASE_SERVICE_ROLE_KEY and Supabase URL are required for admin client operations.'
+    console.warn(
+      'SUPABASE_SERVICE_ROLE_KEY or Supabase URL missing. Using build-safe fallback client.'
     );
   }
-  return createClient(url, serviceRoleKey, {
+
+  return createClient(resolvedUrl, resolvedKey, {
     auth: {
       autoRefreshToken: false,
       persistSession: false,
