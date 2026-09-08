@@ -180,10 +180,12 @@ export class ReportingService {
         type: 'booking',
         title: `${svcName} - ${barberName}`,
         subtitle: `Booked for ${new Date(bk.start_time).toLocaleString('en-ZA', {
+          timeZone: 'Africa/Johannesburg',
           month: 'short',
           day: 'numeric',
           hour: '2-digit',
           minute: '2-digit',
+          hour12: false,
         })}`,
         amount: Number(bk.total_amount) || 0,
         status: bk.status,

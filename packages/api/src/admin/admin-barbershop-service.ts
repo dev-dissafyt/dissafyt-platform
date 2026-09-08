@@ -231,17 +231,14 @@ export class AdminBarbershopService {
 
     if (filters?.date && filters.date !== 'all') {
       if (filters.date === 'upcoming') {
-        const todayStart = new Date();
-        todayStart.setUTCHours(0, 0, 0, 0);
-        query = query.gte('start_time', todayStart.toISOString());
+        const now = new Date();
+        query = query.gte('start_time', now.toISOString());
       } else if (filters.date === 'past') {
-        const todayStart = new Date();
-        todayStart.setUTCHours(0, 0, 0, 0);
-        query = query.lt('start_time', todayStart.toISOString());
+        const now = new Date();
+        query = query.lt('start_time', now.toISOString());
       } else {
-        const [year, month, day] = filters.date.split('-').map(Number);
-        const dayStart = new Date(Date.UTC(year, month - 1, day, 0, 0, 0)).toISOString();
-        const dayEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59)).toISOString();
+        const dayStart = new Date(`${filters.date}T00:00:00+02:00`).toISOString();
+        const dayEnd = new Date(`${filters.date}T23:59:59.999+02:00`).toISOString();
         query = query.gte('start_time', dayStart).lte('start_time', dayEnd);
       }
     }

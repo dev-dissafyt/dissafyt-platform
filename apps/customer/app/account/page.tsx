@@ -201,10 +201,15 @@ export default function AccountPage() {
 
   async function openRescheduleModal(booking: BookingItem) {
     setReschedulingBooking(booking);
-    // Default reschedule date to tomorrow
+    // Default reschedule date to tomorrow in SAST
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
-    const dateStr = tomorrow.toISOString().split('T')[0];
+    const dateStr = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Johannesburg',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(tomorrow);
     setRescheduleDate(dateStr);
     setSelectedRescheduleSlot(null);
     fetchRescheduleSlots(booking, dateStr);
@@ -360,7 +365,16 @@ export default function AccountPage() {
                 Reschedule: {reschedulingBooking.service?.name}
               </h2>
               <p className="text-xs text-zinc-400">
-                Current appointment: {new Date(reschedulingBooking.start_time).toLocaleString('en-ZA')}
+                Current appointment:{' '}
+                {new Date(reschedulingBooking.start_time).toLocaleString('en-ZA', {
+                  timeZone: 'Africa/Johannesburg',
+                  weekday: 'short',
+                  month: 'short',
+                  day: 'numeric',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                  hour12: false,
+                })}
               </p>
             </div>
             <Button
@@ -381,7 +395,12 @@ export default function AccountPage() {
               <Input
                 id="rescheduleDate"
                 type="date"
-                min={new Date().toISOString().split('T')[0]}
+                min={new Intl.DateTimeFormat('en-CA', {
+                  timeZone: 'Africa/Johannesburg',
+                  year: 'numeric',
+                  month: '2-digit',
+                  day: '2-digit',
+                }).format(new Date())}
                 value={rescheduleDate}
                 onChange={(e) => {
                   setRescheduleDate(e.target.value);
@@ -562,12 +581,18 @@ export default function AccountPage() {
                             <span className="flex items-center text-zinc-200">
                               <Clock className="mr-1 h-3.5 w-3.5 text-amber-500" />
                               {startDate.toLocaleDateString('en-ZA', {
+                                timeZone: 'Africa/Johannesburg',
                                 weekday: 'short',
                                 month: 'short',
                                 day: 'numeric',
                               })}{' '}
                               at{' '}
-                              {startDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {startDate.toLocaleTimeString('en-ZA', {
+                                timeZone: 'Africa/Johannesburg',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                                hour12: false,
+                              })}
                             </span>
                             {booking.service?.duration_minutes && (
                               <span className="text-zinc-500">

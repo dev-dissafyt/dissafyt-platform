@@ -531,10 +531,19 @@ export default function AdminBarbershopPage() {
                       <div className="flex items-start space-x-4">
                         <div className="flex flex-col items-center justify-center rounded-lg border border-stone-800 bg-stone-950 p-2.5 min-w-[75px] text-center">
                           <span className="text-xs font-bold text-amber-400">
-                            {startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {startTime.toLocaleTimeString('en-ZA', {
+                              timeZone: 'Africa/Johannesburg',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: false,
+                            })}
                           </span>
                           <span className="text-[10px] text-stone-500 uppercase">
-                            {startTime.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                            {startTime.toLocaleDateString('en-ZA', {
+                              timeZone: 'Africa/Johannesburg',
+                              month: 'short',
+                              day: 'numeric',
+                            })}
                           </span>
                         </div>
 

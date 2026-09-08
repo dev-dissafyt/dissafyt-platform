@@ -1,5 +1,66 @@
 import { getSupabaseAdminClient, BarberService, Booking, BookingWithDetails, Staff, BookingStatus } from '@dissafyt/database';
 
+export const SAST_TIMEZONE = 'Africa/Johannesburg';
+export const SAST_OFFSET = '+02:00';
+export const SLOT_STEP_MINUTES = 30;
+
+/**
+ * Returns the date and time components formatted in SAST (Africa/Johannesburg).
+ */
+export function getSASTComponents(dateInput: Date | string): {
+  weekday: string;
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  timeLabel: string;
+  dateLabel: string;
+} {
+  const d = typeof dateInput === 'string' ? new Date(dateInput) : dateInput;
+  const formatter = new Intl.DateTimeFormat('en-CA', {
+    timeZone: SAST_TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    weekday: 'short',
+    hour12: false,
+  });
+
+  const parts = formatter.formatToParts(d);
+  const partMap: Record<string, string> = {};
+  for (const part of parts) {
+    partMap[part.type] = part.value;
+  }
+
+  const hour = parseInt(partMap.hour || '0', 10);
+  const minute = parseInt(partMap.minute || '0', 10);
+  const year = parseInt(partMap.year || '0', 10);
+  const month = parseInt(partMap.month || '0', 10);
+  const day = parseInt(partMap.day || '0', 10);
+  const weekday = partMap.weekday || 'Mon';
+
+  return {
+    weekday,
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    timeLabel: `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`,
+    dateLabel: `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`,
+  };
+}
+
+/**
+ * Rounds duration up to nearest slot step (e.g. 50m -> 60m).
+ */
+export function getEffectiveDurationMinutes(durationMinutes: number): number {
+  return Math.ceil(Math.max(1, durationMinutes) / SLOT_STEP_MINUTES) * SLOT_STEP_MINUTES;
+}
+
 export interface AvailableSlot {
   time: string; // e.g. "09:00"
   startTime: string; // ISO 8601 string
@@ -36,7 +97,8 @@ export class BarbershopService {
 
   /**
    * Calculates real-time available time slots for a specific date and service.
-   * Accounts for shop operating hours, service duration, and existing bookings.
+   * Accounts for shop operating hours, service duration (rounded to slot increments),
+   * South Africa Standard Time (SAST, UTC+2), and existing bookings.
    */
   static async getAvailableSlots(params: {
     date: string; // "YYYY-MM-DD"
@@ -68,28 +130,27 @@ export class BarbershopService {
       return { slots: [], service, error: 'No active barbers available for this request.' };
     }
 
-    // 3. Determine shop operating hours for the given day
-    const [year, month, day] = params.date.split('-').map(Number);
-    const targetDate = new Date(Date.UTC(year, month - 1, day));
-    const dayOfWeek = targetDate.getUTCDay(); // 0 = Sunday, 1 = Monday, ... 6 = Saturday
+    // 3. Determine shop operating hours for the given day in SAST
+    const midday = new Date(`${params.date}T12:00:00${SAST_OFFSET}`);
+    const { weekday } = getSASTComponents(midday);
 
-    if (dayOfWeek === 0) {
+    if (weekday === 'Sun') {
       // Barbershop closed on Sundays
       return { slots: [], service };
     }
 
-    const openHour = 9; // 09:00
-    const closeHour = dayOfWeek === 6 ? 17 : 18; // Saturday closes at 17:00, Mon-Fri at 18:00
-    const slotStepMinutes = 30; // 30-minute schedule increments
+    const openHour = 9; // 09:00 SAST
+    const closeHour = weekday === 'Sat' ? 17 : 18; // Sat closes at 17:00, Mon-Fri at 18:00
+    const effectiveDurationMinutes = getEffectiveDurationMinutes(service.duration_minutes);
 
-    // 4. Fetch existing bookings for the day (not cancelled)
-    const dayStartISO = new Date(Date.UTC(year, month - 1, day, 0, 0, 0)).toISOString();
-    const dayEndISO = new Date(Date.UTC(year, month - 1, day, 23, 59, 59)).toISOString();
+    // 4. Fetch existing bookings for the day in SAST (not cancelled)
+    const dayStartISO = new Date(`${params.date}T00:00:00${SAST_OFFSET}`).toISOString();
+    const dayEndISO = new Date(`${params.date}T23:59:59.999${SAST_OFFSET}`).toISOString();
 
     const { data: bookings, error: bErr } = await admin
       .from('bookings')
       .select('id, staff_id, start_time, end_time, status')
-      .gte('start_time', dayStartISO)
+      .gte('end_time', dayStartISO)
       .lte('start_time', dayEndISO)
       .neq('status', 'cancelled');
 
@@ -101,15 +162,16 @@ export class BarbershopService {
     // 5. Generate candidate slots and test collisions
     const slots: AvailableSlot[] = [];
     const now = new Date();
+    const closingTime = new Date(`${params.date}T${String(closeHour).padStart(2, '0')}:00:00${SAST_OFFSET}`);
 
     for (let hour = openHour; hour < closeHour; hour++) {
-      for (let minute = 0; minute < 60; minute += slotStepMinutes) {
-        // Build start & end timestamp in UTC
-        const slotStart = new Date(Date.UTC(year, month - 1, day, hour, minute, 0));
-        const slotEnd = new Date(slotStart.getTime() + service.duration_minutes * 60000);
+      for (let minute = 0; minute < 60; minute += SLOT_STEP_MINUTES) {
+        const timeLabel = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
+        // Construct candidate slot start explicitly in SAST
+        const slotStart = new Date(`${params.date}T${timeLabel}:00${SAST_OFFSET}`);
+        const slotEnd = new Date(slotStart.getTime() + effectiveDurationMinutes * 60000);
 
-        // Do not allow slots that exceed closing time
-        const closingTime = new Date(Date.UTC(year, month - 1, day, closeHour, 0, 0));
+        // Do not allow slots where appointment duration exceeds closing time
         if (slotEnd > closingTime) {
           continue;
         }
@@ -121,7 +183,6 @@ export class BarbershopService {
 
         // Find which barbers are free during [slotStart, slotEnd)
         const freeStaff = activeStaff.filter((barber) => {
-          // Check collision with existing bookings for this barber
           const hasCollision = existingBookings.some((b) => {
             if (b.staff_id && b.staff_id !== barber.id) {
               return false; // Booking belongs to another barber
@@ -129,15 +190,19 @@ export class BarbershopService {
             const bStart = new Date(b.start_time);
             const bEnd = new Date(b.end_time);
 
-            // Overlap condition: start < bEnd AND end > bStart
-            return slotStart < bEnd && slotEnd > bStart;
+            // Existing booking's duration is also protected to its 30-min block
+            const bDurationMins = Math.round((bEnd.getTime() - bStart.getTime()) / 60000);
+            const effectiveBDuration = getEffectiveDurationMinutes(bDurationMins);
+            const effectiveBEnd = new Date(bStart.getTime() + effectiveBDuration * 60000);
+
+            // Overlap condition: slotStart < bEnd AND slotEnd > bStart
+            return slotStart < effectiveBEnd && slotEnd > bStart;
           });
 
           return !hasCollision;
         });
 
         if (freeStaff.length > 0) {
-          const timeLabel = `${String(hour).padStart(2, '0')}:${String(minute).padStart(2, '0')}`;
           slots.push({
             time: timeLabel,
             startTime: slotStart.toISOString(),
@@ -186,7 +251,28 @@ export class BarbershopService {
       return { success: false, error: 'Appointments cannot be booked in the past.' };
     }
 
-    const endTime = new Date(startTime.getTime() + service.duration_minutes * 60000);
+    const effectiveDurationMinutes = getEffectiveDurationMinutes(service.duration_minutes);
+    const endTime = new Date(startTime.getTime() + effectiveDurationMinutes * 60000);
+
+    // Validate shop operating hours in SAST
+    const sastStart = getSASTComponents(startTime);
+    const sastEnd = getSASTComponents(endTime);
+
+    if (sastStart.weekday === 'Sun') {
+      return { success: false, error: 'Ace of Fyt is closed on Sundays.' };
+    }
+
+    const openHour = 9;
+    const closeHour = sastStart.weekday === 'Sat' ? 17 : 18;
+    const startDecimalHour = sastStart.hour + sastStart.minute / 60;
+    const endDecimalHour = sastEnd.hour + sastEnd.minute / 60;
+
+    if (startDecimalHour < openHour || endDecimalHour > closeHour || sastStart.dateLabel !== sastEnd.dateLabel) {
+      return {
+        success: false,
+        error: `Appointments must fall within operating hours (09:00 - ${closeHour}:00 SAST).`,
+      };
+    }
 
     // 2. Resolve and assign barber
     let assignedStaffId = input.staff_id || null;
@@ -348,21 +434,32 @@ export class BarbershopService {
       return { success: false, error: 'Unauthorized to reschedule this appointment.' };
     }
 
-    const duration = existing.service?.duration_minutes || 30;
+    const rawDuration = existing.service?.duration_minutes || 30;
+    const effectiveDuration = getEffectiveDurationMinutes(rawDuration);
     const startTime = new Date(params.newStartTime);
-    const endTime = new Date(startTime.getTime() + duration * 60 * 1000);
+    if (isNaN(startTime.getTime())) {
+      return { success: false, error: 'Invalid reschedule start time format.' };
+    }
+    const endTime = new Date(startTime.getTime() + effectiveDuration * 60 * 1000);
 
-    // Validate shop operating hours
-    const dayOfWeek = startTime.getUTCDay();
-    if (dayOfWeek === 0) {
+    // Validate shop operating hours in SAST
+    const sastStart = getSASTComponents(startTime);
+    const sastEnd = getSASTComponents(endTime);
+
+    if (sastStart.weekday === 'Sun') {
       return { success: false, error: 'Ace of Fyt is closed on Sundays.' };
     }
+
     const openHour = 9;
-    const closeHour = dayOfWeek === 6 ? 17 : 18;
-    const startHour = startTime.getUTCHours() + startTime.getUTCMinutes() / 60;
-    const endHour = endTime.getUTCHours() + endTime.getUTCMinutes() / 60;
-    if (startHour < openHour || endHour > closeHour) {
-      return { success: false, error: `Appointments must fall within operating hours (09:00 - ${closeHour}:00).` };
+    const closeHour = sastStart.weekday === 'Sat' ? 17 : 18;
+    const startDecimalHour = sastStart.hour + sastStart.minute / 60;
+    const endDecimalHour = sastEnd.hour + sastEnd.minute / 60;
+
+    if (startDecimalHour < openHour || endDecimalHour > closeHour || sastStart.dateLabel !== sastEnd.dateLabel) {
+      return {
+        success: false,
+        error: `Appointments must fall within operating hours (09:00 - ${closeHour}:00 SAST).`,
+      };
     }
 
     const targetStaffId = params.newStaffId || existing.staff_id;
