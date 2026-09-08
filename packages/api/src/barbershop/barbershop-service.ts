@@ -61,6 +61,38 @@ export function getEffectiveDurationMinutes(durationMinutes: number): number {
   return Math.ceil(Math.max(1, durationMinutes) / SLOT_STEP_MINUTES) * SLOT_STEP_MINUTES;
 }
 
+export interface BarbershopLocation {
+  id: string;
+  name: string;
+  slug: string;
+  address: string;
+  city: string;
+  province: string;
+  country: string;
+  phone: string;
+  is_flagship: boolean;
+  is_active: boolean;
+  capacity_chairs: number;
+  operating_hours_display: string;
+}
+
+export const DEFAULT_LOCATIONS: BarbershopLocation[] = [
+  {
+    id: 'loc-jhb-flagship',
+    name: 'Dissafyt Studio, Johannesburg',
+    slug: 'dissafyt-studio-jhb',
+    address: 'Ace of Fyt Flagship Studio, Johannesburg',
+    city: 'Johannesburg',
+    province: 'Gauteng',
+    country: 'South Africa',
+    phone: '+27 82 123 4567',
+    is_flagship: true,
+    is_active: true,
+    capacity_chairs: 2,
+    operating_hours_display: 'Mon-Fri: 09:00 - 18:00 | Sat: 09:00 - 17:00 | Sun: Closed',
+  },
+];
+
 export interface AvailableSlot {
   time: string; // e.g. "09:00"
   startTime: string; // ISO 8601 string
@@ -74,9 +106,17 @@ export interface CreateBookingInput {
   staff_id?: string | null;
   start_time: string; // ISO string
   notes?: string;
+  location_id?: string | null;
 }
 
 export class BarbershopService {
+  /**
+   * Lists all barbershop physical locations / studios.
+   */
+  static async listLocations(): Promise<BarbershopLocation[]> {
+    return DEFAULT_LOCATIONS;
+  }
+
   /**
    * Retrieves all active barbershop staff.
    */

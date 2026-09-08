@@ -277,6 +277,12 @@ export default function BookPage() {
               </span>
             </div>
             <div className="flex justify-between border-b border-zinc-800 pb-2">
+              <span className="text-xs text-zinc-400 uppercase tracking-wider">Location</span>
+              <span className="text-sm font-semibold text-white flex items-center">
+                <MapPin className="h-3.5 w-3.5 text-amber-500 mr-1.5" /> Dissafyt Studio, Johannesburg
+              </span>
+            </div>
+            <div className="flex justify-between border-b border-zinc-800 pb-2">
               <span className="text-xs text-zinc-400 uppercase tracking-wider">Status</span>
               <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
                 Confirmed
@@ -552,6 +558,12 @@ export default function BookPage() {
               <div className="flex justify-between">
                 <span className="text-zinc-400">Time</span>
                 <span className="text-amber-400 font-bold">{selectedSlot?.time || 'Not chosen'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-zinc-400">Location</span>
+                <span className="text-white font-medium flex items-center">
+                  <MapPin className="h-3 w-3 mr-1 text-amber-500" /> Dissafyt Studio, JHB
+                </span>
               </div>
             </div>
 

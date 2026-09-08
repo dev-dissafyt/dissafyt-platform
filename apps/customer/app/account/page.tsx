@@ -19,6 +19,7 @@ import {
   Calendar,
   RefreshCw,
   AlertCircle,
+  MapPin,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -576,8 +577,8 @@ export default function AccountPage() {
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap items-center justify-between text-xs text-zinc-400 pt-1">
-                          <div className="flex items-center space-x-3">
+                        <div className="flex flex-wrap items-center justify-between text-xs text-zinc-400 pt-1 gap-2">
+                          <div className="flex flex-wrap items-center gap-3">
                             <span className="flex items-center text-zinc-200">
                               <Clock className="mr-1 h-3.5 w-3.5 text-amber-500" />
                               {startDate.toLocaleDateString('en-ZA', {
@@ -593,6 +594,10 @@ export default function AccountPage() {
                                 minute: '2-digit',
                                 hour12: false,
                               })}
+                            </span>
+                            <span className="flex items-center text-zinc-300">
+                              <MapPin className="mr-1 h-3.5 w-3.5 text-amber-500" />
+                              Dissafyt Studio, Johannesburg
                             </span>
                             {booking.service?.duration_minutes && (
                               <span className="text-zinc-500">
