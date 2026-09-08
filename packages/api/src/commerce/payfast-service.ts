@@ -19,9 +19,17 @@ export interface PayfastNotifyPayload {
 }
 
 export class PayfastService {
-  private static merchantId = process.env.PAYFAST_MERCHANT_ID || process.env.NEXT_PUBLIC_PAYFAST_MERCHANT_ID || '17675995';
-  private static passphrase = process.env.PAYFAST_PASSPHRASE || 'Diss_fyt_Wat07081';
-  private static host = process.env.PAYFAST_ENVIRONMENT || 'https://payment.payfast.io/eng/process';
+  private static get merchantId(): string {
+    return process.env.PAYFAST_MERCHANT_ID || process.env.NEXT_PUBLIC_PAYFAST_MERCHANT_ID || '17675995';
+  }
+
+  private static get passphrase(): string {
+    return process.env.PAYFAST_PASSPHRASE || 'Diss_fyt_Wat07081';
+  }
+
+  private static get host(): string {
+    return process.env.PAYFAST_ENVIRONMENT || 'https://payment.payfast.io/eng/process';
+  }
 
   /**
    * Generates MD5 signature for PayFast transactions.
@@ -67,9 +75,12 @@ export class PayfastService {
     const userId = payload.custom_str2;
     const paymentStatus = payload.payment_status?.toUpperCase();
     const amount = parseFloat(payload.amount_gross || '0');
+    const isSubscription = Boolean(payload.token || payload.subscription_type);
+    const relatedType = isSubscription ? 'subscription' : 'order';
+    const relatedId = orderId || payload.token || payload.pf_payment_id || 'unassigned';
 
-    if (!orderId) {
-      return { success: false, message: 'Missing order reference (custom_str1 or m_payment_id)' };
+    if (!orderId && !isSubscription && !payload.pf_payment_id) {
+      return { success: false, message: 'Missing transaction reference (m_payment_id, custom_str1, or token)' };
     }
 
     try {
@@ -86,8 +97,8 @@ export class PayfastService {
           amount,
           currency: 'ZAR',
           status,
-          related_type: 'order',
-          related_id: orderId,
+          related_type: relatedType,
+          related_id: relatedId,
         })
         .select()
         .single();
