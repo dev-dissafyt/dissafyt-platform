@@ -1,8 +1,25 @@
 # Dissafyt Platform — Master Documentation
 
-Dissafyt is being designed as a unified business platform rather than a single website.
+This directory is the working source of truth for the Dissafyt platform.
 
-The platform will provide a shared identity, backend/API, PostgreSQL database, business logic and administrative capabilities. Different customer and staff experiences will sit on top of that common foundation.
+## Documentation rules
+
+- Business requirements belong in the relevant specification document.
+- Important changes in thinking are recorded in `06-build/DEVELOPMENT_JOURNAL.md` (or `journal/development.md`).
+- Major architectural decisions are recorded in `06-build/DECISIONS.md` (or `architecture/decisions.md`).
+- Database design follows the confirmed business model; it does not define the business model.
+
+## Current core model
+
+Dissafyt is a digital platform that can support multiple business modules. The Barbershop module is designed to scale beyond a single physical shop by supporting multiple service providers and locations through shared platform infrastructure.
+
+The platform has:
+- A customer-facing web application.
+- A separate administrative application.
+- A dedicated backend API boundary (`@dissafyt/api`, with independent deployment at `api.dissafyt.com`).
+- Shared authentication via Supabase Auth.
+- A shared PostgreSQL database.
+- Business modules such as Streetwear Commerce and Ace of Fyt Barbershop.
 
 ## Documentation map
 

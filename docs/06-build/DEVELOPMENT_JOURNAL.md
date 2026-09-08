@@ -240,4 +240,52 @@ Customers need to book grooming sessions with live availability without double-b
 - Ran `verify-phase7.mjs`: verified active staff, service duration retrieval, booking creation, anti double-booking collision detection, admin status transition (`confirmed` -> `completed`), customer booking history retrieval, cancellation flow, and cleanup.
 - Executed full Turborepo build (`pnpm build`): both apps compiled cleanly with 0 type errors.
 
+---
 
+## Entry: Barbershop Scaling Model (Platform & Provider Network)
+
+### Date
+2026-09-08
+
+### Observation
+A traditional barbershop scales primarily through physical expansion: more chairs, more square footage, more staff, and potentially more leased premises. That creates a physical ceiling and increases fixed overheads.
+
+### Decision
+The Dissafyt Barbershop module is designed to scale as a digital network supporting multiple providers and locations through one shared platform core. Dissafyt does not need to own every physical location in the network.
+
+### Consequence
+The system must maintain clean separation between:
+- Customers
+- Service Providers (Barbers)
+- Physical Locations
+- Services
+- Availability
+- Bookings
+
+The platform is capable of supporting Dissafyt-operated flagship locations as well as independent or affiliated provider networks.
+
+### Strategic Implication
+The objective is to increase platform transaction volume without requiring proportional increases in founder-owned physical infrastructure. The physical operation serves as the initial validation environment, after which the proven workflows can be offered through the wider provider network.
+
+---
+
+## Entry: Phase 8 — Platform Integration & Executive Reporting
+
+### Date
+2026-09-08
+
+### Phase
+Phase 8 — Platform Integration
+
+### Objective
+Unify commerce and barbershop operations into an executive reporting dashboard, provide self-service appointment rescheduling and notification preferences for customers, and consolidate payment audit records.
+
+### Implementation
+- Built `ReportingService` in `@dissafyt/api` calculating gross volume, module breakdown (clothing vs grooming), order fulfillment pipeline, and barber performance.
+- Upgraded Admin portal (`/`) with live KPI cards, interactive order progress counters, and real-time activity stream.
+- Built Finance & Payment Audit portal (`/finance`) tracking PayFast gateway logs.
+- Added self-service appointment rescheduling with dynamic 30-min slot selector and notification preferences in customer `/account`.
+
+### Testing
+- Automated verification via `verify-phase8.mjs` passed all checks.
+- Zero TypeScript errors across both Next.js applications.

@@ -62,20 +62,37 @@ Do not begin with microservices or distributed infrastructure.
 
 ---
 
-## Future decisions
+## Decision 007 — Dedicated Backend API Boundary
 
-Continue adding decisions here.
+**Status:** Accepted
 
-Recommended format:
+The backend business logic is centralized in `@dissafyt/api`, with an established architectural path for independent deployment at `api.dissafyt.com`.
 
-```text
-Decision number
-Title
-Status
-Date
-Context
-Options
-Decision
-Reason
-Consequences
-```
+**Reason:**
+- Centralizes business rules (availability calculations, collision prevention, PayFast signature verification).
+- Provides one uniform interface for both customer and admin applications.
+- Enables future mobile or third-party apps to consume the exact same capabilities without rewriting business logic.
+
+---
+
+## Decision 008 — Barbershop is a Network-Capable Module
+
+**Status:** Accepted
+
+The Barbershop module must not be architected around a single shop or single barber.
+
+**Reason:**
+- Physical premises create a scaling ceiling and increase fixed overheads.
+- Providers (barbers) and physical locations need to be independently represented.
+- The platform digital infrastructure must support multiple barbers, multiple branches, and future affiliated provider networks.
+
+---
+
+## Decision 009 — Documentation Follows the Business Model
+
+**Status:** Accepted
+
+Database schemas and API design must follow confirmed business requirements.
+
+**Reason:** We should not design arbitrary database tables first and then force real-world business workflows to fit the database.
+

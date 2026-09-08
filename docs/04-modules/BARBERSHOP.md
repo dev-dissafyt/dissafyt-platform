@@ -2,145 +2,177 @@
 
 ## 1. Purpose
 
-The barbershop module provides appointment-based services through the shared Dissafyt identity and API.
+The Barbershop module provides the digital infrastructure for booking and managing barbering and grooming services.
 
-The module may represent Ace of Fyt or another Dissafyt service brand.
+It is designed to scale beyond a single physical shop by supporting multiple service providers and multiple locations through shared platform infrastructure.
 
-## 2. Core entities
+The module represents Ace of Fyt Grooming and can expand to support affiliated service brands.
 
-```text
-Customer
-  |
-Booking
-  |
-+-- Service
-+-- Staff/Barber
-+-- Date/time
-+-- Status
-+-- Payment where applicable
-```
+---
 
-## 3. Services
+## 2. Core Entities
 
-A service should support:
+The business model clearly separates:
 
-- name
-- description
-- price
-- duration
-- active status
-- optional staff restrictions
+- **Customer**
+- **Service provider (Staff/Barber)**
+- **Location**
+- **Service**
+- **Availability**
+- **Booking**
 
-Examples may include:
-
-- haircut
-- consultation
-- combined service
-- future packages
-
-## 4. Staff
-
-Staff records may include:
-
-- linked user ID
-- display name
-- role
-- active status
-- services provided
-- scheduling information
-
-## 5. Availability
-
-Availability should account for:
-
-- staff working hours
-- unavailable periods
-- existing bookings
-- service duration
-- booking rules
-
-The backend must calculate authoritative availability.
-
-## 6. Booking flow
+These entities must not be treated as interchangeable. Dissafyt must not assume that one provider equals one location or that one location equals one provider.
 
 ```text
 Customer
   |
-Choose service
-  |
-Choose staff (optional)
-  |
-Choose date
-  |
-Retrieve available times
-  |
-Choose time
-  |
-Review
-  |
-Confirm
-  |
-Create booking
-  |
-Confirmation
+  +---> Service
+          |
+          +---> Provider (Barber)
+                  |
+                  +---> Location
+                          |
+                          +---> Time Slot (Availability)
+                                  |
+                                  +---> Booking (Status, Payment)
 ```
 
-## 7. Booking states
+### Customer
+A customer has a platform-level Dissafyt account and can interact with the Barbershop module.
+- Name and contact information
+- Unified booking history
+- Service history & preferences
+- Relevant notes & waybill details
 
-Initial model:
+### Service Provider (Barber / Staff)
+A service provider is a grooming specialist who provides barbering or related services.
+- Linked user ID & profile
+- Display name & biography
+- Role (`barber`, `staff`)
+- Associated locations (single or multi-location)
+- Service competencies & duration overrides
+- Individual availability schedules
+
+### Location
+A physical establishment where grooming services are performed.
+- Address & city information
+- Operating hours (e.g. Mon-Fri 09:00-18:00, Sat 09:00-17:00, Sun closed)
+- Associated providers & assigned chairs
+- Available services & capacity rules
+
+### Service
+Defines what the customer books (e.g. The Full Combo, Signature Haircut, Beard Sculpting, VIP Subscriptions).
+- Name, description, base price
+- Duration in minutes
+- Active status
+- Provider availability & location availability
+- Subscription parameters (plan code, billing frequency, recurring cycles)
+
+### Availability
+Authoritatively calculated by the backend API (`BarbershopService` / `AvailabilityEngine`):
+- Operating hours per location
+- Staff working hours & breaks
+- Service duration requirements
+- Existing confirmed bookings (anti-double-booking collision detection)
+
+### Booking
+A confirmed reservation binding customer, service, provider, location, and time slot.
+- Initial status model: `pending`, `confirmed`, `completed`, `cancelled`, `no_show`.
+- Immutable audit log & payment link (`public.payments`).
+
+---
+
+## 3. Booking Flow
 
 ```text
-pending
-confirmed
-completed
-cancelled
-no_show
+Customer
+  |
+Choose Service (Regular haircut or Monthly Subscription)
+  |
+Choose Master Barber (or "Any Barber")
+  |
+Choose Date
+  |
+Retrieve Live 30-min Available Slots (Dynamic API check)
+  |
+Choose Slot
+  |
+Review & Notes
+  |
+Confirm / PayFast Checkout
+  |
+Instant Confirmation & Account Sync
 ```
 
-Exact transitions must be defined before production.
+---
 
-## 8. Customer capabilities
+## 4. Scaling Model
 
-- browse services
-- view pricing
-- view availability
-- create booking
-- view bookings
-- cancel/reschedule where permitted
-- receive confirmations/reminders
+### Stage 1 — Single Operation (Validated MVP)
+Dissafyt begins with one physical service operation (Ace of Fyt Grooming).
+- Validates customer demand, pricing, 30-min service duration workflows.
+- Validates booking and no-show behaviour.
 
-## 9. Staff capabilities
+### Stage 2 — Multiple Providers (Implemented & Active)
+Additional barbers operate concurrently through the same platform.
+- Individual provider profiles and active states (`Ace`, `Marcus`).
+- Provider schedules and chair conflict prevention.
+- Provider performance metrics (completed cuts, upcoming appointments).
 
-Subject to permissions:
+### Stage 3 — Multiple Locations (Architectural Target)
+The platform expands to support multiple physical branches.
+- Physical `locations` entity enabled in database.
+- Customers select location, service, barber, and slot.
+- Location-specific operating hours and capacity.
 
-- view assigned bookings
-- manage permitted availability
-- update permitted booking states
+### Stage 4 — Provider & Salon Network (Strategic Horizon)
+The platform scales to support independent or affiliated barbers and shops operating their own spaces.
+- Digital booking infrastructure and unified customer management provided by Dissafyt.
+- Payments, SMS notifications, and automated recurring memberships.
+- Provider self-service portals and administrative analytics.
 
-## 10. Admin capabilities
+---
 
-- manage services
-- manage staff
-- manage schedules
-- view bookings
-- modify bookings
-- manage pricing
-- view customer booking history
+## 5. Platform Economics & Commercials
 
-## 11. Consultation extension
+The module is designed so that revenue does not depend exclusively on the founder personally performing every service.
 
-A future consultation system may attach structured consultation records to a customer and/or booking.
+Potential commercial models include:
+- Dissafyt-operated direct services.
+- Provider revenue sharing & split commissions.
+- Fixed platform fees per booking.
+- Monthly recurring subscription tiers (Silver, Gold, VIP Club).
+- Hybrid retail/service packages (haircut + streetwear bundle).
 
-This should be designed separately rather than mixing consultation data into the basic booking table.
+---
 
-## 12. Business rules
+## 6. Customer & Staff Capabilities
 
-Examples:
+### Customer Capabilities
+- Browse services and membership tiers.
+- View real-time availability without stale caching.
+- Create bookings and subscribe with PayFast recurring billing.
+- View upcoming and past appointments under a unified account.
+- Self-service reschedule and cancellation within cancellation cutoff windows.
+- Configure notification preferences (SMS/WhatsApp reminders).
 
-- prevent double-booking
-- respect service duration
-- prevent bookings in unavailable periods
-- enforce cancellation rules
-- enforce staff/service compatibility
+### Staff Capabilities
+- View assigned upcoming appointment board.
+- Update booking status (`Confirm`, `Complete`, `No-Show`).
+- View customer Waybill/notes and service requirements.
 
-These rules belong in the backend.
+### Admin Capabilities
+- Real-time schedule calendar with date filters (`upcoming`, `today`, `all`).
+- Staff management (create, update, toggle active status).
+- Service catalog and monthly subscription plan configuration.
+- Operational reporting (gross grooming volume, cuts per barber).
+
+---
+
+## 7. Business Rules (Enforced at Backend API Boundary)
+
+1. **Authoritative Slot Calculation**: Slot availability is strictly computed on the backend (`@dissafyt/api`), never trusted from the client.
+2. **Anti-Collision Guard**: Overlapping time slots for the same barber cannot be double-booked.
+3. **Shop Hours Enforcement**: Bookings cannot start or end outside operational hours; Sunday bookings are rejected.
+4. **Reschedule Integrity**: Rescheduling an appointment verifies target slot availability and updates timestamps atomically.
+5. **Decoupled Identity**: Customers use their platform profile; barbers use linked staff records.
