@@ -10,14 +10,14 @@ Build one verified layer at a time.
 
 # Phase 0 — Documentation
 
-- [ ] Master platform concept
-- [ ] Product scope
-- [ ] Architecture
-- [ ] Database concept
-- [ ] Authentication concept
-- [ ] API concept
-- [ ] Roles/permissions
-- [ ] Module specifications
+- [x] Master platform concept
+- [x] Product scope
+- [x] Architecture
+- [x] Database concept
+- [x] Authentication concept
+- [x] API concept
+- [x] Roles/permissions
+- [x] Module specifications
 
 Exit condition:
 
@@ -27,13 +27,13 @@ The architecture is understandable before implementation begins.
 
 # Phase 1 — Infrastructure Foundation
 
-- [ ] Create source-control repositories/project structure
-- [ ] Create Supabase project
-- [ ] Confirm PostgreSQL access
-- [ ] Configure development environment
-- [ ] Configure environment variables
-- [ ] Establish migration workflow
-- [ ] Establish basic API project structure
+- [x] Create source-control repositories/project structure
+- [x] Create Supabase project
+- [x] Confirm PostgreSQL access
+- [x] Configure development environment
+- [x] Configure environment variables
+- [x] Establish migration workflow
+- [x] Establish basic API project structure
 
 Exit condition:
 
