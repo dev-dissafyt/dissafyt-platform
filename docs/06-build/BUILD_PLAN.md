@@ -43,18 +43,18 @@ Application can securely communicate with the development database/platform.
 
 # Phase 2 — Identity
 
-- [ ] Configure Supabase Auth
-- [ ] Test registration
-- [ ] Test login
-- [ ] Test logout
-- [ ] Test session persistence
-- [ ] Test invalid/expired session
-- [ ] Create profile model
-- [ ] Link profile to user identity
-- [ ] Assign default customer role
-- [ ] Implement `GET /users/me`
-- [ ] Implement profile update
-- [ ] Test unauthorized access
+- [x] Configure Supabase Auth
+- [x] Test registration
+- [x] Test login
+- [x] Test logout
+- [x] Test session persistence
+- [x] Test invalid/expired session
+- [x] Create profile model
+- [x] Link profile to user identity
+- [x] Assign default customer role
+- [x] Implement `GET /users/me`
+- [x] Implement profile update
+- [x] Test unauthorized access
 
 Exit condition:
 
