@@ -1,11 +1,12 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import Image from 'next/image';
 import './globals.css';
 import { LayoutDashboard, Users, ShoppingBag, Scissors, Settings, ShieldAlert } from 'lucide-react';
 
 export const metadata: Metadata = {
-  title: 'DISSafyt Platform Administration',
-  description: 'Central operational control for DISSafyt Platform.',
+  title: 'Dissafyt Platform Administration',
+  description: 'Central operational control for Dissafyt Platform.',
 };
 
 export default function AdminLayout({
@@ -19,11 +20,17 @@ export default function AdminLayout({
         {/* Admin Sidebar */}
         <aside className="w-64 border-r border-stone-800 bg-stone-900/50 flex flex-col justify-between p-4">
           <div className="space-y-6">
-            <div className="flex items-center space-x-2 px-2 py-3 border-b border-stone-800">
-              <span className="font-extrabold text-lg tracking-wider text-amber-500 uppercase">
-                DISSafyt
-              </span>
-              <span className="rounded bg-stone-800 px-1.5 py-0.5 text-xs text-stone-400 font-mono">
+            <div className="flex items-center justify-between px-2 py-3 border-b border-stone-800">
+              <Link href="/">
+                <Image
+                  src="/logo.png"
+                  alt="Dissafyt"
+                  width={120}
+                  height={34}
+                  className="h-7 w-auto object-contain"
+                />
+              </Link>
+              <span className="rounded bg-stone-800 px-1.5 py-0.5 text-[10px] text-stone-400 font-mono">
                 ADMIN
               </span>
             </div>

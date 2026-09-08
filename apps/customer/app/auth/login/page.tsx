@@ -4,6 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getSupabaseBrowserClient } from '@dissafyt/database';
+import Image from 'next/image';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from '@dissafyt/ui';
 import { Lock, Mail } from 'lucide-react';
 
@@ -44,8 +45,18 @@ export default function LoginPage() {
   return (
     <div className="flex min-h-[calc(100vh-12rem)] items-center justify-center px-4 py-12">
       <Card className="w-full max-w-md border-zinc-800 bg-zinc-900/80">
-        <CardHeader className="space-y-1 text-center">
-          <CardTitle className="text-2xl font-bold text-white">Sign In to DISSafyt</CardTitle>
+        <CardHeader className="space-y-3 text-center flex flex-col items-center">
+          <Link href="/" className="inline-block mb-1">
+            <Image
+              src="/logo.png"
+              alt="Dissafyt"
+              width={140}
+              height={42}
+              className="h-9 w-auto object-contain"
+              priority
+            />
+          </Link>
+          <CardTitle className="text-2xl font-bold text-white">Sign In to Dissafyt</CardTitle>
           <CardDescription className="text-zinc-400">
             Access your clothing orders, barbershop bookings, and profile.
           </CardDescription>

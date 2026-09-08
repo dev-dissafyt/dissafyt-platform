@@ -1,4 +1,4 @@
-# DISSafyt Infrastructure
+# Dissafyt Infrastructure
 
 ## Initial technology direction
 

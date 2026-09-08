@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.PROJECT_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-console.log('--- DISSafyt Platform Admin Operations Verification ---');
+console.log('--- Dissafyt Platform Admin Operations Verification ---');
 console.log('Target Supabase:', url);
 
 const admin = createClient(url, serviceKey, {
@@ -22,7 +22,7 @@ async function runTest() {
 
   console.log('Created category:', cat?.name);
 
-  const testProdName = `DISSafyt Test Jacket ${Date.now()}`;
+  const testProdName = `Dissafyt Test Jacket ${Date.now()}`;
   const testProdSlug = `test-jacket-${Date.now()}`;
   const { data: product, error: prodErr } = await admin
     .from('products')

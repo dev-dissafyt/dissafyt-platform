@@ -1,8 +1,8 @@
-# DISSafyt Customer Application
+# Dissafyt Customer Application
 
 ## Purpose
 
-The customer application is the public-facing interface to the DISSafyt platform.
+The customer application is the public-facing interface to the Dissafyt platform.
 
 ## Responsibilities
 
@@ -40,7 +40,7 @@ Home
 
 ## Authentication
 
-The app should use the shared DISSafyt authentication system.
+The app should use the shared Dissafyt authentication system.
 
 It must not create a second customer account system.
 
@@ -60,7 +60,7 @@ POST /bookings
 
 ## UX principle
 
-The customer should experience one coherent DISSafyt account even when interacting with different modules.
+The customer should experience one coherent Dissafyt account even when interacting with different modules.
 
 ## State
 

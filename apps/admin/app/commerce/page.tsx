@@ -166,7 +166,7 @@ export default function AdminCommercePage() {
             Commerce Product Catalog
           </h1>
           <p className="text-sm text-stone-400">
-            Create and maintain DISSafyt apparel items with PayFast checkout support.
+            Create and maintain Dissafyt apparel items with PayFast checkout support.
           </p>
         </div>
 
@@ -246,7 +246,7 @@ export default function AdminCommercePage() {
           <CardHeader className="p-0 mb-6">
             <CardTitle className="text-xl text-white">Add New Clothing Item</CardTitle>
             <CardDescription>
-              Products added here immediately appear in the public DISSafyt Storefront.
+              Products added here immediately appear in the public Dissafyt Storefront.
             </CardDescription>
           </CardHeader>
 
@@ -256,7 +256,7 @@ export default function AdminCommercePage() {
               <Input
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. DISSafyt Heavyweight Hoodie"
+                placeholder="e.g. Dissafyt Heavyweight Hoodie"
                 required
               />
             </div>

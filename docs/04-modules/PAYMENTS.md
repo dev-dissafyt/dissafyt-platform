@@ -1,4 +1,4 @@
-# DISSafyt Payments Module
+# Dissafyt Payments Module
 
 ## Purpose
 
@@ -29,7 +29,7 @@ Payment provider
    |
 Provider response/webhook
    |
-DISSafyt API
+Dissafyt API
    |
 Verify
    |

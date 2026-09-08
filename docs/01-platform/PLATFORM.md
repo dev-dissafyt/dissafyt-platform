@@ -1,8 +1,8 @@
-# DISSafyt Platform Blueprint
+# Dissafyt Platform Blueprint
 
 ## 1. Executive Summary
 
-DISSafyt is a unified digital business platform intended to support multiple products and services through a common technical and customer infrastructure.
+Dissafyt is a unified digital business platform intended to support multiple products and services through a common technical and customer infrastructure.
 
 The platform begins with two primary business experiences:
 
@@ -11,7 +11,7 @@ The platform begins with two primary business experiences:
 
 The platform is intentionally designed so these experiences do not become isolated applications with separate customers, accounts, databases and administration systems.
 
-Instead, DISSafyt has a shared platform core:
+Instead, Dissafyt has a shared platform core:
 
 - One customer identity
 - One authentication system
@@ -23,13 +23,13 @@ Instead, DISSafyt has a shared platform core:
 - Shared notification infrastructure
 - A central administration application
 
-The long-term objective is to allow new DISSafyt products, services and applications to be added without rebuilding identity, customer management and core infrastructure.
+The long-term objective is to allow new Dissafyt products, services and applications to be added without rebuilding identity, customer management and core infrastructure.
 
 ---
 
-## 2. What DISSafyt Is
+## 2. What Dissafyt Is
 
-DISSafyt is not simply:
+Dissafyt is not simply:
 
 - an online clothing store
 - a barber booking website
@@ -41,7 +41,7 @@ It is a platform.
 The website, mobile application, admin dashboard and future interfaces are clients of the platform.
 
 ```text
-                     DISSafyt Platform Core
+                     Dissafyt Platform Core
                               |
           +-------------------+-------------------+
           |                   |                   |
@@ -67,14 +67,14 @@ The website, mobile application, admin dashboard and future interfaces are clien
 
 ## 3. Product Vision
 
-A customer should have a single DISSafyt account.
+A customer should have a single Dissafyt account.
 
-That account should allow the customer to interact with multiple DISSafyt experiences without creating separate identities.
+That account should allow the customer to interact with multiple Dissafyt experiences without creating separate identities.
 
 For example:
 
 ```text
-                 DISSafyt Account
+                 Dissafyt Account
                        |
           +------------+------------+
           |            |            |
@@ -92,7 +92,7 @@ A customer should be able to:
 - view their activity
 - manage account information
 - receive notifications
-- use future DISSafyt applications with the same identity
+- use future Dissafyt applications with the same identity
 
 ---
 
@@ -102,7 +102,7 @@ Initial user categories:
 
 ### Customer
 
-The normal consumer of DISSafyt products and services.
+The normal consumer of Dissafyt products and services.
 
 ### Barber
 
@@ -133,7 +133,7 @@ Roles should be permission-based rather than hard-coded throughout the applicati
 
 ### 5.1 Customer application
 
-The customer application is the public-facing DISSafyt experience.
+The customer application is the public-facing Dissafyt experience.
 
 Potential routes:
 
@@ -250,7 +250,7 @@ The platform core contains capabilities shared across modules and applications.
 
 The key principle is:
 
-> There is one DISSafyt customer identity, not one account per module.
+> There is one Dissafyt customer identity, not one account per module.
 
 Example:
 
@@ -282,7 +282,7 @@ The current direction is to use Supabase Auth with Supabase PostgreSQL.
 
 Supabase handles the identity/authentication infrastructure.
 
-DISSafyt's API remains responsible for platform-specific authorization and business logic.
+Dissafyt's API remains responsible for platform-specific authorization and business logic.
 
 Conceptually:
 
@@ -296,7 +296,7 @@ Authentication
 Authenticated user
     |
     v
-DISSafyt API
+Dissafyt API
     |
     +-- authorization
     +-- validation
@@ -318,9 +318,9 @@ Authentication identity answers:
 
 > Who is this account?
 
-The DISSafyt profile answers:
+The Dissafyt profile answers:
 
-> What information does DISSafyt need about this customer?
+> What information does Dissafyt need about this customer?
 
 The profile may include:
 
@@ -397,7 +397,7 @@ For example:
 Customer logs in
        |
        v
-DISSafyt Account
+Dissafyt Account
        |
        +---- Shop
        |
@@ -421,7 +421,7 @@ The admin application should provide a unified operational view.
 For example:
 
 ```text
-DISSafyt Admin
+Dissafyt Admin
  |
  +-- Customers
  |
@@ -509,7 +509,7 @@ Each major piece of data should have a clear owner.
 Examples:
 
 - Auth identity → authentication system
-- Customer profile → DISSafyt database
+- Customer profile → Dissafyt database
 - Product → commerce module
 - Order → commerce module
 - Booking → barbershop module
@@ -539,7 +539,7 @@ Payment provider
   |
 Provider confirmation/webhook
   |
-DISSafyt API
+Dissafyt API
   |
 Verify payment
   |
@@ -613,7 +613,7 @@ Extract services only when actual scale or operational requirements justify it.
 The architecture should allow:
 
 ```text
-                    DISSafyt Core
+                    Dissafyt Core
                          |
        +-----------------+-----------------+
        |                 |                 |
@@ -634,7 +634,7 @@ The architecture should allow:
           Commerce              Barbershop
 ```
 
-The platform can eventually support additional DISSafyt businesses without rebuilding its identity infrastructure.
+The platform can eventually support additional Dissafyt businesses without rebuilding its identity infrastructure.
 
 ---
 

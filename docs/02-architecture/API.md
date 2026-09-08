@@ -1,8 +1,8 @@
-# DISSafyt API Specification
+# Dissafyt API Specification
 
 ## Purpose
 
-The DISSafyt API is the shared application/business layer between frontend applications and platform data.
+The Dissafyt API is the shared application/business layer between frontend applications and platform data.
 
 ## API responsibilities
 

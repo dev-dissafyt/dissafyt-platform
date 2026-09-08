@@ -1,8 +1,8 @@
-# DISSafyt Clothing / Commerce Module
+# Dissafyt Clothing / Commerce Module
 
 ## 1. Purpose
 
-The clothing module provides DISSafyt e-commerce functionality while using the shared customer identity.
+The clothing module provides Dissafyt e-commerce functionality while using the shared customer identity.
 
 ## 2. Core entities
 

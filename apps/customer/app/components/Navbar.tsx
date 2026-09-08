@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import Image from 'next/image';
 import { ShoppingBag, Scissors, User, Menu, X, ArrowRight } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@dissafyt/database';
 
@@ -49,9 +50,14 @@ export function Navbar() {
       <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
         {/* Brand Logo */}
         <Link href="/" className="flex items-center space-x-2">
-          <span className="font-extrabold text-xl tracking-wider text-zinc-100 uppercase">
-            DISS<span className="text-amber-500">afyt</span>
-          </span>
+          <Image
+            src="/logo.png"
+            alt="Dissafyt"
+            width={140}
+            height={40}
+            className="h-8 w-auto object-contain"
+            priority
+          />
         </Link>
 
         {/* Desktop Navigation Links */}

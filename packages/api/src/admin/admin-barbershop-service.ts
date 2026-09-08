@@ -227,13 +227,23 @@ export class AdminBarbershopService {
         staff:staff(*),
         customer:profiles(*)
       `)
-      .order('start_time', { ascending: false });
+      .order('start_time', { ascending: true });
 
-    if (filters?.date) {
-      const [year, month, day] = filters.date.split('-').map(Number);
-      const dayStart = new Date(Date.UTC(year, month - 1, day, 0, 0, 0)).toISOString();
-      const dayEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59)).toISOString();
-      query = query.gte('start_time', dayStart).lte('start_time', dayEnd);
+    if (filters?.date && filters.date !== 'all') {
+      if (filters.date === 'upcoming') {
+        const todayStart = new Date();
+        todayStart.setUTCHours(0, 0, 0, 0);
+        query = query.gte('start_time', todayStart.toISOString());
+      } else if (filters.date === 'past') {
+        const todayStart = new Date();
+        todayStart.setUTCHours(0, 0, 0, 0);
+        query = query.lt('start_time', todayStart.toISOString());
+      } else {
+        const [year, month, day] = filters.date.split('-').map(Number);
+        const dayStart = new Date(Date.UTC(year, month - 1, day, 0, 0, 0)).toISOString();
+        const dayEnd = new Date(Date.UTC(year, month - 1, day, 23, 59, 59)).toISOString();
+        query = query.gte('start_time', dayStart).lte('start_time', dayEnd);
+      }
     }
 
     if (filters?.staffId && filters.staffId !== 'all') {

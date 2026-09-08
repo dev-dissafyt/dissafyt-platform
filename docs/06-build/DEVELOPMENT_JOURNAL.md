@@ -1,4 +1,4 @@
-# DISSafyt Development Journal
+# Dissafyt Development Journal
 
 This document is the template for recording the actual development process.
 
@@ -89,7 +89,7 @@ Establish the initial platform architecture.
 
 ### Problem
 
-DISSafyt needs multiple applications to share one customer identity and database.
+Dissafyt needs multiple applications to share one customer identity and database.
 
 ### Decision
 
@@ -105,7 +105,7 @@ Architecture documented. Implementation begins with infrastructure and identity 
 
 ### Lesson
 
-DISSafyt is a platform with multiple interfaces, not simply a website.
+Dissafyt is a platform with multiple interfaces, not simply a website.
 
 ---
 

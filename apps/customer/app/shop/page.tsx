@@ -48,7 +48,7 @@ export default function ShopPage() {
       <div className="max-w-2xl space-y-2">
         <h1 className="text-3xl font-bold text-white flex items-center">
           <ShoppingBag className="mr-3 h-8 w-8 text-amber-500" />
-          DISSafyt Clothing Catalog
+          Dissafyt Clothing Catalog
         </h1>
         <p className="text-zinc-400">
           Curated streetwear, limited drops, and lifestyle apparel. Instant checkout with PayFast.
@@ -96,7 +96,7 @@ export default function ShopPage() {
 
                 <CardTitle className="text-xl text-white">{product.name}</CardTitle>
                 <p className="text-sm text-zinc-400 mt-2 line-clamp-2">
-                  {product.description || 'Authentic DISSafyt streetwear garment.'}
+                  {product.description || 'Authentic Dissafyt streetwear garment.'}
                 </p>
               </div>
 

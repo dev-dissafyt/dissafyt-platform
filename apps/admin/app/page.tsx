@@ -7,7 +7,7 @@ export default function AdminDashboardPage() {
       <div>
         <h1 className="text-3xl font-bold text-white">Operations Overview</h1>
         <p className="text-sm text-stone-400">
-          Unified real-time metrics across DISSafyt Commerce and Ace of Fyt Barbershop.
+          Unified real-time metrics across Dissafyt Commerce and Ace of Fyt Barbershop.
         </p>
       </div>
 

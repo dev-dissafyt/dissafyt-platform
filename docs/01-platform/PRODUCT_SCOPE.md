@@ -1,4 +1,4 @@
-# DISSafyt Product Scope
+# Dissafyt Product Scope
 
 ## In scope
 

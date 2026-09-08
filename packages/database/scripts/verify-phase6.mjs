@@ -5,7 +5,7 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.PROJECT_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 const passphrase = process.env.PAYFAST_PASSPHRASE || 'Diss_fyt_Wat07081';
 
-console.log('--- DISSafyt Platform Phase 6: Commerce & PayFast ITN Verification ---');
+console.log('--- Dissafyt Platform Phase 6: Commerce & PayFast ITN Verification ---');
 
 const admin = createClient(url, serviceKey, {
   auth: { autoRefreshToken: false, persistSession: false },
@@ -47,7 +47,7 @@ async function runTest() {
   const { data: product, error: pErr } = await admin
     .from('products')
     .insert({
-      name: `DISSafyt Signature Hoodie ${Date.now()}`,
+      name: `Dissafyt Signature Hoodie ${Date.now()}`,
       slug: `hoodie-${Date.now()}`,
       description: 'Heavyweight streetwear cotton hoodie',
       base_price: 650.00,
@@ -121,7 +121,7 @@ async function runTest() {
     m_payment_id: order.id,
     pf_payment_id: `PF-${Date.now()}`,
     payment_status: 'COMPLETE',
-    item_name: `DISSafyt Order ${order.order_number}`,
+    item_name: `Dissafyt Order ${order.order_number}`,
     amount_gross: '650.00',
     amount_fee: '-15.00',
     amount_net: '635.00',

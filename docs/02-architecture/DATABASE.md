@@ -1,4 +1,4 @@
-# DISSafyt Database Architecture
+# Dissafyt Database Architecture
 
 ## Database technology
 
@@ -8,7 +8,7 @@ PostgreSQL, managed through the selected Supabase environment.
 
 Authentication identity is managed by the authentication system.
 
-DISSafyt-specific records reference the authenticated user's ID.
+Dissafyt-specific records reference the authenticated user's ID.
 
 Conceptual structure:
 

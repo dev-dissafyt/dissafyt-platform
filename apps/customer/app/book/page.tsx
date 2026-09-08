@@ -329,7 +329,7 @@ export default function BookPage() {
 
         <div className="flex items-center space-x-2 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-lg">
           <MapPin className="h-4 w-4 text-amber-500" />
-          <span>DISSafyt Studio, Johannesburg</span>
+          <span>Dissafyt Studio, Johannesburg</span>
         </div>
       </div>
 
@@ -613,7 +613,7 @@ export default function BookPage() {
                 ) : (
                   <form onSubmit={handleInlineAuth} className="space-y-2.5 pt-2 border-t border-zinc-800">
                     <div className="flex justify-between items-center text-xs font-semibold text-white">
-                      <span>{authIsSignUp ? 'Create DISSafyt Account' : 'Sign In'}</span>
+                      <span>{authIsSignUp ? 'Create Dissafyt Account' : 'Sign In'}</span>
                       <button
                         type="button"
                         onClick={() => setAuthIsSignUp(!authIsSignUp)}

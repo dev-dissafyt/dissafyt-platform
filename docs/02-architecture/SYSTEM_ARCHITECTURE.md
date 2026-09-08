@@ -1,4 +1,4 @@
-# DISSafyt System Architecture
+# Dissafyt System Architecture
 
 ## Target model
 
@@ -12,7 +12,7 @@
                         |
                         v
               +-------------------+
-              | DISSafyt API      |
+              | Dissafyt API      |
               | Backend           |
               +---------+---------+
                         |
@@ -45,7 +45,7 @@ The authentication provider handles identity and authentication mechanics.
 
 ### Authorization
 
-DISSafyt backend logic determines whether an authenticated identity may perform an action.
+Dissafyt backend logic determines whether an authenticated identity may perform an action.
 
 ## Deployment evolution
 

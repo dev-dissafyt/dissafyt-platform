@@ -1,4 +1,4 @@
-# DISSafyt Notifications Module
+# Dissafyt Notifications Module
 
 ## Purpose
 

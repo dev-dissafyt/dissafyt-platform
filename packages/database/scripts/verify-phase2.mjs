@@ -4,7 +4,7 @@ const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.PROJECT_URL;
 const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.API_KEY;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-console.log('--- DISSafyt Platform Phase 2 Verification ---');
+console.log('--- Dissafyt Platform Phase 2 Verification ---');
 console.log('Target Supabase Project:', url);
 
 if (!serviceKey) {
@@ -43,7 +43,7 @@ async function runVerification() {
   console.log('\n[Step 3] Testing Customer Registration & Trigger...');
   const testEmail = `test_customer_${Date.now()}@dissafyt.com`;
   const testPassword = `TestPass!${Date.now()}`;
-  const testFullName = 'DISSafyt Test Customer';
+  const testFullName = 'Dissafyt Test Customer';
 
   const { data: signupData, error: signupErr } = await adminClient.auth.admin.createUser({
     email: testEmail,
@@ -101,7 +101,7 @@ async function runVerification() {
 
   console.log('\n[Step 6] Testing Profile Update (PATCH /users/me logic)...');
   const updatedPhone = '+27 82 555 1234';
-  const updatedName = 'DISSafyt Verified Customer';
+  const updatedName = 'Dissafyt Verified Customer';
 
   const { data: updatedProfile, error: updateErr } = await adminClient
     .from('profiles')

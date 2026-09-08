@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 const url = process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.PROJECT_URL;
 const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-console.log('--- DISSafyt Platform Phase 7: Barbershop MVP Verification ---');
+console.log('--- Dissafyt Platform Phase 7: Barbershop MVP Verification ---');
 console.log('Target Supabase:', url);
 
 const admin = createClient(url, serviceKey, {

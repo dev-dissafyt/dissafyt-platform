@@ -1,5 +1,5 @@
 /**
- * DISSafyt Platform - Core Database Entity Definitions
+ * Dissafyt Platform - Core Database Entity Definitions
  * Aligned with docs/02-architecture/DATABASE.md and docs/05-users/USER_SYSTEM.md
  */
 

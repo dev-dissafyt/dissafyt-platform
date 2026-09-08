@@ -10,7 +10,7 @@ export interface PayfastNotifyPayload {
   amount_gross?: string;
   amount_fee?: string;
   amount_net?: string;
-  custom_str1?: string; // e.g. DISSafyt order_id
+  custom_str1?: string; // e.g. Dissafyt order_id
   custom_str2?: string; // e.g. user_id
   custom_str3?: string;
   email_address?: string;

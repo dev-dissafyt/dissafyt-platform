@@ -135,7 +135,7 @@ export default function ProductDetailPage() {
             ) : (
               <div className="flex flex-col items-center justify-center text-zinc-600 space-y-2">
                 <ShoppingBag className="h-16 w-16 text-zinc-700" />
-                <span className="text-sm font-medium">DISSafyt Original Apparel</span>
+                <span className="text-sm font-medium">Dissafyt Original Apparel</span>
               </div>
             )}
           </div>
@@ -160,7 +160,7 @@ export default function ProductDetailPage() {
 
           <div className="border-t border-zinc-800 pt-4">
             <p className="text-zinc-300 text-sm leading-relaxed">
-              {product.description || 'Crafted with premium heavyweight cotton, custom embroidery, and signature DISSafyt streetwear styling.'}
+              {product.description || 'Crafted with premium heavyweight cotton, custom embroidery, and signature Dissafyt streetwear styling.'}
             </p>
           </div>
 

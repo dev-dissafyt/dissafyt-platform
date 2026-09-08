@@ -68,7 +68,7 @@ export async function POST(request: NextRequest) {
       notify_url: `${siteUrl}/api/payments/payfast-notify`,
       m_payment_id: order.id,
       amount: Number(order.total).toFixed(2),
-      item_name: `DISSafyt Order ${order.order_number}`,
+      item_name: `Dissafyt Order ${order.order_number}`,
       custom_str1: order.id,
       custom_str2: userId,
     };

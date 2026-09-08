@@ -1,10 +1,10 @@
-# DISSafyt Barbershop Module
+# Dissafyt Barbershop Module
 
 ## 1. Purpose
 
-The barbershop module provides appointment-based services through the shared DISSafyt identity and API.
+The barbershop module provides appointment-based services through the shared Dissafyt identity and API.
 
-The module may represent Ace of Fyt or another DISSafyt service brand.
+The module may represent Ace of Fyt or another Dissafyt service brand.
 
 ## 2. Core entities
 

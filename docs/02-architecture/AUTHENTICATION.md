@@ -1,4 +1,4 @@
-# DISSafyt Authentication Architecture
+# Dissafyt Authentication Architecture
 
 ## Objective
 
@@ -7,7 +7,7 @@ Provide one identity system that can be used by:
 - customer web application
 - admin application
 - future mobile application
-- future DISSafyt applications
+- future Dissafyt applications
 
 ## Current direction
 
@@ -22,7 +22,7 @@ Supabase Auth is responsible for:
 - supported authentication providers
 - password recovery/verification capabilities provided by the service
 
-DISSafyt is responsible for:
+Dissafyt is responsible for:
 
 - application profile
 - roles
@@ -41,7 +41,7 @@ Supabase Auth
    |
 Authenticated identity created
    |
-DISSafyt profile created/linked
+Dissafyt profile created/linked
    |
 Default role = customer
 ```
@@ -67,7 +67,7 @@ Application
    |
 Authenticated request
    |
-DISSafyt API
+Dissafyt API
    |
 Verify identity
    |
@@ -86,7 +86,7 @@ The API should expose a current-user operation, conceptually:
 GET /users/me
 ```
 
-This should return the authenticated user's DISSafyt profile and relevant identity information.
+This should return the authenticated user's Dissafyt profile and relevant identity information.
 
 ## Logout
 

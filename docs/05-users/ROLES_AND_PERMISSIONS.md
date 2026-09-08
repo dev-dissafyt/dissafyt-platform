@@ -1,4 +1,4 @@
-# DISSafyt Roles and Permissions
+# Dissafyt Roles and Permissions
 
 ## Roles
 

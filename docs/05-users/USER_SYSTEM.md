@@ -1,4 +1,4 @@
-# DISSafyt User System
+# Dissafyt User System
 
 ## Objective
 
@@ -8,7 +8,7 @@ Create one unified customer identity for the entire platform.
 
 The authentication provider owns authentication identity.
 
-DISSafyt stores application-specific profile information.
+Dissafyt stores application-specific profile information.
 
 ```text
 Auth identity
@@ -17,7 +17,7 @@ Auth identity
     +-- email/authentication data
              |
              v
-        DISSafyt profile
+        Dissafyt profile
              |
              +-- customer information
              +-- preferences

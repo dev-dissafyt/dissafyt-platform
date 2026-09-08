@@ -1,4 +1,4 @@
--- DISSafyt Platform Initial Database Migration
+-- Dissafyt Platform Initial Database Migration
 -- Corresponds to Phase 1/2 of BUILD_PLAN.md and docs/02-architecture/DATABASE.md
 
 -- Enable UUID extension if not present

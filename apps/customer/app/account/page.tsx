@@ -187,7 +187,7 @@ export default function AccountPage() {
   if (loading) {
     return (
       <div className="container mx-auto max-w-4xl px-4 py-16 text-center text-zinc-400">
-        Loading your unified DISSafyt profile...
+        Loading your unified Dissafyt profile...
       </div>
     );
   }
@@ -199,7 +199,7 @@ export default function AccountPage() {
         <div>
           <h1 className="text-3xl font-bold text-white">My Account</h1>
           <p className="text-sm text-zinc-400">
-            One unified identity across DISSafyt commerce and Ace of Fyt barbershop.
+            One unified identity across Dissafyt commerce and Ace of Fyt barbershop.
           </p>
         </div>
         <Button

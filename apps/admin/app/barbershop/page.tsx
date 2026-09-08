@@ -72,10 +72,7 @@ export default function AdminBarbershopPage() {
   // --- TAB 1: APPOINTMENTS STATE ---
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
   const [loadingBookings, setLoadingBookings] = useState(false);
-  const [filterDate, setFilterDate] = useState<string>(() => {
-    const today = new Date();
-    return `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
-  });
+  const [filterDate, setFilterDate] = useState<string>('upcoming');
   const [filterStaffId, setFilterStaffId] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
 
@@ -427,8 +424,8 @@ export default function AdminBarbershopPage() {
                   <Calendar className="h-4 w-4 text-stone-400" />
                   <Input
                     type="date"
-                    value={filterDate}
-                    onChange={(e) => setFilterDate(e.target.value)}
+                    value={filterDate.includes('-') ? filterDate : ''}
+                    onChange={(e) => setFilterDate(e.target.value || 'upcoming')}
                     className="w-40 bg-stone-950 border-stone-800 text-xs text-white"
                   />
                 </div>
@@ -469,6 +466,18 @@ export default function AdminBarbershopPage() {
               <div className="flex items-center space-x-2">
                 <Button
                   size="sm"
+                  variant={filterDate === 'upcoming' ? 'default' : 'outline'}
+                  onClick={() => setFilterDate('upcoming')}
+                  className={`text-xs ${
+                    filterDate === 'upcoming'
+                      ? 'bg-amber-500 text-black font-semibold hover:bg-amber-400'
+                      : 'border-stone-800 text-stone-300'
+                  }`}
+                >
+                  Upcoming
+                </Button>
+                <Button
+                  size="sm"
                   variant="outline"
                   onClick={() => {
                     const today = new Date();
@@ -476,31 +485,25 @@ export default function AdminBarbershopPage() {
                       `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
                     );
                   }}
-                  className="text-xs border-stone-800 text-stone-300"
+                  className={`text-xs ${
+                    filterDate.includes('-') && !filterDate.includes('upcoming')
+                      ? 'border-amber-500/50 text-amber-300'
+                      : 'border-stone-800 text-stone-300'
+                  }`}
                 >
                   Today
                 </Button>
                 <Button
                   size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const tomorrow = new Date();
-                    tomorrow.setDate(tomorrow.getDate() + 1);
-                    setFilterDate(
-                      `${tomorrow.getFullYear()}-${String(tomorrow.getMonth() + 1).padStart(2, '0')}-${String(tomorrow.getDate()).padStart(2, '0')}`
-                    );
-                  }}
-                  className="text-xs border-stone-800 text-stone-300"
+                  variant={filterDate === 'all' ? 'default' : 'outline'}
+                  onClick={() => setFilterDate('all')}
+                  className={`text-xs ${
+                    filterDate === 'all'
+                      ? 'bg-amber-500 text-black font-semibold hover:bg-amber-400'
+                      : 'border-stone-800 text-stone-300'
+                  }`}
                 >
-                  Tomorrow
-                </Button>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setFilterDate('')}
-                  className="text-xs border-stone-800 text-stone-400"
-                >
-                  Clear Date
+                  All Bookings
                 </Button>
               </div>
             </div>

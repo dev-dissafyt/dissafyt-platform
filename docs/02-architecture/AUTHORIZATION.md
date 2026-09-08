@@ -1,4 +1,4 @@
-# DISSafyt Authorization Model
+# Dissafyt Authorization Model
 
 ## Authentication vs authorization
 

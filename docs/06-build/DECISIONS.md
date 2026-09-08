@@ -1,4 +1,4 @@
-# DISSafyt Architecture Decision Record
+# Dissafyt Architecture Decision Record
 
 This is the running decision log.
 
@@ -6,7 +6,7 @@ This is the running decision log.
 
 **Status:** Accepted
 
-DISSafyt will be designed as a platform with multiple applications sharing a common backend, authentication and PostgreSQL data layer.
+Dissafyt will be designed as a platform with multiple applications sharing a common backend, authentication and PostgreSQL data layer.
 
 **Reason:** Prevent duplicated identity and business logic.
 
@@ -28,7 +28,7 @@ Use PostgreSQL as the primary relational database.
 
 Use Supabase Auth rather than implementing password/session infrastructure from scratch.
 
-**Reason:** Authentication is security-critical infrastructure and does not provide competitive differentiation for DISSafyt.
+**Reason:** Authentication is security-critical infrastructure and does not provide competitive differentiation for Dissafyt.
 
 ---
 

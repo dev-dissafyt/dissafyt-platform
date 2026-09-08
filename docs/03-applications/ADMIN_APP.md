@@ -1,12 +1,12 @@
-# DISSafyt Admin Application
+# Dissafyt Admin Application
 
 ## Purpose
 
-The admin application provides operational control over DISSafyt.
+The admin application provides operational control over Dissafyt.
 
 ## Authentication
 
-The admin uses the same identity system as every other DISSafyt user.
+The admin uses the same identity system as every other Dissafyt user.
 
 The difference is authorization.
 

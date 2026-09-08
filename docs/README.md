@@ -1,6 +1,6 @@
-# DISSafyt Platform — Master Documentation
+# Dissafyt Platform — Master Documentation
 
-DISSafyt is being designed as a unified business platform rather than a single website.
+Dissafyt is being designed as a unified business platform rather than a single website.
 
 The platform will provide a shared identity, backend/API, PostgreSQL database, business logic and administrative capabilities. Different customer and staff experiences will sit on top of that common foundation.
 
@@ -42,7 +42,7 @@ The platform will provide a shared identity, backend/API, PostgreSQL database, b
 **Build the platform once. Build experiences on top of it.**
 
 ```text
-                         DISSafyt PLATFORM
+                         Dissafyt PLATFORM
                                 |
               +-----------------+-----------------+
               |                                   |

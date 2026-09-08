@@ -1,4 +1,4 @@
-# DISSafyt Build Plan
+# Dissafyt Build Plan
 
 ## Rule
 
@@ -190,7 +190,7 @@ Potential:
 - advanced subscriptions
 - loyalty
 - analytics
-- additional DISSafyt businesses
+- additional Dissafyt businesses
 - independent API deployment at `api.dissafyt.com`
 
 ---
