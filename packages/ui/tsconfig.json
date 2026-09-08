@@ -1,0 +1,7 @@
+{
+  "extends": "@dissafyt/tsconfig/react-library.json",
+  "compilerOptions": {
+    "moduleResolution": "bundler"
+  },
+  "include": ["src/**/*"]
+}

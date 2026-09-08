@@ -1,0 +1,7 @@
+{
+  "extends": "@dissafyt/tsconfig/base.json",
+  "compilerOptions": {
+    "moduleResolution": "bundler"
+  },
+  "include": ["src/**/*"]
+}
