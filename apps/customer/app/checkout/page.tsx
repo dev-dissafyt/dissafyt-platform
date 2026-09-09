@@ -37,6 +37,7 @@ export default function CheckoutPage() {
   // Shipping Address State (Courier Guy spec)
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
+  const [recipientEmail, setRecipientEmail] = useState('');
   const [streetAddress, setStreetAddress] = useState('');
   const [suburb, setSuburb] = useState('');
   const [city, setCity] = useState('');
@@ -58,6 +59,9 @@ export default function CheckoutPage() {
       const supabase = getSupabaseBrowserClient();
       const { data } = await supabase.auth.getSession();
       if (data?.session) {
+        if (data.session.user?.email) {
+          setRecipientEmail(data.session.user.email);
+        }
         const token = data.session.access_token;
         const res = await fetch('/api/users/me', {
           headers: { Authorization: `Bearer ${token}` },
@@ -66,6 +70,7 @@ export default function CheckoutPage() {
           const profile = await res.json();
           if (profile.full_name) setRecipientName(profile.full_name);
           if (profile.phone) setRecipientPhone(profile.phone);
+          if (profile.email) setRecipientEmail(profile.email);
         }
       }
       setLoading(false);
@@ -113,6 +118,7 @@ export default function CheckoutPage() {
         shippingAddress: {
           recipient_name: recipientName,
           recipient_phone: recipientPhone,
+          recipient_email: recipientEmail,
           street_address: streetAddress,
           suburb,
           city,
@@ -238,6 +244,18 @@ export default function CheckoutPage() {
                     required
                   />
                 </div>
+              </div>
+
+              <div className="space-y-1">
+                <Label htmlFor="recipientEmail">Email Address (for Order Confirmation & Tracking)</Label>
+                <Input
+                  id="recipientEmail"
+                  type="email"
+                  value={recipientEmail}
+                  onChange={(e) => setRecipientEmail(e.target.value)}
+                  placeholder="name@example.com"
+                  required
+                />
               </div>
 
               <div className="space-y-1">

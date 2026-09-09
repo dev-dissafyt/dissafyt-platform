@@ -64,6 +64,14 @@ export async function POST(request: NextRequest) {
       || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
     const merchantId = process.env.PAYFAST_MERCHANT_ID || process.env.NEXT_PUBLIC_PAYFAST_MERCHANT_ID || '17675995';
 
+    // Extract customer details from shippingAddress for PayFast prefill
+    const recipientName = (shippingAddress.recipient_name || '').trim();
+    const nameParts = recipientName ? recipientName.split(' ') : ['Customer'];
+    const firstName = nameParts[0] || 'Customer';
+    const lastName = nameParts.slice(1).join(' ') || '';
+    const recipientPhone = shippingAddress.recipient_phone || '';
+    const recipientEmail = shippingAddress.recipient_email || '';
+
     const payfastData: Record<string, string> = {
       merchant_id: merchantId,
       merchant_key: process.env.PAYFAST_MERCHANT_KEY || 'c08hjtdezifi4',
@@ -73,6 +81,10 @@ export async function POST(request: NextRequest) {
       m_payment_id: order.id,
       amount: Number(order.total).toFixed(2),
       item_name: `Dissafyt Order ${order.order_number}`,
+      name_first: firstName,
+      ...(lastName ? { name_last: lastName } : {}),
+      ...(recipientEmail ? { email_address: recipientEmail } : {}),
+      ...(recipientPhone ? { cell_number: recipientPhone } : {}),
       custom_str1: order.id,
       custom_str2: userId,
     };

@@ -296,3 +296,20 @@ export interface AuditLog {
   created_at: string;
 }
 
+// Subscription types
+export type SubscriptionStatus = 'active' | 'cancelled' | 'past_due';
+
+export interface Subscription {
+  id: string;
+  user_id: string;
+  plan_code: 'solo' | 'twice' | 'father-son' | string;
+  plan_name: string;
+  price: number;
+  status: SubscriptionStatus;
+  current_period_start: string;
+  current_period_end: string;
+  payfast_token?: string | null;
+  created_at: string;
+  updated_at: string;
+}
+

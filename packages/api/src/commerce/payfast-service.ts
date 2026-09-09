@@ -109,13 +109,44 @@ export class PayfastService {
 
       // 3. Update order state if COMPLETE
       if (isPaid) {
-        await admin
-          .from('orders')
-          .update({
-            status: 'paid',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', orderId);
+        if (orderId && !isSubscription) {
+          await admin
+            .from('orders')
+            .update({
+              status: 'paid',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', orderId);
+        }
+
+        // 4. Activate or renew barbershop subscription if subscription payment
+        if (isSubscription && userId && userId !== '00000000-0000-0000-0000-000000000000') {
+          const planCode = payload.custom_str1 || 'twice';
+          const planNames: Record<string, string> = {
+            solo: 'The Solo Membership',
+            twice: 'The Regular Membership',
+            'father-son': 'Father n Son Membership',
+          };
+          const planName = planNames[planCode] || payload.item_name || 'Barbershop Membership';
+
+          const startDate = new Date();
+          const endDate = new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+
+          try {
+            await admin.from('subscriptions').insert({
+              user_id: userId,
+              plan_code: planCode,
+              plan_name: planName,
+              price: amount,
+              status: 'active',
+              current_period_start: startDate.toISOString(),
+              current_period_end: endDate.toISOString(),
+              payfast_token: payload.token || payload.pf_payment_id || null,
+            });
+          } catch (subErr) {
+            console.error('Failed to create subscription in table:', subErr);
+          }
+        }
       }
 
       return {

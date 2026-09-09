@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Card, CardTitle, CardContent, Button, Input, Label, PayfastButton } from '@dissafyt/ui';
+import { Card, CardTitle, CardContent, Button, Input, Label } from '@dissafyt/ui';
 import {
   Scissors,
   Clock,
@@ -16,9 +16,13 @@ import {
   Sparkles,
   MapPin,
   CalendarCheck,
+  ShieldCheck,
+  Crown,
+  Lock,
 } from 'lucide-react';
 import Link from 'next/link';
 import { getSupabaseBrowserClient } from '@dissafyt/database';
+import { SubscriptionCarousel } from '../components/subscription-carousel';
 
 interface Service {
   id: string;
@@ -50,6 +54,12 @@ export default function BookPage() {
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
 
+  // Subscription Gating State
+  const [checkingSubscription, setCheckingSubscription] = useState(true);
+  const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
+  const [activeSubscription, setActiveSubscription] = useState<any>(null);
+  const [customerProfile, setCustomerProfile] = useState<any>(null);
+
   // Wizard Selection States
   const [selectedService, setSelectedService] = useState<Service | null>(null);
   const [selectedStaffId, setSelectedStaffId] = useState<string>('any');
@@ -80,14 +90,72 @@ export default function BookPage() {
   // Generate the next 14 bookable days
   const dateOptions = generateNextDays(14);
 
-  // 1. Initial Load: Services, Staff, and User Session
+  // Function to check active subscription status
+  async function checkSubscriptionStatus(token?: string) {
+    setCheckingSubscription(true);
+    if (!token) {
+      setHasActiveSubscription(false);
+      setActiveSubscription(null);
+      setCheckingSubscription(false);
+      return;
+    }
+
+    try {
+      const res = await fetch('/api/subscriptions/status', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setHasActiveSubscription(Boolean(data.hasActiveSubscription));
+        setActiveSubscription(data.subscription || null);
+      } else {
+        setHasActiveSubscription(false);
+        setActiveSubscription(null);
+      }
+    } catch (err) {
+      console.error('Subscription check error:', err);
+      setHasActiveSubscription(false);
+    } finally {
+      setCheckingSubscription(false);
+    }
+  }
+
+  // 1. Initial Load: Services, Staff, User Session & Subscription Status
   useEffect(() => {
     async function init() {
       try {
         // Check session
         const supabase = getSupabaseBrowserClient();
         const { data: authData } = await supabase.auth.getSession();
-        setUserSession(authData?.session || null);
+        const session = authData?.session || null;
+        setUserSession(session);
+
+        // Fetch subscription status & profile if logged in
+        if (session) {
+          checkSubscriptionStatus(session.access_token);
+
+          // Fetch profile for prefilling
+          fetch('/api/users/me', {
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          })
+            .then((r) => r.ok && r.json())
+            .then((p) => p && setCustomerProfile(p))
+            .catch((e) => console.error(e));
+        } else {
+          setCheckingSubscription(false);
+        }
+
+        // Listen to auth changes
+        const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+          setUserSession(newSession);
+          if (newSession) {
+            checkSubscriptionStatus(newSession.access_token);
+          } else {
+            setHasActiveSubscription(false);
+            setActiveSubscription(null);
+            setCheckingSubscription(false);
+          }
+        });
 
         // Fetch services
         const sRes = await fetch('/api/services');
@@ -316,6 +384,103 @@ export default function BookPage() {
     );
   }
 
+  // Loading Membership Verification Screen
+  if (checkingSubscription) {
+    return (
+      <div className="container mx-auto max-w-4xl px-4 py-24 text-center space-y-4">
+        <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10 text-amber-500 animate-pulse">
+          <Scissors className="h-7 w-7" />
+        </div>
+        <h2 className="text-xl font-bold text-white">Verifying Membership Access...</h2>
+        <p className="text-xs text-zinc-500">Connecting to Ace of Fyt member registry.</p>
+      </div>
+    );
+  }
+
+  // GATING VIEW: Non-subscribers & Guests
+  if (!hasActiveSubscription) {
+    return (
+      <div className="container mx-auto max-w-6xl px-4 py-12 space-y-12">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
+          <div>
+            <Link href="/" className="inline-flex items-center text-xs text-zinc-400 hover:text-white mb-2">
+              <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back to Home
+            </Link>
+            <h1 className="text-3xl font-extrabold text-white flex items-center">
+              <Scissors className="mr-3 h-8 w-8 text-amber-500" />
+              Ace of Fyt Barbershop
+            </h1>
+            <p className="text-sm text-zinc-400 mt-1">
+              Precision fades, scissor craft, and hot towel sculpting.
+            </p>
+          </div>
+
+          <div className="flex items-center space-x-2 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-lg">
+            <MapPin className="h-4 w-4 text-amber-500" />
+            <span>Dissafyt Studio, Johannesburg</span>
+          </div>
+        </div>
+
+        {/* Member Gating Educational Hero Card */}
+        <div className="relative overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/10 via-zinc-900/90 to-zinc-950 p-8 sm:p-12 text-center space-y-6 shadow-2xl">
+          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 ring-4 ring-amber-500/10">
+            <Crown className="h-8 w-8" />
+          </div>
+
+          <div className="max-w-2xl mx-auto space-y-3">
+            <span className="inline-flex items-center rounded-full bg-amber-500 px-3 py-0.5 text-xs font-black text-black uppercase tracking-wider">
+              Member-Exclusive Grooming Schedule
+            </span>
+            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
+              Grooming Appointments are Reserved for Members
+            </h2>
+            <p className="text-sm sm:text-base text-zinc-300 leading-relaxed">
+              To guarantee dedicated 1-on-1 chair time, master styling craft, and <span className="text-white font-semibold">zero queue waiting</span> for our community, our booking calendar is exclusive to active Ace of Fyt subscribers.
+            </p>
+          </div>
+
+          {/* 3 Value Pillars */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto pt-4 text-left">
+            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/70 space-y-1.5">
+              <div className="flex items-center space-x-2 text-amber-400 font-semibold text-sm">
+                <Clock className="h-4 w-4" />
+                <span>Zero Wait Time</span>
+              </div>
+              <p className="text-xs text-zinc-400">Walk straight to your designated barber chair right at your confirmed booking slot.</p>
+            </div>
+            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/70 space-y-1.5">
+              <div className="flex items-center space-x-2 text-amber-400 font-semibold text-sm">
+                <Scissors className="h-4 w-4" />
+                <span>Master Barber Craft</span>
+              </div>
+              <p className="text-xs text-zinc-400">Precision fades, hot towel conditioning, and tailored beard alignment every single visit.</p>
+            </div>
+            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/70 space-y-1.5">
+              <div className="flex items-center space-x-2 text-amber-400 font-semibold text-sm">
+                <CreditCard className="h-4 w-4" />
+                <span>Predictable Value</span>
+              </div>
+              <p className="text-xs text-zinc-400">Save up to 40% vs walk-ins with automated monthly billing powered securely by PayFast.</p>
+            </div>
+          </div>
+        </div>
+
+        {/* The Carousel for Immediate Subscription */}
+        <div className="space-y-4 pt-4">
+          <SubscriptionCarousel
+            title="Select a Membership to Unlock Booking"
+            subtitle="Subscribe now to unlock instant appointment scheduling. Your membership details and priority slots will be automatically bound to your account."
+            onSubscribed={() => {
+              if (userSession) checkSubscriptionStatus(userSession.access_token);
+            }}
+          />
+        </div>
+      </div>
+    );
+  }
+
+  // UNLOCKED VIEW: Active Members
   return (
     <div className="container mx-auto max-w-6xl px-4 py-12 space-y-12">
       {/* Header */}
@@ -336,6 +501,33 @@ export default function BookPage() {
         <div className="flex items-center space-x-2 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-lg">
           <MapPin className="h-4 w-4 text-amber-500" />
           <span>Dissafyt Studio, Johannesburg</span>
+        </div>
+      </div>
+
+      {/* Active Member VIP Status Banner */}
+      <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+        <div className="flex items-center space-x-3">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
+            <Crown className="h-5 w-5" />
+          </div>
+          <div>
+            <div className="flex items-center space-x-2">
+              <span className="text-sm font-bold text-white">
+                Active Member: {activeSubscription?.plan_name || 'Ace of Fyt Member'}
+              </span>
+              <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 uppercase tracking-wider">
+                Priority Access Active
+              </span>
+            </div>
+            <p className="text-xs text-zinc-400">
+              Welcome back{customerProfile?.full_name ? `, ${customerProfile.full_name}` : ''}! Your appointment slot is guaranteed.
+            </p>
+          </div>
+        </div>
+
+        <div className="text-xs text-zinc-400 border-l border-zinc-800 pl-3 hidden sm:block">
+          <div>Next Renewal: {activeSubscription?.current_period_end ? new Date(activeSubscription.current_period_end).toLocaleDateString() : 'Active'}</div>
+          <div className="text-emerald-400 font-semibold">Priority Booking Unlocked</div>
         </div>
       </div>
 
@@ -379,8 +571,8 @@ export default function BookPage() {
                       <span className="text-zinc-500 flex items-center">
                         <Clock className="mr-1 h-3 w-3" /> {service.duration_minutes} mins
                       </span>
-                      <span className="text-sm font-bold text-amber-400">
-                        R {Number(service.price).toFixed(2)}
+                      <span className="text-sm font-bold text-emerald-400">
+                        Included
                       </span>
                     </div>
                   </div>
@@ -536,6 +728,10 @@ export default function BookPage() {
 
             <div className="space-y-3 text-xs border-b border-zinc-800 pb-4">
               <div className="flex justify-between">
+                <span className="text-zinc-400">Membership Tier</span>
+                <span className="text-amber-400 font-semibold">{activeSubscription?.plan_name || 'Active Member'}</span>
+              </div>
+              <div className="flex justify-between">
                 <span className="text-zinc-400">Service</span>
                 <span className="text-white font-semibold">{selectedService?.name || 'None selected'}</span>
               </div>
@@ -568,9 +764,9 @@ export default function BookPage() {
             </div>
 
             <div className="flex justify-between items-center text-sm font-bold">
-              <span className="text-zinc-300">Total Due</span>
-              <span className="text-xl text-amber-400">
-                R {Number(selectedService?.price || 0).toFixed(2)}
+              <span className="text-zinc-300">Appointment Fee</span>
+              <span className="text-lg text-emerald-400">
+                Included <span className="text-[10px] text-zinc-500 font-normal">in Membership</span>
               </span>
             </div>
 
@@ -591,178 +787,23 @@ export default function BookPage() {
               </div>
             )}
 
-            {/* User Session Check & Booking Action */}
-            {!userSession ? (
-              <div className="space-y-3 pt-2">
-                <div className="rounded border border-amber-500/20 bg-amber-500/5 p-3 text-xs text-amber-300 flex items-start space-x-2">
-                  <AlertCircle className="h-4 w-4 flex-shrink-0 mt-0.5" />
-                  <span>Please sign in to secure and track your appointment.</span>
-                </div>
-
-                {!showAuthForm ? (
-                  <div className="grid grid-cols-2 gap-2">
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setAuthIsSignUp(false);
-                        setShowAuthForm(true);
-                      }}
-                      className="bg-zinc-800 hover:bg-zinc-700 text-white text-xs"
-                    >
-                      Sign In
-                    </Button>
-                    <Button
-                      size="sm"
-                      onClick={() => {
-                        setAuthIsSignUp(true);
-                        setShowAuthForm(true);
-                      }}
-                      className="bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs"
-                    >
-                      Register
-                    </Button>
-                  </div>
-                ) : (
-                  <form onSubmit={handleInlineAuth} className="space-y-2.5 pt-2 border-t border-zinc-800">
-                    <div className="flex justify-between items-center text-xs font-semibold text-white">
-                      <span>{authIsSignUp ? 'Create Dissafyt Account' : 'Sign In'}</span>
-                      <button
-                        type="button"
-                        onClick={() => setAuthIsSignUp(!authIsSignUp)}
-                        className="text-[10px] text-amber-400 hover:underline"
-                      >
-                        {authIsSignUp ? 'Already have account?' : 'Need an account?'}
-                      </button>
-                    </div>
-
-                    {authIsSignUp && (
-                      <Input
-                        placeholder="Full Name"
-                        value={authFullName}
-                        onChange={(e) => setAuthFullName(e.target.value)}
-                        required
-                        className="bg-zinc-950 border-zinc-800 text-xs text-white"
-                      />
-                    )}
-                    <Input
-                      type="email"
-                      placeholder="Email address"
-                      value={authEmail}
-                      onChange={(e) => setAuthEmail(e.target.value)}
-                      required
-                      className="bg-zinc-950 border-zinc-800 text-xs text-white"
-                    />
-                    <Input
-                      type="password"
-                      placeholder="Password"
-                      value={authPassword}
-                      onChange={(e) => setAuthPassword(e.target.value)}
-                      required
-                      className="bg-zinc-950 border-zinc-800 text-xs text-white"
-                    />
-
-                    {authError && (
-                      <div className="text-[11px] text-rose-400">{authError}</div>
-                    )}
-
-                    <Button
-                      type="submit"
-                      disabled={authLoading}
-                      className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs"
-                    >
-                      {authLoading ? 'Signing in...' : authIsSignUp ? 'Create & Continue' : 'Sign In & Continue'}
-                    </Button>
-                  </form>
-                )}
-              </div>
-            ) : (
-              <Button
-                disabled={!selectedSlot || submitting}
-                onClick={handleConfirmBooking}
-                className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm py-5"
-              >
-                {submitting ? 'Confirming Appointment...' : 'Confirm Appointment'}
-              </Button>
-            )}
+            <Button
+              disabled={!selectedSlot || submitting}
+              onClick={handleConfirmBooking}
+              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm py-5"
+            >
+              {submitting ? 'Confirming Appointment...' : 'Confirm Appointment'}
+            </Button>
           </Card>
         </div>
       </div>
 
-      {/* Monthly Subscriptions Section (Ace of Fyt Memberships) */}
-      <div className="space-y-6 pt-12 border-t border-zinc-800">
-        <div className="space-y-1">
-          <h2 className="text-xl font-bold text-white flex items-center">
-            <CreditCard className="mr-2 h-5 w-5 text-amber-500" />
-            Monthly Barbershop Memberships
-          </h2>
-          <p className="text-xs text-zinc-400">
-            Never wait in line. Enjoy guaranteed recurring grooming sessions and automatic monthly billing powered securely by PayFast.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {subscriptions.length > 0 ? (
-            subscriptions.map((sub) => (
-              <Card key={sub.id} className="border-amber-500/40 bg-zinc-900/80 p-6 flex flex-col justify-between">
-                <div className="space-y-3">
-                  <span className="rounded bg-amber-500/10 text-amber-400 text-[10px] font-bold px-2 py-0.5 uppercase tracking-wider border border-amber-500/30">
-                    Monthly Membership
-                  </span>
-                  <CardTitle className="text-xl text-white">{sub.name}</CardTitle>
-                  <p className="text-sm text-zinc-400">{sub.description}</p>
-                  <div className="text-2xl font-extrabold text-amber-400 pt-2">
-                    R {Number(sub.price).toFixed(2)} <span className="text-xs text-zinc-500 font-normal">/mo</span>
-                  </div>
-                </div>
-                <div className="mt-6 pt-4 border-t border-zinc-800">
-                  {sub.plan_code && ['solo', 'twice', 'father-son'].includes(sub.plan_code) ? (
-                    <PayfastButton planId={sub.plan_code} />
-                  ) : (
-                    <Button className="w-full bg-amber-500 text-black font-semibold">
-                      Subscribe with PayFast
-                    </Button>
-                  )}
-                </div>
-              </Card>
-            ))
-          ) : (
-            <>
-              <Card className="border-zinc-800 bg-zinc-900/60 p-6 flex flex-col justify-between">
-                <div className="space-y-3">
-                  <CardTitle className="text-xl text-white">The Solo</CardTitle>
-                  <p className="text-sm text-zinc-400">1 fresh haircut per month.</p>
-                  <div className="text-2xl font-extrabold text-white">R100 <span className="text-xs text-zinc-500">/mo</span></div>
-                </div>
-                <div className="mt-6 pt-4 border-t border-zinc-800">
-                  <PayfastButton planId="solo" />
-                </div>
-              </Card>
-              <Card className="border-amber-500 bg-zinc-900/80 p-6 flex flex-col justify-between shadow-lg shadow-amber-500/10">
-                <div className="space-y-3">
-                  <span className="rounded bg-amber-500 text-black text-[10px] font-bold px-2 py-0.5 uppercase tracking-wider">
-                    Most Popular
-                  </span>
-                  <CardTitle className="text-xl text-white">The Regular</CardTitle>
-                  <p className="text-sm text-zinc-400">2 fresh haircuts per month with queue skip.</p>
-                  <div className="text-2xl font-extrabold text-amber-400">R180 <span className="text-xs text-zinc-500">/mo</span></div>
-                </div>
-                <div className="mt-6 pt-4 border-t border-zinc-800">
-                  <PayfastButton planId="twice" featured />
-                </div>
-              </Card>
-              <Card className="border-zinc-800 bg-zinc-900/60 p-6 flex flex-col justify-between">
-                <div className="space-y-3">
-                  <CardTitle className="text-xl text-white">Father n Son</CardTitle>
-                  <p className="text-sm text-zinc-400">1 combo cut per month for you and your boy.</p>
-                  <div className="text-2xl font-extrabold text-white">R180 <span className="text-xs text-zinc-500">/mo</span></div>
-                </div>
-                <div className="mt-6 pt-4 border-t border-zinc-800">
-                  <PayfastButton planId="father-son" />
-                </div>
-              </Card>
-            </>
-          )}
-        </div>
+      {/* Subscription Carousel Section (Membership Tier Management) */}
+      <div className="pt-12 border-t border-zinc-800">
+        <SubscriptionCarousel
+          title="Your Barbershop Membership Plan"
+          subtitle="You are currently an active subscriber. You can review plan benefits, change plans, or add family members below."
+        />
       </div>
     </div>
   );

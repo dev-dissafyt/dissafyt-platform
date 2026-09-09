@@ -1,7 +1,8 @@
 import Link from 'next/link';
 import Image from 'next/image';
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, PayfastButton } from '@dissafyt/ui';
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle } from '@dissafyt/ui';
 import { Scissors, ShoppingBag, ShieldCheck, Calendar, ArrowRight, Sparkles, CheckCircle2 } from 'lucide-react';
+import { SubscriptionCarousel } from './components/subscription-carousel';
 
 export default function HomePage() {
   return (
@@ -135,83 +136,7 @@ export default function HomePage() {
 
       {/* PayFast Monthly Memberships Section */}
       <section className="container mx-auto max-w-7xl px-4 sm:px-6">
-        <div className="text-center max-w-2xl mx-auto space-y-4 mb-12">
-          <h2 className="text-3xl font-bold text-white">Barbershop Memberships</h2>
-          <p className="text-zinc-400 text-sm">
-            Save on fresh cuts with monthly subscriptions powered securely by PayFast. Cancel anytime.
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 gap-8 md:grid-cols-3">
-          {/* Plan 1 */}
-          <Card className="border-zinc-800 bg-zinc-900/70 flex flex-col justify-between">
-            <CardHeader>
-              <CardTitle className="text-xl text-white">The Solo</CardTitle>
-              <CardDescription>Keep sharp every month</CardDescription>
-              <div className="mt-4 text-3xl font-extrabold text-white">
-                R100 <span className="text-sm font-normal text-zinc-400">/month</span>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm text-zinc-300">
-              <ul className="space-y-2">
-                <li>&bull; 1 haircut per month</li>
-                <li>&bull; Book anytime in the month</li>
-                <li>&bull; Priority booking slots</li>
-                <li>&bull; Cancel anytime</li>
-              </ul>
-              <div className="pt-4">
-                <PayfastButton planId="solo" />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Plan 2 - Featured */}
-          <Card className="border-amber-500 bg-zinc-900/90 relative flex flex-col justify-between shadow-lg shadow-amber-500/10">
-            <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-amber-500 px-3 py-0.5 text-xs font-bold text-black uppercase tracking-wider">
-              Most Popular
-            </div>
-            <CardHeader>
-              <CardTitle className="text-xl text-white">The Regular</CardTitle>
-              <CardDescription>Never let it grow out</CardDescription>
-              <div className="mt-4 text-3xl font-extrabold text-amber-400">
-                R180 <span className="text-sm font-normal text-zinc-400">/month</span>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm text-zinc-300">
-              <ul className="space-y-2">
-                <li>&bull; 2 haircuts per month</li>
-                <li>&bull; Best value per cut</li>
-                <li>&bull; Skip the queue</li>
-                <li>&bull; Cancel anytime</li>
-              </ul>
-              <div className="pt-4">
-                <PayfastButton planId="twice" featured />
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Plan 3 */}
-          <Card className="border-zinc-800 bg-zinc-900/70 flex flex-col justify-between">
-            <CardHeader>
-              <CardTitle className="text-xl text-white">Father n Son</CardTitle>
-              <CardDescription>Bonding time, sorted</CardDescription>
-              <div className="mt-4 text-3xl font-extrabold text-white">
-                R180 <span className="text-sm font-normal text-zinc-400">/month</span>
-              </div>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm text-zinc-300">
-              <ul className="space-y-2">
-                <li>&bull; 1 combo cut per month</li>
-                <li>&bull; Father + son together</li>
-                <li>&bull; Great for the little ones</li>
-                <li>&bull; Cancel anytime</li>
-              </ul>
-              <div className="pt-4">
-                <PayfastButton planId="father-son" />
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <SubscriptionCarousel />
       </section>
     </div>
   );
