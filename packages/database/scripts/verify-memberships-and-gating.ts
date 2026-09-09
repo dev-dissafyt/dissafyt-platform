@@ -34,9 +34,9 @@ async function runVerification() {
   assert(PAYFAST_PLANS.twice.amount === '180', 'The Regular (twice) plan is R180/mo');
   assert(PAYFAST_PLANS.twice.itemName === 'The Regular', 'The Regular item name is correct');
 
-  assert(Boolean(PAYFAST_PLANS['father-son']), 'Plan "father-son" exists in PAYFAST_PLANS');
-  assert(PAYFAST_PLANS['father-son'].amount === '180', 'Father n Son plan is R180/mo');
-  assert(PAYFAST_PLANS['father-son'].itemName === 'Father n Son', 'Father n Son item name is correct');
+  assert(Boolean(PAYFAST_PLANS.executive), 'Plan "executive" exists in PAYFAST_PLANS');
+  assert(PAYFAST_PLANS.executive.amount === '350', 'The Executive plan is R350/mo');
+  assert(PAYFAST_PLANS.executive.itemName === 'The Executive', 'The Executive item name is correct');
 
   // ----------------------------------------------------
   // Test 2: PayFast Signature Generation for Subscriptions

@@ -155,7 +155,8 @@ export class PayfastService {
           const planNames: Record<string, string> = {
             solo: 'The Solo Membership',
             twice: 'The Regular Membership',
-            'father-son': 'Father n Son Membership',
+            executive: 'The Executive Membership',
+            'father-son': 'The Executive Membership',
           };
           const planName = planNames[planCode] || payload.item_name || 'Barbershop Membership';
 

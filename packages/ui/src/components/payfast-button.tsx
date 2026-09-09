@@ -28,11 +28,17 @@ export const PAYFAST_PLANS: Record<string, PayfastPlanConfig> = {
     itemDescription:
       'Two cuts a month for the guy who never lets it grow out.\n\n- 2 haircuts per month\n- Best value per cut\n- Priority booking slots\n- Skip the queue\n- Cancel anytime',
   },
-  'father-son': {
-    amount: '180',
-    itemName: 'Father n Son',
+  executive: {
+    amount: '350',
+    itemName: 'The Executive',
     itemDescription:
-      'A combo cut for you and your boy — bonding time, sorted.\n\n- 1 combo cut per month\n- Father + son together\n- Great for the little ones\n- Priority booking slots\n- Cancel anytime',
+      'Full combo, twice a month with hot towel & beard sculpt.\n\n- 2 Full Combos per month\n- Razor line-up & hot towel\n- Queue skip & VIP priority booking\n- Complimentary styling\n- Cancel anytime',
+  },
+  'father-son': {
+    amount: '350',
+    itemName: 'The Executive',
+    itemDescription:
+      'Full combo, twice a month with hot towel & beard sculpt.\n\n- 2 Full Combos per month\n- Razor line-up & hot towel\n- Queue skip & VIP priority booking\n- Complimentary styling\n- Cancel anytime',
   },
 };
 

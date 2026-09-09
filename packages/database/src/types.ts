@@ -302,7 +302,7 @@ export type SubscriptionStatus = 'active' | 'cancelled' | 'past_due';
 export interface Subscription {
   id: string;
   user_id: string;
-  plan_code: 'solo' | 'twice' | 'father-son' | string;
+  plan_code: 'solo' | 'twice' | 'executive' | 'father-son' | string;
   plan_name: string;
   price: number;
   status: SubscriptionStatus;

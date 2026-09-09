@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState, Suspense } from 'react';
+import { useEffect, useState, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { Card, CardTitle, CardContent, Button, Input, Label } from '@dissafyt/ui';
 import {
@@ -62,7 +62,7 @@ function BookContent() {
   const [loading, setLoading] = useState(true);
 
   // Subscription Gating State
-  const [checkingSubscription, setCheckingSubscription] = useState(true);
+  const [checkingSubscription, setCheckingSubscription] = useState(false);
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
   const [activeSubscription, setActiveSubscription] = useState<any>(null);
   const [customerProfile, setCustomerProfile] = useState<any>(null);
@@ -96,10 +96,10 @@ function BookContent() {
 
   // Generate the next 14 bookable days
   const dateOptions = generateNextDays(14);
+  const isCheckingRef = useRef(false);
 
-  // Function to check active subscription status
+  // Function to check active subscription status with timeout
   async function checkSubscriptionStatus(token?: string) {
-    setCheckingSubscription(true);
     if (!token) {
       setHasActiveSubscription(false);
       setActiveSubscription(null);
@@ -107,10 +107,19 @@ function BookContent() {
       return;
     }
 
+    if (isCheckingRef.current) return;
+    isCheckingRef.current = true;
+    setCheckingSubscription(true);
+
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+
     try {
       const res = await fetch('/api/subscriptions/status', {
         headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
       });
+
       if (res.ok) {
         const data = await res.json();
         setHasActiveSubscription(Boolean(data.hasActiveSubscription));
@@ -119,16 +128,23 @@ function BookContent() {
         setHasActiveSubscription(false);
         setActiveSubscription(null);
       }
-    } catch (err) {
-      console.error('Subscription check error:', err);
+    } catch (err: any) {
+      if (err.name !== 'AbortError') {
+        console.warn('Subscription check error:', err.message);
+      }
       setHasActiveSubscription(false);
     } finally {
+      clearTimeout(timeoutId);
       setCheckingSubscription(false);
+      isCheckingRef.current = false;
     }
   }
 
   // Auto-confirm subscription on return from checkout
   async function confirmReturnSubscription(token: string) {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3500);
+
     try {
       setJustSubscribed(true);
       await fetch('/api/subscriptions/confirm', {
@@ -138,20 +154,53 @@ function BookContent() {
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({ planCode: planParam }),
+        signal: controller.signal,
       });
     } catch (e) {
       console.warn('Subscription auto-confirm error:', e);
+    } finally {
+      clearTimeout(timeoutId);
     }
   }
 
   // 1. Initial Load: Services, Staff, User Session & Subscription Status
   useEffect(() => {
+    let mounted = true;
+
     async function init() {
       try {
-        // Check session
+        // Fetch services & staff in parallel so booking wizard is ready immediately
+        const [sRes, stRes] = await Promise.all([
+          fetch('/api/services'),
+          fetch('/api/staff'),
+        ]);
+
+        if (sRes.ok && mounted) {
+          const sData: Service[] = await sRes.json();
+          if (sData && sData.length > 0) {
+            setServices(sData);
+            // Default select first regular appointment
+            const firstAppointment = sData.find((s) => !s.is_subscription);
+            if (firstAppointment) setSelectedService(firstAppointment);
+          }
+        }
+
+        if (stRes.ok && mounted) {
+          const stData: StaffMember[] = await stRes.json();
+          setStaffList(stData);
+        }
+
+        // Set default date to tomorrow or next valid day
+        if (dateOptions.length > 0 && mounted) {
+          const firstAvailable = dateOptions.find((d) => !d.isSunday) || dateOptions[0];
+          setSelectedDate(firstAvailable.iso);
+        }
+
+        // Check user session
         const supabase = getSupabaseBrowserClient();
         const { data: authData } = await supabase.auth.getSession();
         const session = authData?.session || null;
+        if (!mounted) return;
         setUserSession(session);
 
         // Fetch subscription status & profile if logged in
@@ -166,19 +215,15 @@ function BookContent() {
             headers: { Authorization: `Bearer ${session.access_token}` },
           })
             .then((r) => r.ok && r.json())
-            .then((p) => p && setCustomerProfile(p))
+            .then((p) => p && mounted && setCustomerProfile(p))
             .catch((e) => console.error(e));
-        } else {
-          setCheckingSubscription(false);
         }
 
         // Listen to auth changes
         const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
+          if (!mounted) return;
           setUserSession(newSession);
           if (newSession) {
-            if (isSubscribedParam) {
-              await confirmReturnSubscription(newSession.access_token);
-            }
             await checkSubscriptionStatus(newSession.access_token);
           } else {
             setHasActiveSubscription(false);
@@ -186,38 +231,26 @@ function BookContent() {
             setCheckingSubscription(false);
           }
         });
-
-        // Fetch services
-        const sRes = await fetch('/api/services');
-        if (sRes.ok) {
-          const sData: Service[] = await sRes.json();
-          if (sData && sData.length > 0) {
-            setServices(sData);
-            // Default select first regular appointment
-            const firstAppointment = sData.find((s) => !s.is_subscription);
-            if (firstAppointment) setSelectedService(firstAppointment);
-          }
-        }
-
-        // Fetch staff
-        const stRes = await fetch('/api/staff');
-        if (stRes.ok) {
-          const stData: StaffMember[] = await stRes.json();
-          setStaffList(stData);
-        }
-
-        // Set default date to tomorrow or next valid day
-        if (dateOptions.length > 0) {
-          const firstAvailable = dateOptions.find((d) => !d.isSunday) || dateOptions[0];
-          setSelectedDate(firstAvailable.iso);
-        }
       } catch (err) {
         console.error('Initialization error:', err);
       } finally {
-        setLoading(false);
+        if (mounted) {
+          setLoading(false);
+        }
       }
     }
+
     init();
+
+    // Safety timeout: guarantee that checkingSubscription settles within 3 seconds
+    const failsafeTimeout = setTimeout(() => {
+      if (mounted) setCheckingSubscription(false);
+    }, 3000);
+
+    return () => {
+      mounted = false;
+      clearTimeout(failsafeTimeout);
+    };
   }, []);
 
   // 2. Fetch Availability whenever Service, Barber, or Date changes
@@ -274,6 +307,7 @@ function BookContent() {
         if (data.session) {
           setUserSession(data.session);
           setShowAuthForm(false);
+          await checkSubscriptionStatus(data.session.access_token);
         } else {
           setAuthError('Sign up successful! Please check your email or login to continue.');
         }
@@ -286,6 +320,7 @@ function BookContent() {
         if (data.session) {
           setUserSession(data.session);
           setShowAuthForm(false);
+          await checkSubscriptionStatus(data.session.access_token);
         }
       }
     } catch (err: any) {
@@ -414,113 +449,19 @@ function BookContent() {
     );
   }
 
-  // Loading Membership Verification Screen
-  if (checkingSubscription) {
+  // Loading Services & Staff Screen
+  if (loading) {
     return (
       <div className="container mx-auto max-w-4xl px-4 py-24 text-center space-y-4">
         <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10 text-amber-500 animate-pulse">
           <Scissors className="h-7 w-7" />
         </div>
-        <h2 className="text-xl font-bold text-white">Verifying Membership Access...</h2>
-        <p className="text-xs text-zinc-500">Connecting to Ace of Fyt member registry.</p>
+        <h2 className="text-xl font-bold text-white">Loading Ace of Fyt Barbershop...</h2>
+        <p className="text-xs text-zinc-500">Preparing available chairs and styling schedule.</p>
       </div>
     );
   }
 
-  // GATING VIEW: Non-subscribers & Guests
-  if (!hasActiveSubscription) {
-    return (
-      <div className="container mx-auto max-w-6xl px-4 py-12 space-y-12">
-        {/* Header */}
-        <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
-          <div>
-            <Link href="/" className="inline-flex items-center text-xs text-zinc-400 hover:text-white mb-2">
-              <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back to Home
-            </Link>
-            <h1 className="text-3xl font-extrabold text-white flex items-center">
-              <Scissors className="mr-3 h-8 w-8 text-amber-500" />
-              Ace of Fyt Barbershop
-            </h1>
-            <p className="text-sm text-zinc-400 mt-1">
-              Precision fades, scissor craft, and hot towel sculpting.
-            </p>
-          </div>
-
-          <div className="flex items-center space-x-2 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-lg">
-            <MapPin className="h-4 w-4 text-amber-500" />
-            <span>Dissafyt Studio, Johannesburg</span>
-          </div>
-        </div>
-
-        {/* Cancellation notification if customer backed out on PayFast */}
-        {isCancelledParam && (
-          <div className="rounded-xl border border-zinc-800 bg-zinc-900/90 p-4 text-zinc-300 flex items-center gap-3">
-            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
-            <p className="text-xs text-zinc-300">
-              Subscription checkout was cancelled. Choose any membership plan below whenever you are ready to unlock priority booking.
-            </p>
-          </div>
-        )}
-
-        {/* Member Gating Educational Hero Card */}
-        <div className="relative overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/10 via-zinc-900/90 to-zinc-950 p-8 sm:p-12 text-center space-y-6 shadow-2xl">
-          <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 ring-4 ring-amber-500/10">
-            <Crown className="h-8 w-8" />
-          </div>
-
-          <div className="max-w-2xl mx-auto space-y-3">
-            <span className="inline-flex items-center rounded-full bg-amber-500 px-3 py-0.5 text-xs font-black text-black uppercase tracking-wider">
-              Member-Exclusive Grooming Schedule
-            </span>
-            <h2 className="text-3xl sm:text-4xl font-extrabold text-white tracking-tight">
-              Grooming Appointments are Reserved for Members
-            </h2>
-            <p className="text-sm sm:text-base text-zinc-300 leading-relaxed">
-              To guarantee dedicated 1-on-1 chair time, master styling craft, and <span className="text-white font-semibold">zero queue waiting</span> for our community, our booking calendar is exclusive to active Ace of Fyt subscribers.
-            </p>
-          </div>
-
-          {/* 3 Value Pillars */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto pt-4 text-left">
-            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/70 space-y-1.5">
-              <div className="flex items-center space-x-2 text-amber-400 font-semibold text-sm">
-                <Clock className="h-4 w-4" />
-                <span>Zero Wait Time</span>
-              </div>
-              <p className="text-xs text-zinc-400">Walk straight to your designated barber chair right at your confirmed booking slot.</p>
-            </div>
-            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/70 space-y-1.5">
-              <div className="flex items-center space-x-2 text-amber-400 font-semibold text-sm">
-                <Scissors className="h-4 w-4" />
-                <span>Master Barber Craft</span>
-              </div>
-              <p className="text-xs text-zinc-400">Precision fades, hot towel conditioning, and tailored beard alignment every single visit.</p>
-            </div>
-            <div className="p-4 rounded-xl border border-zinc-800 bg-zinc-900/70 space-y-1.5">
-              <div className="flex items-center space-x-2 text-amber-400 font-semibold text-sm">
-                <CreditCard className="h-4 w-4" />
-                <span>Predictable Value</span>
-              </div>
-              <p className="text-xs text-zinc-400">Save up to 40% vs walk-ins with automated monthly billing powered securely by PayFast.</p>
-            </div>
-          </div>
-        </div>
-
-        {/* The Carousel for Immediate Subscription */}
-        <div className="space-y-4 pt-4">
-          <SubscriptionCarousel
-            title="Select a Membership to Unlock Booking"
-            subtitle="Subscribe now to unlock instant appointment scheduling. Your membership details and priority slots will be automatically bound to your account."
-            onSubscribed={() => {
-              if (userSession) checkSubscriptionStatus(userSession.access_token);
-            }}
-          />
-        </div>
-      </div>
-    );
-  }
-
-  // UNLOCKED VIEW: Active Members
   return (
     <div className="container mx-auto max-w-6xl px-4 py-12 space-y-12">
       {/* Header */}
@@ -544,32 +485,73 @@ function BookContent() {
         </div>
       </div>
 
-      {/* Active Member VIP Status Banner */}
-      <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
-        <div className="flex items-center space-x-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
-            <Crown className="h-5 w-5" />
-          </div>
-          <div>
-            <div className="flex items-center space-x-2">
-              <span className="text-sm font-bold text-white">
-                Active Member: {activeSubscription?.plan_name || 'Ace of Fyt Member'}
-              </span>
-              <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 uppercase tracking-wider">
-                Priority Access Active
-              </span>
-            </div>
-            <p className="text-xs text-zinc-400">
-              Welcome back{customerProfile?.full_name ? `, ${customerProfile.full_name}` : ''}! Your appointment slot is guaranteed.
-            </p>
-          </div>
+      {/* Cancellation notification if customer backed out on PayFast */}
+      {isCancelledParam && (
+        <div className="rounded-xl border border-zinc-800 bg-zinc-900/90 p-4 text-zinc-300 flex items-center gap-3">
+          <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+          <p className="text-xs text-zinc-300">
+            Subscription checkout was cancelled. You can continue booking below or choose a membership at any time.
+          </p>
         </div>
+      )}
 
-        <div className="text-xs text-zinc-400 border-l border-zinc-800 pl-3 hidden sm:block">
-          <div>Next Renewal: {activeSubscription?.current_period_end ? new Date(activeSubscription.current_period_end).toLocaleDateString() : 'Active'}</div>
-          <div className="text-emerald-400 font-semibold">Priority Booking Unlocked</div>
+      {/* Active Member VIP Status Banner vs Standard Booking Banner */}
+      {hasActiveSubscription ? (
+        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center space-x-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
+              <Crown className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-bold text-white">
+                  Active Member: {activeSubscription?.plan_name || 'Ace of Fyt Member'}
+                </span>
+                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 uppercase tracking-wider">
+                  Priority Access Active
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400">
+                Welcome back{customerProfile?.full_name ? `, ${customerProfile.full_name}` : ''}! All grooming appointments are included (R0.00) in your membership.
+              </p>
+            </div>
+          </div>
+
+          <div className="text-xs text-zinc-400 border-l border-zinc-800 pl-3 hidden sm:block">
+            <div>Next Renewal: {activeSubscription?.current_period_end ? new Date(activeSubscription.current_period_end).toLocaleDateString() : 'Active'}</div>
+            <div className="text-emerald-400 font-semibold">Included / R0.00 Booking</div>
+          </div>
         </div>
-      </div>
+      ) : (
+        <div className="rounded-xl border border-amber-500/30 bg-gradient-to-r from-amber-500/10 via-zinc-900 to-zinc-900 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg">
+          <div className="flex items-center space-x-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-amber-500/20 text-amber-400">
+              <Sparkles className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-bold text-white">
+                  Standard Grooming Schedule
+                </span>
+                <span className="rounded-full bg-zinc-800 border border-zinc-700 px-2 py-0.5 text-[10px] font-medium text-zinc-300 uppercase tracking-wider">
+                  Standard Rates
+                </span>
+              </div>
+              <p className="text-xs text-zinc-400">
+                Book single cuts below at standard rates, or join a monthly membership for R0.00 regular cuts & zero queue wait times.
+              </p>
+            </div>
+          </div>
+
+          <a
+            href="#memberships"
+            className="inline-flex items-center px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition-all shrink-0"
+          >
+            <Crown className="w-3.5 h-3.5 mr-1.5" />
+            View Memberships
+          </a>
+        </div>
+      )}
 
       {/* Returning Subscriber Celebration Banner */}
       {(justSubscribed || (isSubscribedParam && hasActiveSubscription)) && (
@@ -624,9 +606,16 @@ function BookContent() {
                       <span className="text-zinc-500 flex items-center">
                         <Clock className="mr-1 h-3 w-3" /> {service.duration_minutes} mins
                       </span>
-                      <span className="text-sm font-bold text-emerald-400">
-                        Included
-                      </span>
+                      {hasActiveSubscription ? (
+                        <span className="text-sm font-bold text-emerald-400 flex items-center">
+                          <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                          Included
+                        </span>
+                      ) : (
+                        <span className="text-sm font-bold text-white">
+                          R {Number(service.price).toFixed(2)}
+                        </span>
+                      )}
                     </div>
                   </div>
                 );
@@ -782,7 +771,9 @@ function BookContent() {
             <div className="space-y-3 text-xs border-b border-zinc-800 pb-4">
               <div className="flex justify-between">
                 <span className="text-zinc-400">Membership Tier</span>
-                <span className="text-amber-400 font-semibold">{activeSubscription?.plan_name || 'Active Member'}</span>
+                <span className="text-amber-400 font-semibold">
+                  {hasActiveSubscription ? activeSubscription?.plan_name || 'Active Member' : 'Standard Client'}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-zinc-400">Service</span>
@@ -818,9 +809,15 @@ function BookContent() {
 
             <div className="flex justify-between items-center text-sm font-bold">
               <span className="text-zinc-300">Appointment Fee</span>
-              <span className="text-lg text-emerald-400">
-                Included <span className="text-[10px] text-zinc-500 font-normal">in Membership</span>
-              </span>
+              {hasActiveSubscription ? (
+                <span className="text-lg text-emerald-400">
+                  Included <span className="text-[10px] text-zinc-500 font-normal">in Membership</span>
+                </span>
+              ) : (
+                <span className="text-lg text-white">
+                  R {selectedService ? Number(selectedService.price).toFixed(2) : '0.00'}
+                </span>
+              )}
             </div>
 
             {/* Special Requests / Notes */}
@@ -851,13 +848,118 @@ function BookContent() {
         </div>
       </div>
 
-      {/* Subscription Carousel Section (Membership Tier Management) */}
-      <div className="pt-12 border-t border-zinc-800">
+      {/* Subscription Carousel Section */}
+      <div id="memberships" className="pt-12 border-t border-zinc-800 space-y-4">
         <SubscriptionCarousel
-          title="Your Barbershop Membership Plan"
-          subtitle="You are currently an active subscriber. You can review plan benefits, change plans, or add family members below."
+          title="Ace of Fyt Barbershop Memberships"
+          subtitle={
+            hasActiveSubscription
+              ? "You are currently an active subscriber. You can review plan benefits, change plans, or add family members below."
+              : "Subscribe to a monthly plan to unlock regular haircuts, queue-free priority booking, and R0.00 appointment fees."
+          }
+          onSubscribed={() => {
+            if (userSession) checkSubscriptionStatus(userSession.access_token);
+          }}
         />
       </div>
+
+      {/* Quick Auth Dialog Modal for Guests confirming appointment */}
+      {showAuthForm && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 p-4 backdrop-blur-sm">
+          <Card className="w-full max-w-md border-zinc-800 bg-zinc-950 p-6 space-y-5 shadow-2xl relative">
+            <button
+              onClick={() => setShowAuthForm(false)}
+              className="absolute top-4 right-4 text-zinc-400 hover:text-white text-lg font-bold"
+            >
+              ✕
+            </button>
+
+            <div className="space-y-1 text-center">
+              <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-full bg-amber-500/10 text-amber-400 mb-2">
+                <Scissors className="h-6 w-6" />
+              </div>
+              <h3 className="text-xl font-bold text-white">
+                {authIsSignUp ? 'Create Your Account' : 'Sign In to Confirm Booking'}
+              </h3>
+              <p className="text-xs text-zinc-400">
+                Sign in or register to secure your chair at Ace of Fyt Barbershop.
+              </p>
+            </div>
+
+            <form onSubmit={handleInlineAuth} className="space-y-3.5">
+              {authIsSignUp && (
+                <div className="space-y-1">
+                  <Label className="text-xs text-zinc-300">Full Name</Label>
+                  <Input
+                    required
+                    placeholder="e.g. Sipho Khumalo"
+                    value={authFullName}
+                    onChange={(e) => setAuthFullName(e.target.value)}
+                    className="bg-zinc-900 border-zinc-800 text-sm text-white"
+                  />
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <Label className="text-xs text-zinc-300">Email Address</Label>
+                <Input
+                  required
+                  type="email"
+                  placeholder="you@example.com"
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  className="bg-zinc-900 border-zinc-800 text-sm text-white"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <Label className="text-xs text-zinc-300">Password</Label>
+                <Input
+                  required
+                  type="password"
+                  placeholder="••••••••"
+                  value={authPassword}
+                  onChange={(e) => setAuthPassword(e.target.value)}
+                  className="bg-zinc-900 border-zinc-800 text-sm text-white"
+                />
+              </div>
+
+              {authError && (
+                <div className="rounded-lg border border-rose-500/20 bg-rose-500/10 p-2.5 text-xs text-rose-400">
+                  {authError}
+                </div>
+              )}
+
+              <Button
+                type="submit"
+                disabled={authLoading}
+                className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm py-4"
+              >
+                {authLoading
+                  ? 'Processing...'
+                  : authIsSignUp
+                  ? 'Create Account & Continue'
+                  : 'Sign In & Continue'}
+              </Button>
+            </form>
+
+            <div className="text-center pt-2 border-t border-zinc-800">
+              <button
+                type="button"
+                onClick={() => {
+                  setAuthIsSignUp(!authIsSignUp);
+                  setAuthError(null);
+                }}
+                className="text-xs text-amber-400 hover:text-amber-300"
+              >
+                {authIsSignUp
+                  ? 'Already have an account? Sign In'
+                  : "Don't have an account? Sign Up"}
+              </button>
+            </div>
+          </Card>
+        </div>
+      )}
     </div>
   );
 }

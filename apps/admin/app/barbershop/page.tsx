@@ -1304,7 +1304,7 @@ export default function AdminBarbershopPage() {
                   <div className="space-y-1 md:col-span-2 bg-stone-800/40 p-3 rounded-lg border border-stone-800">
                     <Label className="text-amber-400">PayFast Plan Identifier</Label>
                     <div className="flex gap-4 pt-1">
-                      {['solo', 'twice', 'father-son'].map((code) => (
+                      {['solo', 'twice', 'executive'].map((code) => (
                         <label key={code} className="flex items-center space-x-1.5 text-xs text-stone-300">
                           <input
                             type="radio"
@@ -1426,7 +1426,7 @@ export default function AdminBarbershopPage() {
                   <div className="space-y-1 md:col-span-2 bg-stone-800/40 p-3 rounded-lg border border-stone-800">
                     <Label className="text-amber-400">PayFast Plan Identifier</Label>
                     <div className="flex gap-4 pt-1">
-                      {['solo', 'twice', 'father-son'].map((code) => (
+                      {['solo', 'twice', 'executive'].map((code) => (
                         <label key={code} className="flex items-center space-x-1.5 text-xs text-stone-300">
                           <input
                             type="radio"

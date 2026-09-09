@@ -8,7 +8,8 @@ export const revalidate = 0;
 const PLAN_CONFIGS: Record<string, { name: string; price: number }> = {
   solo: { name: 'The Solo Membership', price: 100.0 },
   twice: { name: 'The Regular Membership', price: 180.0 },
-  'father-son': { name: 'Father n Son Membership', price: 180.0 },
+  executive: { name: 'The Executive Membership', price: 350.0 },
+  'father-son': { name: 'The Executive Membership', price: 350.0 },
 };
 
 /**

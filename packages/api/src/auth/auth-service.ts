@@ -12,15 +12,34 @@ export class AuthService {
    */
   static async verifyToken(token: string): Promise<AuthContext | null> {
     try {
-      const supabase = getSupabaseBrowserClient();
-      const { data, error } = await supabase.auth.getUser(token);
+      let user = null;
 
-      if (error || !data.user) {
+      // 1. Try administrative client (fastest and most reliable on server)
+      try {
+        const adminClient = getSupabaseAdminClient();
+        const { data: adminData, error: adminErr } = await adminClient.auth.getUser(token);
+        if (!adminErr && adminData?.user) {
+          user = adminData.user;
+        }
+      } catch (err) {
+        console.warn('Admin token verification fallback to browser client:', err);
+      }
+
+      // 2. Fallback to browser client if admin client was unavailable
+      if (!user) {
+        const supabase = getSupabaseBrowserClient();
+        const { data, error } = await supabase.auth.getUser(token);
+        if (!error && data?.user) {
+          user = data.user;
+        }
+      }
+
+      if (!user) {
         return null;
       }
 
-      const userId = data.user.id;
-      const email = data.user.email;
+      const userId = user.id;
+      const email = user.email;
 
       // In production/privileged backend, query user_roles table
       let roles: AppRole[] = ['customer'];

@@ -19,10 +19,15 @@ const PLAN_CONFIGS: Record<
     price: 180.0,
     description: '2 haircuts per month with queue skip and priority booking.',
   },
+  executive: {
+    name: 'The Executive',
+    price: 350.0,
+    description: 'Full combo, twice a month with hot towel & beard sculpt.',
+  },
   'father-son': {
-    name: 'Father n Son',
-    price: 180.0,
-    description: '1 combo cut per month for father and son.',
+    name: 'The Executive',
+    price: 350.0,
+    description: 'Full combo, twice a month with hot towel & beard sculpt.',
   },
 };
 
