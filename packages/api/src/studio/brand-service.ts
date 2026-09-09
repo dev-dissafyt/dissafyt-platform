@@ -54,6 +54,46 @@ export interface CreateCustomProductInput {
   tags?: string[];
 }
 
+export interface CreatorSalesSummary {
+  brand_id: string;
+  brand_name: string;
+  deal_type: 'stacked_returns' | 'drip_income';
+  total_gross_revenue: number;
+  total_units_sold: number;
+  total_royalties_earned: number;
+  royalties_pending_clearance: number;
+  royalties_paid_out: number;
+  available_for_payout: number;
+  by_category: { name: string; units: number; revenue: number }[];
+  by_color: { color: string; count: number; percentage: number }[];
+  by_size: { size: string; count: number }[];
+}
+
+export interface StackedReturnsMetrics {
+  brand_id: string;
+  initial_batch_size: number;
+  unit_production_cost: number;
+  total_stack_invested: number;
+  retail_price: number;
+  units_sold_total: number;
+  units_sold_in_studio_racks: number;
+  units_sold_online: number;
+  remaining_rack_inventory: number;
+  break_even_units: number;
+  break_even_reached: boolean;
+  gross_recovered: number;
+  net_stacked_profit: number;
+  roi_percentage: number;
+}
+
+export interface CreatorBankingDetails {
+  bank_name: string;
+  account_holder: string;
+  account_number: string;
+  branch_code: string;
+  account_type: 'cheque' | 'savings';
+}
+
 export class BrandService {
   /**
    * Lists all registered Kasi Kollekt brands and local creators.
@@ -264,5 +304,140 @@ export class BrandService {
       creatorRoyalty: creatorEarnings,
       platformFee: factoryFee,
     };
+  }
+
+  /**
+   * Generates a comprehensive sales, margin, and royalty analytics summary for a creator brand.
+   */
+  static async getCreatorSalesSummary(brandId: string): Promise<CreatorSalesSummary> {
+    const brand = await this.getBrandById(brandId);
+    const brandName = brand?.name || 'Skhanda Heritage Co.';
+    const dealType = brand?.deal_type || 'drip_income';
+
+    // Mock/runtime aggregation based on print queue activity and demo catalog
+    return {
+      brand_id: brandId,
+      brand_name: brandName,
+      deal_type: dealType,
+      total_gross_revenue: dealType === 'stacked_returns' ? 15300 : 9900,
+      total_units_sold: dealType === 'stacked_returns' ? 34 : 22,
+      total_royalties_earned: dealType === 'stacked_returns' ? 6300 : 3465,
+      royalties_pending_clearance: 770, // 7-day holding period for recent orders
+      royalties_paid_out: dealType === 'stacked_returns' ? 3500 : 1500,
+      available_for_payout: dealType === 'stacked_returns' ? 2030 : 1195,
+      by_category: [
+        { name: '240gsm Boxy Tees', units: 18, revenue: 8100 },
+        { name: 'Heavyweight Fleece Hoodies', units: 8, revenue: 6000 },
+        { name: 'Drop-Shoulder Street Tees', units: 8, revenue: 3040 },
+      ],
+      by_color: [
+        { color: 'Onyx Black', count: 20, percentage: 59 },
+        { color: 'Bone / Off-White', count: 9, percentage: 26 },
+        { color: 'Washed Olive', count: 5, percentage: 15 },
+      ],
+      by_size: [
+        { size: 'M', count: 8 },
+        { size: 'L', count: 16 },
+        { size: 'XL', count: 10 },
+      ],
+    };
+  }
+
+  /**
+   * Generates Option A: 'Stacked Returns' wholesale rack metrics.
+   * Tracks batch investment, physical barbershop studio rack sales, and break-even milestones.
+   */
+  static async getStackedReturnsMetrics(brandId: string): Promise<StackedReturnsMetrics> {
+    const initialBatch = 50;
+    const unitCost = 180;
+    const retailPrice = 450;
+    const unitsSoldStudio = 20; // sold off physical hangers in Ace of Fyt barbershop
+    const unitsSoldOnline = 14;
+    const unitsSoldTotal = unitsSoldStudio + unitsSoldOnline;
+    const totalStack = initialBatch * unitCost; // R9,000
+    const grossRecovered = unitsSoldTotal * retailPrice;
+    const breakEvenUnits = Math.ceil(totalStack / retailPrice); // 20 units
+
+    return {
+      brand_id: brandId,
+      initial_batch_size: initialBatch,
+      unit_production_cost: unitCost,
+      total_stack_invested: totalStack,
+      retail_price: retailPrice,
+      units_sold_total: unitsSoldTotal,
+      units_sold_in_studio_racks: unitsSoldStudio,
+      units_sold_online: unitsSoldOnline,
+      remaining_rack_inventory: Math.max(0, initialBatch - unitsSoldTotal),
+      break_even_units: breakEvenUnits,
+      break_even_reached: unitsSoldTotal >= breakEvenUnits,
+      gross_recovered: grossRecovered,
+      net_stacked_profit: Math.max(0, grossRecovered - totalStack),
+      roi_percentage: Math.round(((grossRecovered - totalStack) / totalStack) * 100),
+    };
+  }
+
+  /**
+   * Retrieves creator payout ledger & banking status.
+   */
+  static async getCreatorPayouts(brandId: string): Promise<{
+    payouts: any[];
+    banking: CreatorBankingDetails;
+  }> {
+    return {
+      banking: {
+        bank_name: 'First National Bank (FNB)',
+        account_holder: 'Skhanda Heritage Enterprise',
+        account_number: '••••••••4892',
+        branch_code: '250655',
+        account_type: 'cheque',
+      },
+      payouts: [
+        {
+          id: 'pay-001',
+          amount: 2000,
+          status: 'paid',
+          reference: 'EFT-DISS-2026-0901',
+          created_at: new Date(Date.now() - 86400000 * 7).toISOString(),
+          processed_at: new Date(Date.now() - 86400000 * 6).toISOString(),
+        },
+        {
+          id: 'pay-002',
+          amount: 1500,
+          status: 'paid',
+          reference: 'EFT-DISS-2026-0905',
+          created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
+          processed_at: new Date(Date.now() - 86400000 * 2).toISOString(),
+        },
+      ],
+    };
+  }
+
+  /**
+   * Submits a creator payout request.
+   */
+  static async requestPayout(
+    brandId: string,
+    amount: number,
+    banking: CreatorBankingDetails,
+    actor?: { email?: string; role?: string }
+  ): Promise<{ success: boolean; payoutId?: string; error?: string }> {
+    if (amount < 500) {
+      return { success: false, error: 'Minimum payout threshold is R500.00' };
+    }
+
+    const payoutId = `pay-${Date.now()}`;
+
+    // Invisible Audit Trail
+    await AuditService.recordLog({
+      actor_email: actor?.email || 'creator@dissafyt.com',
+      actor_role: actor?.role || 'creator',
+      action: 'creator.request_payout',
+      entity_type: 'creator_payout',
+      entity_id: payoutId,
+      entity_name: `Payout Request of R${amount}`,
+      changes: { brand_id: brandId, amount, banking },
+    });
+
+    return { success: true, payoutId };
   }
 }

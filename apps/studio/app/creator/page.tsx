@@ -20,6 +20,7 @@ import {
   Tag
 } from 'lucide-react';
 import type { Brand, DealType } from '@dissafyt/database';
+import { getActivePersona, StudioPersona } from '../../lib/persona';
 
 const GARMENT_PRESETS = [
   { id: 'tee_boxy_240', name: '240gsm Heavyweight Boxy Tee', type: 'tee', baseCost: 180, defaultRetail: 450 },
@@ -74,8 +75,24 @@ export default function CreatorStudioPage() {
   const [publishing, setPublishing] = useState(false);
   const [publishedSlug, setPublishedSlug] = useState<string | null>(null);
 
+  const [persona, setPersona] = useState<StudioPersona>(getActivePersona());
+
   useEffect(() => {
+    const current = getActivePersona();
+    setPersona(current);
+    if (current.brandId) {
+      setSelectedBrandId(current.brandId);
+    }
     fetchBrands();
+
+    const handlePersonaChange = (e: any) => {
+      if (e.detail) {
+        setPersona(e.detail);
+        if (e.detail.brandId) setSelectedBrandId(e.detail.brandId);
+      }
+    };
+    window.addEventListener('studio_persona_changed', handlePersonaChange);
+    return () => window.removeEventListener('studio_persona_changed', handlePersonaChange);
   }, []);
 
   const fetchBrands = async () => {
@@ -84,7 +101,10 @@ export default function CreatorStudioPage() {
       if (res.ok) {
         const data = await res.json();
         setBrands(data);
-        if (data.length > 0 && !selectedBrandId) {
+        const current = getActivePersona();
+        if (current.brandId) {
+          setSelectedBrandId(current.brandId);
+        } else if (data.length > 0 && !selectedBrandId) {
           setSelectedBrandId(data[0].id);
         }
       }
@@ -181,29 +201,43 @@ export default function CreatorStudioPage() {
             </p>
           </div>
 
-          <div className="flex items-center space-x-2 bg-zinc-950/80 p-1.5 rounded-xl border border-zinc-800">
+          <div className="flex flex-wrap items-center gap-2 bg-zinc-950/80 p-1.5 rounded-xl border border-zinc-800">
             <button
               onClick={() => setActiveTab('mockup')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-2 ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
                 activeTab === 'mockup'
                   ? 'bg-amber-500 text-black shadow-md'
                   : 'text-zinc-400 hover:text-white'
               }`}
             >
               <Shirt className="w-3.5 h-3.5" />
-              <span>Garment Lab & Mockup</span>
+              <span>Garment Lab</span>
             </button>
             <button
               onClick={() => setActiveTab('brand')}
-              className={`px-4 py-2 rounded-lg text-xs font-bold transition flex items-center space-x-2 ${
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition flex items-center space-x-1.5 ${
                 activeTab === 'brand'
                   ? 'bg-amber-500 text-black shadow-md'
                   : 'text-zinc-400 hover:text-white'
               }`}
             >
               <Store className="w-3.5 h-3.5" />
-              <span>Brand & Deals</span>
+              <span>Brand Profile</span>
             </button>
+            <Link
+              href="/creator/sales"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-900 transition flex items-center space-x-1.5"
+            >
+              <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Sales & Profits</span>
+            </Link>
+            <Link
+              href="/creator/payouts"
+              className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-900 transition flex items-center space-x-1.5"
+            >
+              <DollarSign className="w-3.5 h-3.5 text-purple-400" />
+              <span>Payouts</span>
+            </Link>
           </div>
         </div>
       </div>
@@ -472,17 +506,26 @@ export default function CreatorStudioPage() {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   <div className="space-y-1.5">
                     <label className="text-xs font-mono uppercase text-zinc-400">Associated Brand Drop</label>
-                    <select
-                      value={selectedBrandId}
-                      onChange={(e) => setSelectedBrandId(e.target.value)}
-                      className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500"
-                    >
-                      {brands.map((b) => (
-                        <option key={b.id} value={b.id}>
-                          {b.name} ({b.deal_type === 'stacked_returns' ? 'Stacked' : 'Drip Income'})
-                        </option>
-                      ))}
-                    </select>
+                    {persona.role === 'creator' && persona.brandId ? (
+                      <div className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs font-bold text-amber-400 font-mono flex items-center justify-between">
+                        <span>{persona.brandName?.split('(')[0] || 'Your Brand'}</span>
+                        <span className="text-[9px] bg-amber-500/10 text-amber-400 border border-amber-500/20 px-1.5 py-0.5 rounded uppercase">
+                          Authenticated Creator
+                        </span>
+                      </div>
+                    ) : (
+                      <select
+                        value={selectedBrandId}
+                        onChange={(e) => setSelectedBrandId(e.target.value)}
+                        className="w-full px-3 py-2 bg-zinc-950 border border-zinc-800 rounded-xl text-xs text-white focus:outline-none focus:border-amber-500"
+                      >
+                        {brands.map((b) => (
+                          <option key={b.id} value={b.id}>
+                            {b.name} ({b.deal_type === 'stacked_returns' ? 'Stacked' : 'Drip Income'})
+                          </option>
+                        ))}
+                      </select>
+                    )}
                   </div>
 
                   <div className="space-y-1.5">

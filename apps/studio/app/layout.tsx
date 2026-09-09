@@ -1,6 +1,8 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import './globals.css';
+import { StudioNavigation } from '../components/studio-navigation';
+import { PersonaSwitcher } from '../components/persona-switcher';
 
 export const metadata: Metadata = {
   title: 'Dissafyt Studio — Factory OS & Kasi Kollekt Fulfillment',
@@ -33,38 +35,16 @@ export default function RootLayout({
                 </div>
               </Link>
 
-              <nav className="hidden md:flex items-center space-x-1 pl-4 border-l border-zinc-800">
-                <Link
-                  href="/"
-                  className="px-3 py-1.5 rounded-md text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors"
-                >
-                  Factory Queue
-                </Link>
-                <Link
-                  href="/creator"
-                  className="px-3 py-1.5 rounded-md text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors"
-                >
-                  Creator Studio & Mockup
-                </Link>
-                <Link
-                  href="/dispatch"
-                  className="px-3 py-1.5 rounded-md text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors"
-                >
-                  Kasi Kollekt Dispatch
-                </Link>
-              </nav>
+              <StudioNavigation />
             </div>
 
             <div className="flex items-center space-x-3">
-              <span className="hidden sm:inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse mr-1.5"></span>
-                Factory Port 3002
-              </span>
+              <PersonaSwitcher />
               <a
                 href="http://localhost:3000"
                 target="_blank"
                 rel="noreferrer"
-                className="px-2.5 py-1 rounded text-xs font-medium text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 transition"
+                className="hidden sm:inline-block px-2.5 py-1 rounded text-xs font-medium text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 transition"
               >
                 Storefront ↗
               </a>
@@ -72,7 +52,7 @@ export default function RootLayout({
                 href="http://localhost:3001"
                 target="_blank"
                 rel="noreferrer"
-                className="px-2.5 py-1 rounded text-xs font-medium text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 transition"
+                className="hidden sm:inline-block px-2.5 py-1 rounded text-xs font-medium text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 transition"
               >
                 Admin ↗
               </a>

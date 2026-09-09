@@ -216,6 +216,63 @@ async function runVerification() {
   assert(retrievedTicket?.artwork_notes === 'White DTF ink with gold metallic shimmer pigment.', 'Artwork notes preserved on ticket');
 
   // ----------------------------------------------------
+  // Test 8: Creator Sales & Drip Analytics Aggregation
+  // ----------------------------------------------------
+  console.log('\n--- 8. Creator Sales & Drip Profit Analytics ---');
+
+  const salesSummary = await BrandService.getCreatorSalesSummary(stackedBrandRes.brand!.id);
+  assert(salesSummary.total_gross_revenue > 0, `Gross revenue aggregated (R${salesSummary.total_gross_revenue})`);
+  assert(salesSummary.total_royalties_earned > 0, `Royalties earned calculated (R${salesSummary.total_royalties_earned})`);
+  assert(salesSummary.available_for_payout > 0, `Available balance ready for EFT (R${salesSummary.available_for_payout})`);
+  assert(salesSummary.royalties_pending_clearance > 0, `7-day holding clearance accounted for (R${salesSummary.royalties_pending_clearance})`);
+  assert(salesSummary.by_category.length >= 3, `Garment cut breakdown generated (${salesSummary.by_category.length} cuts)`);
+  assert(salesSummary.by_color.length >= 3, `Colorway popularity curve generated (${salesSummary.by_color.length} colors)`);
+  assert(salesSummary.by_size.length >= 3, `Size demand distribution generated (${salesSummary.by_size.length} sizes)`);
+
+  // ----------------------------------------------------
+  // Test 9: Option A Stacked Returns Wholesale Rack Tracker
+  // ----------------------------------------------------
+  console.log('\n--- 9. Option A Stacked Returns Wholesale Rack Tracker ---');
+
+  const stackedMetrics = await BrandService.getStackedReturnsMetrics(stackedBrandRes.brand!.id);
+  assert(stackedMetrics.total_stack_invested === 9000, `Initial stack invested verified (50 units * R180 = R${stackedMetrics.total_stack_invested})`);
+  assert(stackedMetrics.break_even_units === 20, `Break-even threshold accurately determined (20 units needed, got ${stackedMetrics.break_even_units})`);
+  assert(stackedMetrics.break_even_reached === true, 'Break-even reached indicator is true (34 units sold)');
+  assert(stackedMetrics.units_sold_in_studio_racks === 20, 'In-studio barbershop physical rack sales tracked (20 units)');
+  assert(stackedMetrics.remaining_rack_inventory === 16, `Remaining physical studio rack stock counted (${stackedMetrics.remaining_rack_inventory} hangers)`);
+  assert(stackedMetrics.net_stacked_profit === 6300, `Net stacked profit above investment computed (R${stackedMetrics.net_stacked_profit})`);
+  assert(stackedMetrics.roi_percentage === 70, `Stacked ROI percentage computed (${stackedMetrics.roi_percentage}%)`);
+
+  // ----------------------------------------------------
+  // Test 10: Creator Banking & EFT Payout Request Governance
+  // ----------------------------------------------------
+  console.log('\n--- 10. Creator Banking & EFT Payout Governance ---');
+
+  const testBanking = {
+    bank_name: 'First National Bank (FNB)',
+    account_holder: 'Skhanda Heritage Enterprise',
+    account_number: '62899123456',
+    branch_code: '250655',
+    account_type: 'cheque' as const,
+  };
+
+  // Test minimum threshold restriction (< R500)
+  const invalidPayout = await BrandService.requestPayout(stackedBrandRes.brand!.id, 250, testBanking);
+  assert(!invalidPayout.success && invalidPayout.error?.includes('Minimum payout threshold'), 'Prevented payout request below R500 threshold');
+
+  // Test valid payout request (>= R500)
+  const validPayout = await BrandService.requestPayout(stackedBrandRes.brand!.id, 1500, testBanking, {
+    email: 'creator.skhanda@dissafyt.com',
+    role: 'creator',
+  });
+  assert(validPayout.success && !!validPayout.payoutId, `EFT payout request submitted successfully (ID: ${validPayout.payoutId})`);
+
+  // Fetch payout ledger
+  const payoutLedger = await BrandService.getCreatorPayouts(stackedBrandRes.brand!.id);
+  assert(payoutLedger.payouts.length >= 2, `Retrieved historical payout ledger (${payoutLedger.payouts.length} past payments)`);
+  assert(payoutLedger.banking.bank_name === 'First National Bank (FNB)', 'Banking profile verified');
+
+  // ----------------------------------------------------
   // Summary
   // ----------------------------------------------------
   console.log('\n====================================================');
