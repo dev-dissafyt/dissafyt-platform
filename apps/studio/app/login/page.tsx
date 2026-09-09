@@ -77,7 +77,7 @@ function StudioLoginContent() {
           brandName = 'Factory Floor Operator';
         } else if (userEmail.includes('vibecult')) {
           brandId = 'b0000000-0000-0000-0000-000000000002';
-          brandName = 'Vibe Cult Johannesburg';
+          brandName = 'Vibe Cult Cape Town';
         }
 
         const persona: StudioPersona = {
@@ -228,7 +228,7 @@ function StudioLoginContent() {
                 </div>
                 <div>
                   <div className="flex items-center space-x-2">
-                    <span className="text-sm font-bold text-white">Creator: Vibe Cult Johannesburg</span>
+                    <span className="text-sm font-bold text-white">Creator: Vibe Cult Cape Town</span>
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold uppercase">
                       Creator
                     </span>

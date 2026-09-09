@@ -42,9 +42,9 @@ const SAMPLE_PRINTS = [
     description: 'Minimal typographic front chest print'
   },
   {
-    name: 'Johannesburg Skyline Vector',
+    name: 'Table Mountain Skyline Vector',
     url: 'https://images.unsplash.com/photo-1549887534-1541e9326642?w=600&auto=format&fit=crop&q=80',
-    description: 'High-contrast urban landscape for oversized back'
+    description: 'High-contrast Cape Town landscape for oversized back'
   },
   {
     name: 'Geometric Afro-Streetwear Shield',

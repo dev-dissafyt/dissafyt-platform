@@ -210,11 +210,11 @@ export function SubscriptionCarousel({
       {/* Header & Navigation Controls */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div className="space-y-2 max-w-2xl">
-          <div className="inline-flex items-center space-x-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 px-3 py-1 text-xs font-semibold text-amber-400 uppercase tracking-wider">
+          <div className="inline-flex items-center space-x-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 px-3 py-1 text-xs font-semibold text-amber-400 uppercase tracking-wider font-mono">
             <Sparkles className="h-3.5 w-3.5" />
-            <span>VIP Grooming Tiers</span>
+            <span>VIP Grooming Guild</span>
           </div>
-          <h2 className="text-2xl md:text-3xl font-extrabold text-white">{title}</h2>
+          <h2 className="font-display text-2xl md:text-4xl font-black uppercase text-white tracking-tight">{title}</h2>
           <p className="text-xs md:text-sm text-zinc-400">{subtitle}</p>
         </div>
 
@@ -278,7 +278,7 @@ export function SubscriptionCarousel({
                 <CardHeader className="pt-6">
                   <div className="flex justify-between items-start">
                     <div>
-                      <CardTitle className="text-xl font-bold text-white">{plan.name}</CardTitle>
+                      <CardTitle className="font-display text-xl font-bold uppercase tracking-tight text-white">{plan.name}</CardTitle>
                       <CardDescription className="text-xs text-zinc-400 mt-0.5">
                         {plan.tagline}
                       </CardDescription>
@@ -286,8 +286,8 @@ export function SubscriptionCarousel({
                   </div>
 
                   <div className="mt-4 flex items-baseline">
-                    <span className="text-3xl font-extrabold text-white">R {plan.price}</span>
-                    <span className="text-xs text-zinc-400 ml-1.5 font-normal">/ month</span>
+                    <span className="font-display text-3xl font-black text-amber-400">R {plan.price}</span>
+                    <span className="text-xs text-zinc-400 ml-1.5 font-mono">/ month</span>
                   </div>
                 </CardHeader>
 

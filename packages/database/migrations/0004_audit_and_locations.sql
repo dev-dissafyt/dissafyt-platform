@@ -23,18 +23,18 @@ CREATE TABLE IF NOT EXISTS public.locations (
 INSERT INTO public.locations (
     id, name, slug, address, city, province, country, phone, is_flagship, is_active, capacity_chairs, operating_hours_display
 ) VALUES (
-    'loc-jhb-flagship',
-    'Dissafyt Studio, Johannesburg',
-    'dissafyt-studio-jhb',
-    'Ace of Fyt Flagship Studio, Johannesburg',
-    'Johannesburg',
-    'Gauteng',
+    'loc-cpt-flagship',
+    'Dissafyt Studio, Cape Town',
+    'dissafyt-studio-cpt',
+    'Ace of Fyt Flagship Studio, Cape Town',
+    'Cape Town',
+    'Western Cape',
     'South Africa',
-    '+27 82 123 4567',
+    '+27 21 000 0000',
     true,
     true,
     2,
-    'Mon-Fri: 09:00 - 18:00 | Sat: 09:00 - 17:00 | Sun: Closed'
+    'Tue-Sat: 09:00 - 19:00 | Sun: 10:00 - 16:00 | Mon: By Appointment'
 ) ON CONFLICT (id) DO UPDATE SET
     name = EXCLUDED.name,
     address = EXCLUDED.address,

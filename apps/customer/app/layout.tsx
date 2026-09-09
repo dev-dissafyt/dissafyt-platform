@@ -6,8 +6,8 @@ import './globals.css';
 import { Navbar } from './components/Navbar';
 
 export const metadata: Metadata = {
-  title: 'Dissafyt Platform',
-  description: 'Unified digital platform for Dissafyt commerce, services and community.',
+  title: 'DISSAFYT // The Sharpest Cut. The Heaviest Drip. — Cape Town Flagship',
+  description: 'Premier grooming lounge at Ace of Fyt Barbershop × Dissafyt Streetwear Lab. Cape Town, Western Cape.',
 };
 
 export default function RootLayout({
@@ -17,31 +17,75 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className="min-h-screen flex flex-col bg-zinc-950 text-zinc-50 antialiased selection:bg-amber-500 selection:text-black">
+      <body className="min-h-screen flex flex-col bg-black text-zinc-50 antialiased selection:bg-amber-500 selection:text-black">
         {/* Responsive Navigation Bar */}
         <Navbar />
 
         {/* Main Content Area */}
         <main className="flex-1">{children}</main>
 
-        {/* Footer */}
-        <footer className="border-t border-zinc-800 bg-zinc-950 py-10 text-center text-sm text-zinc-500">
-          <div className="container mx-auto max-w-7xl px-4 flex flex-col items-center">
-            <Link href="/" className="mb-4 inline-block">
-              <Image
-                src="/logo.png"
-                alt="Dissafyt"
-                width={130}
-                height={38}
-                className="h-7 w-auto object-contain opacity-80 hover:opacity-100 transition-opacity"
-              />
-            </Link>
-            <p className="mb-2 text-zinc-400">
-              &copy; {new Date().getFullYear()} Dissafyt Platform. All rights reserved.
-            </p>
-            <p className="text-xs text-zinc-600">
-              Unified Commerce & Barbershop Services &bull; Secure Payments by PayFast
-            </p>
+        {/* High-End Editorial Footer */}
+        <footer className="border-t border-zinc-900 bg-black py-12 text-zinc-500">
+          <div className="container mx-auto max-w-7xl px-4 sm:px-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-8 pb-10 border-b border-zinc-900">
+              <div className="md:col-span-2 space-y-4">
+                <Link href="/" className="inline-block">
+                  <Image
+                    src="/logo.png"
+                    alt="Dissafyt"
+                    width={150}
+                    height={42}
+                    className="h-8 w-auto object-contain brightness-110"
+                  />
+                </Link>
+                <p className="text-xs text-zinc-400 max-w-sm leading-relaxed">
+                  The intersection of precision barbering and heavyweight streetwear culture.
+                  Engineered and operated out of our Cape Town flagship lounge.
+                </p>
+                <div className="flex items-center space-x-2 text-[11px] font-mono text-zinc-500">
+                  <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" />
+                  <span>CAPE TOWN FLAGSHIP // MOTHER CITY</span>
+                </div>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-widest text-white mb-3">Pillars</h4>
+                <ul className="space-y-2 text-xs">
+                  <li>
+                    <Link href="/book" className="hover:text-amber-400 transition-colors">
+                      Ace of Fyt Barbershop
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/shop" className="hover:text-amber-400 transition-colors">
+                      Dissafyt Streetwear Lab
+                    </Link>
+                  </li>
+                  <li>
+                    <Link href="/book" className="hover:text-amber-400 transition-colors">
+                      VIP Monthly Guild Memberships
+                    </Link>
+                  </li>
+                </ul>
+              </div>
+
+              <div>
+                <h4 className="text-xs font-bold uppercase tracking-widest text-white mb-3">Studio & Hub</h4>
+                <ul className="space-y-2 text-xs text-zinc-400">
+                  <li>Dissafyt Studio, Cape Town Flagship</li>
+                  <li>Western Cape, South Africa</li>
+                  <li className="text-zinc-500">Tue – Sat: 09:00 – 19:00</li>
+                  <li className="text-zinc-500">Sun: 10:00 – 16:00</li>
+                </ul>
+              </div>
+            </div>
+
+            <div className="pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-600 gap-3">
+              <p>&copy; {new Date().getFullYear()} Dissafyt Platform. All rights reserved.</p>
+              <p className="font-mono text-[11px] text-zinc-500">
+                POWERED BY PAYFAST ZAR // EXPRESS NATIONWIDE COURIER
+              </p>
+            </div>
           </div>
         </footer>
       </body>

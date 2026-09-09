@@ -287,7 +287,7 @@ export default function CheckoutPage() {
                     id="city"
                     value={city}
                     onChange={(e) => setCity(e.target.value)}
-                    placeholder="e.g. Johannesburg, Cape Town, Durban"
+                    placeholder="e.g. Cape Town, Stellenbosch, Durban"
                     required
                   />
                 </div>

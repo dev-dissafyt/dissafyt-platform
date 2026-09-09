@@ -27,6 +27,19 @@ const config: Config = {
           900: '#78350f',
         },
       },
+      fontFamily: {
+        display: ['"Clash Display"', '-apple-system', 'BlinkMacSystemFont', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'monospace'],
+      },
+      keyframes: {
+        marquee: {
+          '0%': { transform: 'translateX(0%)' },
+          '100%': { transform: 'translateX(-50%)' },
+        },
+      },
+      animation: {
+        marquee: 'marquee 25s linear infinite',
+      },
     },
   },
   plugins: [],

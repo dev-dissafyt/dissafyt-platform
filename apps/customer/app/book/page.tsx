@@ -412,7 +412,7 @@ function BookContent() {
             <div className="flex justify-between border-b border-zinc-800 pb-2">
               <span className="text-xs text-zinc-400 uppercase tracking-wider">Location</span>
               <span className="text-sm font-semibold text-white flex items-center">
-                <MapPin className="h-3.5 w-3.5 text-amber-500 mr-1.5" /> Dissafyt Studio, Johannesburg
+                <MapPin className="h-3.5 w-3.5 text-amber-500 mr-1.5" /> Dissafyt Studio, Cape Town
               </span>
             </div>
             <div className="flex justify-between border-b border-zinc-800 pb-2">
@@ -470,18 +470,18 @@ function BookContent() {
           <Link href="/" className="inline-flex items-center text-xs text-zinc-400 hover:text-white mb-2">
             <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back to Home
           </Link>
-          <h1 className="text-3xl font-extrabold text-white flex items-center">
-            <Scissors className="mr-3 h-8 w-8 text-amber-500" />
+          <h1 className="font-display text-4xl sm:text-5xl font-extrabold text-white tracking-tight flex items-center">
+            <Scissors className="mr-3 h-9 w-9 text-amber-500" />
             Ace of Fyt Barbershop
           </h1>
-          <p className="text-sm text-zinc-400 mt-1">
-            Precision fades, scissor work, and beard sculpting. Select your master barber and preferred time slot.
+          <p className="text-sm text-zinc-400 mt-1 max-w-xl">
+            Cape Town’s premier grooming destination. Precision fades, scissor craft, and hot towel sculpting.
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 text-xs text-zinc-400 bg-zinc-900 border border-zinc-800 px-3 py-2 rounded-lg">
+        <div className="flex items-center space-x-2 text-xs text-zinc-400 bg-zinc-900/90 border border-zinc-800 px-3.5 py-2 rounded-xl backdrop-blur-md">
           <MapPin className="h-4 w-4 text-amber-500" />
-          <span>Dissafyt Studio, Johannesburg</span>
+          <span className="font-medium">Dissafyt Studio, Cape Town (CPT)</span>
         </div>
       </div>
 
@@ -802,7 +802,7 @@ function BookContent() {
               <div className="flex justify-between items-center">
                 <span className="text-zinc-400">Location</span>
                 <span className="text-white font-medium flex items-center">
-                  <MapPin className="h-3 w-3 mr-1 text-amber-500" /> Dissafyt Studio, JHB
+                  <MapPin className="h-3 w-3 mr-1 text-amber-500" /> Dissafyt Studio, CPT
                 </span>
               </div>
             </div>

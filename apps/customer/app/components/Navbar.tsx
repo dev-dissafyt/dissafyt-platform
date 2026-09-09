@@ -48,20 +48,26 @@ export function Navbar() {
   return (
     <header className="sticky top-0 z-50 w-full border-b border-zinc-800/80 bg-zinc-950/90 backdrop-blur">
       <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
-        {/* Brand Logo */}
-        <Link href="/" className="flex items-center space-x-2">
-          <Image
-            src="/logo.png"
-            alt="Dissafyt"
-            width={140}
-            height={40}
-            className="h-8 w-auto object-contain"
-            priority
-          />
-        </Link>
+        {/* Brand Logo & Location Pill */}
+        <div className="flex items-center space-x-3">
+          <Link href="/" className="flex items-center space-x-2">
+            <Image
+              src="/logo.png"
+              alt="Dissafyt"
+              width={140}
+              height={40}
+              className="h-8 w-auto object-contain brightness-110"
+              priority
+            />
+          </Link>
+          <span className="hidden sm:inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full border border-zinc-800 bg-zinc-900/80 text-[10px] font-mono tracking-widest text-zinc-400">
+            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+            <span>CPT // FLAGSHIP</span>
+          </span>
+        </div>
 
         {/* Desktop Navigation Links */}
-        <nav className="hidden md:flex items-center space-x-8 text-sm font-medium">
+        <nav className="hidden md:flex items-center space-x-8 text-xs font-semibold uppercase tracking-wider">
           {navLinks.map((link) => {
             const isActive = pathname === link.href;
             return (
@@ -70,8 +76,8 @@ export function Navbar() {
                 href={link.href}
                 className={`transition-colors py-1 border-b-2 ${
                   isActive
-                    ? 'border-amber-500 text-white font-semibold'
-                    : 'border-transparent text-zinc-400 hover:text-zinc-100'
+                    ? 'border-amber-500 text-white font-bold'
+                    : 'border-transparent text-zinc-400 hover:text-zinc-100 hover:border-zinc-700'
                 }`}
               >
                 {link.label}
@@ -84,7 +90,7 @@ export function Navbar() {
         <div className="hidden md:flex items-center space-x-3">
           <Link
             href="/checkout"
-            className="inline-flex h-9 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900/80 px-3 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
+            className="inline-flex h-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/90 px-3 text-xs font-medium text-zinc-300 transition-colors hover:bg-zinc-800 hover:text-white"
           >
             <ShoppingBag className="mr-1.5 h-3.5 w-3.5 text-zinc-400" />
             Cart
@@ -93,7 +99,7 @@ export function Navbar() {
           {user ? (
             <Link
               href="/account"
-              className="inline-flex h-9 items-center justify-center rounded-md border border-zinc-700 bg-zinc-900 px-3.5 text-xs font-semibold text-zinc-200 transition-colors hover:bg-zinc-800"
+              className="inline-flex h-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/90 px-3.5 text-xs font-semibold text-zinc-200 transition-colors hover:bg-zinc-800"
             >
               <User className="mr-1.5 h-3.5 w-3.5 text-amber-500" />
               Account
@@ -101,7 +107,7 @@ export function Navbar() {
           ) : (
             <Link
               href="/auth/login"
-              className="inline-flex h-9 items-center justify-center rounded-md border border-zinc-700 bg-zinc-900 px-3.5 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-800"
+              className="inline-flex h-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/90 px-3.5 text-xs font-medium text-zinc-200 transition-colors hover:bg-zinc-800"
             >
               Sign In
             </Link>
@@ -109,10 +115,10 @@ export function Navbar() {
 
           <Link
             href="/book"
-            className="inline-flex h-9 items-center justify-center rounded-md bg-amber-500 px-4 text-xs font-bold text-black transition-colors hover:bg-amber-400"
+            className="inline-flex h-9 items-center justify-center rounded-lg bg-amber-500 hover:bg-amber-400 px-4 text-xs font-extrabold text-black uppercase tracking-wider transition-all shadow-md shadow-amber-500/10 hover:shadow-amber-500/20"
           >
             <Scissors className="mr-1.5 h-3.5 w-3.5" />
-            Book Cut
+            Book Chair
           </Link>
         </div>
 

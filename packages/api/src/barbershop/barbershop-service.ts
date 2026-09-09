@@ -64,12 +64,12 @@ export function getEffectiveDurationMinutes(durationMinutes: number): number {
 
 export const DEFAULT_LOCATIONS: BarbershopLocation[] = [
   {
-    id: 'loc-jhb-flagship',
-    name: 'Dissafyt Studio, Johannesburg',
-    slug: 'dissafyt-studio-jhb',
-    address: 'Ace of Fyt Flagship Studio, Johannesburg',
-    city: 'Johannesburg',
-    province: 'Gauteng',
+    id: 'loc-cpt-flagship',
+    name: 'Dissafyt Studio, Cape Town',
+    slug: 'dissafyt-studio-cpt',
+    address: 'Ace of Fyt Flagship Studio, Cape Town',
+    city: 'Cape Town',
+    province: 'Western Cape',
     country: 'South Africa',
     phone: '+27 82 123 4567',
     is_flagship: true,

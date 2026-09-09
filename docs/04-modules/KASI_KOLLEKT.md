@@ -144,4 +144,4 @@ Because customer profiles are unified across grooming and commerce, Kasi Kollekt
 
 2. **Outfit Coordinate Engine**:
    - AI-powered matching: When a customer buys or views a graphic tee, the system suggests matching headwear, bottoms, or cross-promotes a grooming appointment:
-     > *"Matches with: Heavy Canvas Cap (Kasi Kollekt) + Book Beard Sculpt with Marcus at Johannesburg Flagship Studio."*
+     > *"Matches with: Heavy Canvas Cap (Kasi Kollekt) + Book Beard Sculpt with Marcus at Cape Town Flagship Studio."*

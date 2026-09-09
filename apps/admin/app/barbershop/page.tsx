@@ -226,10 +226,10 @@ export default function AdminBarbershopPage() {
           name: newLocName,
           slug: newLocName.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
           address: newLocAddress,
-          city: newLocCity || 'Johannesburg',
-          province: 'Gauteng',
+          city: newLocCity || 'Cape Town',
+          province: 'Western Cape',
           country: 'South Africa',
-          phone: newLocPhone || '+27 11 000 0000',
+          phone: newLocPhone || '+27 21 000 0000',
           is_flagship: false,
           is_active: true,
           capacity_chairs: parseInt(newLocChairs || '2', 10),
@@ -593,7 +593,7 @@ export default function AdminBarbershopPage() {
             </h1>
             <div className="flex items-center space-x-1.5 text-xs text-stone-300 bg-stone-900 border border-stone-800 px-3 py-1.5 rounded-lg shadow-inner">
               <MapPin className="h-4 w-4 text-amber-500" />
-              <span className="font-semibold text-white">Dissafyt Studio, Johannesburg</span>
+              <span className="font-semibold text-white">Dissafyt Studio, Cape Town</span>
               <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/20 uppercase tracking-wider">
                 Flagship
               </span>
@@ -913,7 +913,7 @@ export default function AdminBarbershopPage() {
                             </div>
                             <div className="flex items-center space-x-1 text-stone-400">
                               <MapPin className="h-3.5 w-3.5 text-amber-500" />
-                              <span className="text-stone-300">Dissafyt Studio, Johannesburg</span>
+                              <span className="text-stone-300">Dissafyt Studio, Cape Town</span>
                             </div>
                           </div>
 
@@ -1184,7 +1184,7 @@ export default function AdminBarbershopPage() {
                   <div className="text-[11px] text-stone-500 border-t border-stone-800/80 pt-3 space-y-1.5">
                     <div className="flex items-center text-stone-300">
                       <MapPin className="h-3 w-3 mr-1 text-amber-500" />
-                      <span>Stationed: Dissafyt Studio, Johannesburg (Flagship)</span>
+                      <span>Stationed: Dissafyt Studio, Cape Town (Flagship)</span>
                     </div>
                     <div>Standard Hours: Mon-Fri 09:00 - 18:00, Sat 09:00 - 17:00</div>
                   </div>
@@ -1622,7 +1622,7 @@ export default function AdminBarbershopPage() {
                     <Input
                       value={newLocCity}
                       onChange={(e) => setNewLocCity(e.target.value)}
-                      placeholder="e.g. Johannesburg or Cape Town"
+                      placeholder="e.g. Cape Town"
                       required
                     />
                   </div>
@@ -1711,7 +1711,7 @@ export default function AdminBarbershopPage() {
                     <Input
                       value={editLocCity}
                       onChange={(e) => setEditLocCity(e.target.value)}
-                      placeholder="e.g. Johannesburg"
+                      placeholder="e.g. Cape Town"
                       required
                     />
                   </div>

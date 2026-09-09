@@ -23,7 +23,7 @@ export const PRESET_PERSONAS: StudioPersona[] = [
     email: 'creator.vibecult@dissafyt.com',
     role: 'creator',
     brandId: 'b0000000-0000-0000-0000-000000000002',
-    brandName: 'Vibe Cult Johannesburg (Drip Income)',
+    brandName: 'Vibe Cult Cape Town (Drip Income)',
   },
   {
     email: 'admin@dissafyt.com',

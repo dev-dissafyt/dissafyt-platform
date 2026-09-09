@@ -597,7 +597,7 @@ export default function AccountPage() {
                             </span>
                             <span className="flex items-center text-zinc-300">
                               <MapPin className="mr-1 h-3.5 w-3.5 text-amber-500" />
-                              Dissafyt Studio, Johannesburg
+                              Dissafyt Studio, Cape Town
                             </span>
                             {booking.service?.duration_minutes && (
                               <span className="text-zinc-500">

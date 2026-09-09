@@ -248,7 +248,7 @@ export default function DispatchDeskPage() {
 
                     <div className="flex justify-between text-zinc-400">
                       <span className="text-[10px] font-mono text-zinc-500 uppercase">Hub Origin</span>
-                      <span className="text-zinc-300">Dissafyt Central Hub (JHB)</span>
+                      <span className="text-zinc-300">Dissafyt Central Hub (CPT)</span>
                     </div>
 
                     {job.courier_tracking_number && (
@@ -330,7 +330,7 @@ export default function DispatchDeskPage() {
                 </span>
                 <p className="font-bold text-zinc-900">Dissafyt Micro-Factory Hub</p>
                 <p className="text-zinc-600">Kasi Kollekt Fulfillment Desk</p>
-                <p className="text-zinc-600">Johannesburg, Gauteng, 2000</p>
+                <p className="text-zinc-600">Cape Town, Western Cape, 8001</p>
                 <p className="text-zinc-600">South Africa</p>
               </div>
               <div>
