@@ -5,6 +5,9 @@ export interface OperationalMetrics {
     totalRevenue: number;
     commerceRevenue: number;
     barbershopRevenue: number;
+    subscriptionRevenue: number;
+    walkInRevenue: number;
+    serviceValueDelivered: number;
     totalCustomers: number;
     totalOrders: number;
     totalBookings: number;
@@ -61,14 +64,43 @@ export class ReportingService {
       .from('profiles')
       .select('*', { count: 'exact', head: true });
 
-    // 2. Fetch all orders
+    // 2. Fetch authoritative settled payments (Ledger-based Single Source of Truth)
+    const { data: payments } = await admin
+      .from('payments')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    const paymentList = payments || [];
+    // Only count genuine settled payments (exclude mock/test records)
+    const livePaid = paymentList.filter(
+      (p) => (p.status === 'paid' || p.status === 'completed') && p.is_test !== true
+    );
+
+    let subscriptionRevenue = 0;
+    let commerceRevenue = 0;
+    let walkInRevenue = 0;
+
+    for (const p of livePaid) {
+      const amt = Number(p.amount) || 0;
+      if (p.related_type === 'subscription') {
+        subscriptionRevenue += amt;
+      } else if (p.related_type === 'order') {
+        commerceRevenue += amt;
+      } else if (p.related_type === 'booking') {
+        walkInRevenue += amt;
+      }
+    }
+
+    const totalRevenue = subscriptionRevenue + commerceRevenue + walkInRevenue;
+    const barbershopRevenue = subscriptionRevenue + walkInRevenue;
+
+    // 3. Fetch all orders
     const { data: orders } = await admin
       .from('orders')
       .select('id, order_number, user_id, status, total, created_at')
       .order('created_at', { ascending: false });
 
     const orderList = orders || [];
-    let commerceRevenue = 0;
     const orderStatusCounts = {
       pending: 0,
       paid: 0,
@@ -79,11 +111,7 @@ export class ReportingService {
     };
 
     for (const ord of orderList) {
-      const amt = Number(ord.total) || 0;
       const st = ord.status.toLowerCase();
-      if (st === 'paid' || st === 'processing' || st === 'shipped' || st === 'delivered') {
-        commerceRevenue += amt;
-      }
       if (st in orderStatusCounts) {
         orderStatusCounts[st as keyof typeof orderStatusCounts]++;
       } else if (st === 'pending_payment') {
@@ -91,18 +119,18 @@ export class ReportingService {
       }
     }
 
-    // 3. Fetch all bookings with staff & services
+    // 4. Fetch all bookings with staff & services
     const { data: bookings } = await admin
       .from('bookings')
       .select(`
         id, customer_id, staff_id, start_time, status, total_amount, created_at,
-        service:services(name),
+        service:services(name, price),
         staff:staff(id, display_name)
       `)
       .order('created_at', { ascending: false });
 
     const bookingList = bookings || [];
-    let barbershopRevenue = 0;
+    let serviceValueDelivered = 0;
     const bookingStatusCounts = {
       confirmed: 0,
       completed: 0,
@@ -117,10 +145,10 @@ export class ReportingService {
     const todayEnd = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate(), 23, 59, 59)).toISOString();
 
     for (const bk of bookingList) {
-      const amt = Number(bk.total_amount) || 0;
+      const svcVal = Number((bk as any).service?.price || bk.total_amount) || 0;
       const st = bk.status.toLowerCase();
       if (st === 'confirmed' || st === 'completed') {
-        barbershopRevenue += amt;
+        serviceValueDelivered += svcVal;
       }
       if (st === 'confirmed') bookingStatusCounts.confirmed++;
       else if (st === 'completed') bookingStatusCounts.completed++;
@@ -198,9 +226,12 @@ export class ReportingService {
 
     return {
       overview: {
-        totalRevenue: commerceRevenue + barbershopRevenue,
+        totalRevenue,
         commerceRevenue,
         barbershopRevenue,
+        subscriptionRevenue,
+        walkInRevenue,
+        serviceValueDelivered,
         totalCustomers: customerCount || 0,
         totalOrders: orderList.length,
         totalBookings: bookingList.length,

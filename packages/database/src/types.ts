@@ -193,6 +193,13 @@ export interface Staff {
   created_at: string;
 }
 
+export type BookingPaymentStatus =
+  | 'unpaid'
+  | 'paid_online'
+  | 'paid_in_chair'
+  | 'membership_covered'
+  | 'waived';
+
 export interface Booking {
   id: string;
   customer_id: string;
@@ -202,6 +209,10 @@ export interface Booking {
   end_time: string;
   status: BookingStatus;
   total_amount: number;
+  payment_status?: BookingPaymentStatus;
+  is_subscription_covered?: boolean;
+  subscription_id?: string | null;
+  payment_id?: string | null;
   notes?: string | null;
   created_at: string;
   updated_at: string;
@@ -232,6 +243,7 @@ export interface Payment {
   status: PaymentStatus;
   related_type: 'order' | 'booking' | 'subscription';
   related_id: string;
+  is_test?: boolean;
   created_at: string;
   updated_at: string;
 }

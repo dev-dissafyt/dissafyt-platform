@@ -285,6 +285,26 @@ export default function AdminBarbershopPage() {
     }
   }
 
+  async function handleUpdatePaymentStatus(id: string, payment_status: string) {
+    try {
+      const res = await adminFetch('/api/bookings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, payment_status }),
+      });
+      if (res.ok) {
+        setStatusMsg(`Payment status updated to ${payment_status}.`);
+        loadBookings();
+      } else {
+        const err = await res.json();
+        setStatusMsg(`Failed to update payment status: ${err.error}`);
+      }
+    } catch (e) {
+      console.error(e);
+      setStatusMsg('Network error updating payment status.');
+    }
+  }
+
   // --- STAFF ACTIONS ---
   function openEditStaffModal(staff: StaffMember) {
     setEditingStaff(staff);
@@ -574,10 +594,18 @@ export default function AdminBarbershopPage() {
     return filterLocationId === 'loc-jhb-flagship';
   });
 
-  // Metrics for appointments
-  const totalRevenue = filteredBookings
-    .filter((b) => b.status === 'confirmed' || b.status === 'completed')
+  // Metrics for appointments (Audit-Compliant: Memberships are separated from cash walk-ins)
+  const walkInCashRevenue = filteredBookings
+    .filter(
+      (b) =>
+        (b.status === 'confirmed' || b.status === 'completed') &&
+        (b as any).is_subscription_covered !== true &&
+        Number(b.total_amount) > 0
+    )
     .reduce((sum, b) => sum + Number(b.total_amount), 0);
+  const memberCutsCount = filteredBookings.filter(
+    (b) => (b as any).is_subscription_covered === true || Number(b.total_amount) === 0
+  ).length;
   const confirmedCount = filteredBookings.filter((b) => b.status === 'confirmed').length;
   const completedCount = filteredBookings.filter((b) => b.status === 'completed').length;
 
@@ -727,8 +755,9 @@ export default function AdminBarbershopPage() {
               <div className="text-2xl font-bold text-blue-400 mt-1">{completedCount}</div>
             </Card>
             <Card className="border-stone-800 bg-stone-900/60 p-4">
-              <div className="text-xs text-amber-400">Projected Revenue</div>
-              <div className="text-2xl font-bold text-amber-400 mt-1">R {totalRevenue.toFixed(2)}</div>
+              <div className="text-xs text-amber-400">Walk-In Cash Revenue</div>
+              <div className="text-2xl font-bold text-amber-400 mt-1">R {walkInCashRevenue.toFixed(2)}</div>
+              <div className="text-[10px] text-stone-500 mt-0.5">{memberCutsCount} Member Cuts (R0.00)</div>
             </Card>
           </div>
 
@@ -902,6 +931,21 @@ export default function AdminBarbershopPage() {
                             >
                               {b.status}
                             </span>
+
+                            {/* Payment Audit Classification */}
+                            {(b as any).is_subscription_covered || Number(b.total_amount) === 0 ? (
+                              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-purple-500/10 text-purple-400 border border-purple-500/20">
+                                Membership Pass
+                              </span>
+                            ) : (b as any).payment_status === 'paid_online' || (b as any).payment_status === 'paid_in_chair' ? (
+                              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                Paid
+                              </span>
+                            ) : (
+                              <span className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                                Payment Due
+                              </span>
+                            )}
                           </div>
 
                           <div className="text-xs text-stone-300 flex flex-wrap items-center gap-3">
@@ -947,12 +991,35 @@ export default function AdminBarbershopPage() {
                       <div className="flex flex-col sm:flex-row items-end sm:items-center gap-4 pt-2 lg:pt-0 border-t lg:border-t-0 border-stone-800">
                         <div className="text-right">
                           <span className="text-xs text-stone-400 block">Total</span>
-                          <span className="text-lg font-bold text-amber-400">
-                            R {Number(b.total_amount).toFixed(2)}
-                          </span>
+                          {(b as any).is_subscription_covered || Number(b.total_amount) === 0 ? (
+                            <div className="text-right">
+                              <span className="text-sm font-bold text-emerald-400 whitespace-nowrap">
+                                Included (R0.00)
+                              </span>
+                              <span className="block text-[10px] text-stone-500 font-mono">Member Cut</span>
+                            </div>
+                          ) : (
+                            <span className="text-lg font-bold text-amber-400 whitespace-nowrap">
+                              R {Number(b.total_amount).toFixed(2)}
+                            </span>
+                          )}
                         </div>
 
                         <div className="flex items-center space-x-1.5">
+                          {/* Inline Mark Paid Button for Unpaid Walk-in appointments */}
+                          {!((b as any).is_subscription_covered || Number(b.total_amount) === 0) &&
+                            (b as any).payment_status !== 'paid_online' &&
+                            (b as any).payment_status !== 'paid_in_chair' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => handleUpdatePaymentStatus(b.id, 'paid_in_chair')}
+                                className="text-xs border-amber-500/30 text-amber-400 hover:bg-amber-500/10 h-8"
+                              >
+                                <CreditCard className="mr-1 h-3 w-3" /> Mark Paid
+                              </Button>
+                            )}
+
                           {b.status !== 'confirmed' && (
                             <Button
                               size="sm"

@@ -114,27 +114,55 @@ export class PayfastService {
     const validUserId = isUuid(userId) ? userId! : '00000000-0000-0000-0000-000000000000';
 
     try {
-      // 2. Insert or update record in payments table
+      // 2. Idempotent insert or update in payments table
       const isPaid = paymentStatus === 'COMPLETE';
       const status = isPaid ? 'paid' : paymentStatus === 'FAILED' ? 'failed' : 'pending';
+      let paymentRecord: any = null;
 
-      const { data: payment, error: payErr } = await admin
-        .from('payments')
-        .insert({
-          user_id: validUserId,
-          provider: 'payfast',
-          provider_reference: payload.pf_payment_id || null,
-          amount,
-          currency: 'ZAR',
-          status,
-          related_type: relatedType,
-          related_id: validRelatedId,
-        })
-        .select()
-        .single();
+      if (payload.pf_payment_id) {
+        const { data: existingPay } = await admin
+          .from('payments')
+          .select('*')
+          .eq('provider', 'payfast')
+          .eq('provider_reference', payload.pf_payment_id)
+          .maybeSingle();
 
-      if (payErr) {
-        console.error('Failed to insert payment record:', payErr);
+        if (existingPay) {
+          const { data: updPay } = await admin
+            .from('payments')
+            .update({
+              status,
+              amount: amount || existingPay.amount,
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', existingPay.id)
+            .select()
+            .single();
+          paymentRecord = updPay || existingPay;
+        }
+      }
+
+      if (!paymentRecord) {
+        const { data: newPay, error: payErr } = await admin
+          .from('payments')
+          .insert({
+            user_id: validUserId,
+            provider: 'payfast',
+            provider_reference: payload.pf_payment_id || null,
+            amount,
+            currency: 'ZAR',
+            status,
+            related_type: relatedType,
+            related_id: validRelatedId,
+            is_test: false,
+          })
+          .select()
+          .single();
+
+        if (payErr) {
+          console.error('Failed to insert payment record:', payErr);
+        }
+        paymentRecord = newPay;
       }
 
       // 3. Update order state if COMPLETE
@@ -164,18 +192,41 @@ export class PayfastService {
           const endDate = new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
 
           try {
-            await admin.from('subscriptions').insert({
-              user_id: userId,
-              plan_code: planCode,
-              plan_name: planName,
-              price: amount,
-              status: 'active',
-              current_period_start: startDate.toISOString(),
-              current_period_end: endDate.toISOString(),
-              payfast_token: payload.token || payload.pf_payment_id || null,
-            });
+            // Check for existing active subscription to update rather than creating duplicates
+            const { data: existingSub } = await admin
+              .from('subscriptions')
+              .select('id')
+              .eq('user_id', userId)
+              .maybeSingle();
+
+            if (existingSub) {
+              await admin
+                .from('subscriptions')
+                .update({
+                  plan_code: planCode,
+                  plan_name: planName,
+                  price: amount,
+                  status: 'active',
+                  current_period_start: startDate.toISOString(),
+                  current_period_end: endDate.toISOString(),
+                  payfast_token: payload.token || payload.pf_payment_id || null,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', existingSub.id);
+            } else {
+              await admin.from('subscriptions').insert({
+                user_id: userId,
+                plan_code: planCode,
+                plan_name: planName,
+                price: amount,
+                status: 'active',
+                current_period_start: startDate.toISOString(),
+                current_period_end: endDate.toISOString(),
+                payfast_token: payload.token || payload.pf_payment_id || null,
+              });
+            }
           } catch (subErr) {
-            console.error('Failed to create subscription in table:', subErr);
+            console.error('Failed to create/update subscription in table:', subErr);
           }
         }
       }
@@ -183,7 +234,7 @@ export class PayfastService {
       return {
         success: true,
         message: `Payment processed as ${status}`,
-        payment: payment as Payment,
+        payment: paymentRecord as Payment,
       };
     } catch (err: any) {
       return { success: false, message: err.message };

@@ -45,7 +45,9 @@ export default function FinancePage() {
     fetchPayments();
   }, []);
 
-  const filtered = records.filter((r) => {
+  const liveRecords = records.filter((r) => (r as any).is_test !== true);
+
+  const filtered = liveRecords.filter((r) => {
     const matchesSearch =
       (r.provider_reference && r.provider_reference.toLowerCase().includes(search.toLowerCase())) ||
       (r.customer_email && r.customer_email.toLowerCase().includes(search.toLowerCase())) ||
@@ -56,8 +58,20 @@ export default function FinancePage() {
     return matchesSearch && matchesType;
   });
 
-  const totalAudited = records
+  const totalAudited = liveRecords
     .filter((r) => r.status === 'paid' || r.status === 'completed')
+    .reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+
+  const subscriptionTotal = liveRecords
+    .filter((r) => (r.status === 'paid' || r.status === 'completed') && r.related_type === 'subscription')
+    .reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+
+  const orderTotal = liveRecords
+    .filter((r) => (r.status === 'paid' || r.status === 'completed') && r.related_type === 'order')
+    .reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
+
+  const bookingTotal = liveRecords
+    .filter((r) => (r.status === 'paid' || r.status === 'completed') && r.related_type === 'booking')
     .reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
 
   return (
@@ -91,7 +105,13 @@ export default function FinancePage() {
             <div className="text-2xl font-bold text-white">
               R {totalAudited.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
             </div>
-            <p className="text-xs text-stone-500 mt-1">Settled & verified payments</p>
+            <div className="text-[11px] text-stone-400 mt-2 flex items-center justify-between border-t border-stone-800/80 pt-2">
+              <span>Subs: R {subscriptionTotal.toFixed(0)}</span>
+              <span>&bull;</span>
+              <span>Orders: R {orderTotal.toFixed(0)}</span>
+              <span>&bull;</span>
+              <span>Walk-in: R {bookingTotal.toFixed(0)}</span>
+            </div>
           </CardContent>
         </Card>
 
@@ -101,8 +121,8 @@ export default function FinancePage() {
             <CreditCard className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-white">{records.length}</div>
-            <p className="text-xs text-stone-500 mt-1">Across all payment providers</p>
+            <div className="text-2xl font-bold text-white">{liveRecords.length}</div>
+            <p className="text-xs text-stone-500 mt-1">Verified settled transactions</p>
           </CardContent>
         </Card>
 

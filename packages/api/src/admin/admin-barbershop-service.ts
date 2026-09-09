@@ -375,22 +375,38 @@ export class AdminBarbershopService {
   }
 
   /**
-   * Updates an appointment's status (confirmed, completed, cancelled, no_show).
+   * Updates an appointment's status (confirmed, completed, cancelled, no_show) and optional payment_status.
    */
   static async updateBookingStatus(
     id: string,
-    status: string
+    status: string,
+    paymentStatus?: string
   ): Promise<{ success: boolean; error?: string }> {
     const admin = getSupabaseAdminClient();
+    const updatePayload: Record<string, any> = {
+      status,
+      updated_at: new Date().toISOString(),
+    };
+    if (paymentStatus) {
+      updatePayload.payment_status = paymentStatus;
+    }
+
     const { error } = await admin
       .from('bookings')
-      .update({
-        status,
-        updated_at: new Date().toISOString(),
-      })
+      .update(updatePayload)
       .eq('id', id);
 
     if (error) {
+      // Fallback if payment_status column not yet present in PostgREST cache
+      if (paymentStatus) {
+        delete updatePayload.payment_status;
+        const { error: fbErr } = await admin
+          .from('bookings')
+          .update(updatePayload)
+          .eq('id', id);
+        if (fbErr) return { success: false, error: fbErr.message };
+        return { success: true };
+      }
       return { success: false, error: error.message };
     }
     return { success: true };

@@ -34,13 +34,13 @@ export async function GET(request: NextRequest) {
 export async function PATCH(request: NextRequest) {
   try {
     const body = await request.json();
-    const { id, status } = body;
+    const { id, status, payment_status } = body;
 
-    if (!id || !status) {
-      return NextResponse.json({ error: 'ID and status are required' }, { status: 400 });
+    if (!id) {
+      return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    const result = await AdminBarbershopService.updateBookingStatus(id, status);
+    const result = await AdminBarbershopService.updateBookingStatus(id, status, payment_status);
     if (!result.success) {
       return NextResponse.json({ error: result.error || 'Failed to update booking status' }, { status: 400 });
     }

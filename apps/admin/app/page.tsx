@@ -25,6 +25,9 @@ interface OperationalMetrics {
     totalRevenue: number;
     commerceRevenue: number;
     barbershopRevenue: number;
+    subscriptionRevenue?: number;
+    walkInRevenue?: number;
+    serviceValueDelivered?: number;
     totalCustomers: number;
     totalOrders: number;
     totalBookings: number;
@@ -127,10 +130,12 @@ export default function AdminDashboardPage() {
                 })}`
               )}
             </div>
-            <div className="text-xs text-stone-400 mt-2 flex items-center justify-between border-t border-stone-800/80 pt-2">
+            <div className="text-[11px] text-stone-400 mt-2 flex items-center justify-between border-t border-stone-800/80 pt-2">
+              <span>Subs: R {(metrics?.overview.subscriptionRevenue || 0).toFixed(0)}</span>
+              <span>&bull;</span>
               <span>Apparel: R {(metrics?.overview.commerceRevenue || 0).toFixed(0)}</span>
               <span>&bull;</span>
-              <span>Barbershop: R {(metrics?.overview.barbershopRevenue || 0).toFixed(0)}</span>
+              <span>Walk-in: R {(metrics?.overview.walkInRevenue || 0).toFixed(0)}</span>
             </div>
           </CardContent>
         </Card>

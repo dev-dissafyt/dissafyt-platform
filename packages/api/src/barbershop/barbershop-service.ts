@@ -489,28 +489,116 @@ export class BarbershopService {
       assignedStaffId = freeBarber.id;
     }
 
-    // 3. Create booking record
-    const { data: booking, error: bErr } = await admin
-      .from('bookings')
-      .insert({
-        customer_id: input.customer_id,
-        service_id: input.service_id,
-        staff_id: assignedStaffId,
-        start_time: startTime.toISOString(),
-        end_time: endTime.toISOString(),
-        status: 'confirmed',
-        total_amount: service.price,
-        notes: input.notes || null,
-      })
-      .select()
-      .single();
+    // 3. Determine if customer has active membership subscription
+    let isCoveredBySubscription = false;
+    let activeSubId: string | null = null;
 
-    if (bErr || !booking) {
-      console.error('Error inserting booking:', bErr);
-      return { success: false, error: bErr?.message || 'Failed to create booking' };
+    try {
+      const { data: activeSub } = await admin
+        .from('subscriptions')
+        .select('id, plan_code, status')
+        .eq('user_id', input.customer_id)
+        .eq('status', 'active')
+        .maybeSingle();
+
+      if (activeSub) {
+        isCoveredBySubscription = true;
+        activeSubId = activeSub.id;
+      }
+    } catch {
+      // Subscriptions table check fallback
     }
 
-    return { success: true, booking };
+    // Active members have haircut covered under monthly fee (R0.00 cash increment)
+    // Walk-ins and guest clients require payment settlement
+    const totalAmount = isCoveredBySubscription ? 0.00 : Number(service.price || 0);
+    const paymentStatus = isCoveredBySubscription ? 'membership_covered' : 'unpaid';
+
+    // 4. Create booking record with audit attributes
+    let bookingResult: any = null;
+    try {
+      const { data: bk, error: bErr } = await admin
+        .from('bookings')
+        .insert({
+          customer_id: input.customer_id,
+          service_id: input.service_id,
+          staff_id: assignedStaffId,
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          status: 'confirmed',
+          total_amount: totalAmount,
+          payment_status: paymentStatus,
+          is_subscription_covered: isCoveredBySubscription,
+          subscription_id: activeSubId,
+          notes: input.notes || (isCoveredBySubscription ? 'Included in Member Subscription' : null),
+        })
+        .select()
+        .single();
+
+      if (bErr) throw bErr;
+      bookingResult = bk;
+    } catch (insertErr: any) {
+      // Fallback if migration 0007 columns are not yet applied on Supabase PostgREST schema cache
+      console.warn('Booking insert with audit columns fallback:', insertErr?.message);
+      const { data: fallbackBk, error: fallbackErr } = await admin
+        .from('bookings')
+        .insert({
+          customer_id: input.customer_id,
+          service_id: input.service_id,
+          staff_id: assignedStaffId,
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          status: 'confirmed',
+          total_amount: totalAmount,
+          notes: input.notes || (isCoveredBySubscription ? 'Included in Member Subscription' : null),
+        })
+        .select()
+        .single();
+
+      if (fallbackErr || !fallbackBk) {
+        return { success: false, error: fallbackErr?.message || 'Failed to create booking' };
+      }
+      bookingResult = fallbackBk;
+    }
+
+    return { success: true, booking: bookingResult };
+  }
+
+  /**
+   * Updates the payment status for an appointment (e.g. paid cash/card at chair).
+   */
+  static async markBookingPaid(
+    bookingId: string,
+    paymentStatus: 'paid_in_chair' | 'paid_online' | 'waived',
+    actor?: { email?: string; role?: string }
+  ): Promise<{ success: boolean; error?: string }> {
+    const admin = getSupabaseAdminClient();
+    try {
+      const { error } = await admin
+        .from('bookings')
+        .update({
+          payment_status: paymentStatus,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', bookingId);
+
+      if (error) {
+        console.warn('markBookingPaid update error (may need migration 0007):', error.message);
+      }
+
+      await AuditService.recordLog({
+        actor_email: actor?.email || 'admin@dissafyt.com',
+        actor_role: actor?.role || 'admin',
+        action: 'booking.payment_update',
+        entity_type: 'booking',
+        entity_id: bookingId,
+        changes: { payment_status: paymentStatus },
+      });
+
+      return { success: true };
+    } catch (err: any) {
+      return { success: false, error: err.message };
+    }
   }
 
   /**

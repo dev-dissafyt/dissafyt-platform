@@ -86,6 +86,7 @@ export default function AccountPage() {
   const [token, setToken] = useState<string | null>(null);
   const [orders, setOrders] = useState<Order[]>([]);
   const [bookings, setBookings] = useState<BookingItem[]>([]);
+  const [subscription, setSubscription] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
@@ -136,10 +137,11 @@ export default function AccountPage() {
       setToken(accessToken);
 
       try {
-        const [userRes, ordersRes, bookingsRes] = await Promise.all([
+        const [userRes, ordersRes, bookingsRes, subRes] = await Promise.all([
           fetch('/api/users/me', { headers: { Authorization: `Bearer ${accessToken}` } }),
           fetch('/api/orders', { headers: { Authorization: `Bearer ${accessToken}` } }),
           fetch('/api/bookings', { headers: { Authorization: `Bearer ${accessToken}` } }),
+          fetch('/api/subscriptions/status', { headers: { Authorization: `Bearer ${accessToken}` } }),
         ]);
 
         if (userRes.ok) {
@@ -165,6 +167,11 @@ export default function AccountPage() {
         if (bookingsRes.ok) {
           const bookingsData = await bookingsRes.json();
           setBookings(bookingsData);
+        }
+
+        if (subRes.ok) {
+          const subData = await subRes.json();
+          setSubscription(subData.subscription || null);
         }
       } catch (e) {
         console.error('Error fetching account data:', e);
@@ -571,9 +578,15 @@ export default function AccountPage() {
                             >
                               {booking.status}
                             </span>
-                            <span className="font-extrabold text-amber-400 text-sm">
-                              R {Number(booking.total_amount).toFixed(2)}
-                            </span>
+                            {Number(booking.total_amount) === 0 || (booking as any).is_subscription_covered ? (
+                              <span className="font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
+                                Included in Membership (R0.00)
+                              </span>
+                            ) : (
+                              <span className="font-extrabold text-amber-400 text-sm whitespace-nowrap">
+                                R {Number(booking.total_amount).toFixed(2)}
+                              </span>
+                            )}
                           </div>
                         </div>
 
@@ -772,6 +785,46 @@ export default function AccountPage() {
 
         {/* Sidebar Column: Roles, Notifications, Quick Actions */}
         <div className="space-y-6">
+          {/* Active Membership Card */}
+          {subscription && (
+            <Card className="border-amber-500/40 bg-gradient-to-b from-zinc-900 via-zinc-950 to-zinc-950 shadow-lg shadow-amber-500/5">
+              <CardHeader className="pb-3">
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-base text-white flex items-center">
+                    <Scissors className="mr-2 h-4 w-4 text-amber-500" />
+                    VIP Membership
+                  </CardTitle>
+                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400 border border-emerald-500/20">
+                    Active
+                  </span>
+                </div>
+                <CardDescription className="text-xs">
+                  Ace of Fyt Recurring Chair Pass
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3 text-xs">
+                <div className="flex items-baseline justify-between border-b border-zinc-800 pb-2">
+                  <span className="font-bold text-white text-sm">
+                    {subscription.plan_name || 'The Solo Membership'}
+                  </span>
+                  <span className="font-mono font-bold text-amber-400">
+                    R {Number(subscription.price || 100).toFixed(2)}/mo
+                  </span>
+                </div>
+                <p className="text-zinc-400 text-[11px] leading-relaxed">
+                  Your monthly haircut allotment is active. Book your fresh cut anytime with guaranteed chair time.
+                </p>
+                <div className="pt-1">
+                  <Link href="/book">
+                    <Button size="sm" className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-8">
+                      Book Included Cut (R0.00)
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Notification Preferences */}
           <Card className="border-zinc-800 bg-zinc-900/60">
             <CardHeader className="pb-3">
