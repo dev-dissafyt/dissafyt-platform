@@ -289,3 +289,31 @@ Unify commerce and barbershop operations into an executive reporting dashboard, 
 ### Testing
 - Automated verification via `verify-phase8.mjs` passed all checks.
 - Zero TypeScript errors across both Next.js applications.
+
+---
+
+## Entry: Phase 9 — Multi-Brand Marketplace & On-Demand Factory OS (Kasi Kollekt)
+
+### Date
+2026-09-09
+
+### Phase
+Phase 9 — Marketplace & Micro-Factory Evolution
+
+### Objective
+Expand the single-brand commerce model into a decentralized urban marketplace (**Kasi Kollekt**) and an in-house **Micro-Factory Production OS**, served by a dedicated third application: **`apps/studio`** (running on port 3002).
+
+### Strategic Problem
+Single-brand apparel carries substantial inventory risk (dead stock in unpopular sizes/colors). Local artists, culture brands, and designers have compelling graphics but lack manufacturing equipment, fulfillment logistics, and e-commerce infrastructure.
+
+### Architectural Solution
+1. **Third Monorepo App (`apps/studio`)**:
+   - **Factory Production Desk**: Mirrored incoming print orders, printable job tickets with placement schematics, quality control terminal, and automated Courier Guy dispatch.
+   - **Creator Studio**: Asset uploader (300 DPI graphics), 2D mockup preview canvas on boxy tee blanks, and profit margin calculator.
+2. **Dual Commercial Deal Matrix**:
+   - **Stacked Returns** (Wholesale Batch / Consignment): Brand pre-funds physical run of 50–200 units for physical studio racks and online store; keeps wholesale margin.
+   - **Drip Income** (On-Demand POD): Zero upfront cost for creator; printed just-in-time per order; creator earns passive royalty per tee.
+3. **Automated Order Mirroring**:
+   - When an order containing custom brand drops is confirmed on `apps/customer`, backend hooks instantly generate mirrored `print_jobs` tickets in `apps/studio`.
+4. **Unified Buyer Horizon**:
+   - Laying the groundwork for unified sizing preferences in `profiles` to support future AI outfit matching between Kasi Kollekt apparel and studio grooming sessions.

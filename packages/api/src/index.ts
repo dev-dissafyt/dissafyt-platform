@@ -10,4 +10,6 @@ export * from './commerce/payfast-service';
 export * from './commerce/order-service';
 export * from './barbershop/barbershop-service';
 export * from './reporting/reporting-service';
+export * from './studio/studio-service';
+export * from './studio/brand-service';
 

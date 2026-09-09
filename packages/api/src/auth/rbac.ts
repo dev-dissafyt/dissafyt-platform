@@ -14,13 +14,23 @@ export type Permission =
   | 'location:edit'
   | 'location:delete'
   | 'user:manage_roles'
-  | 'audit:view';
+  | 'audit:view'
+  | 'factory:view_queue'
+  | 'factory:update_job'
+  | 'factory:dispatch'
+  | 'brand:manage_own'
+  | 'design:upload'
+  | 'product:create_custom'
+  | 'product:edit_own'
+  | 'job:view_own'
+  | 'earnings:view_own';
 
 /**
   * Granular RBAC Role Permission Matrix.
   * - admin: Complete platform governance.
-  * - staff: Operational management (can update product info/stock and manage daily bookings).
+  * - staff: Operational management & factory production desk.
   * - barber: Service provider (schedule & personal bio).
+  * - creator: Local brand owner / designer (catalog & earnings).
   * - customer: Storefront access only.
   */
 export const ROLE_PERMISSIONS: Record<AppRole, Permission[]> = {
@@ -39,14 +49,34 @@ export const ROLE_PERMISSIONS: Record<AppRole, Permission[]> = {
     'location:delete',
     'user:manage_roles',
     'audit:view',
+    'factory:view_queue',
+    'factory:update_job',
+    'factory:dispatch',
+    'brand:manage_own',
+    'design:upload',
+    'product:create_custom',
+    'product:edit_own',
+    'job:view_own',
+    'earnings:view_own',
   ],
   staff: [
     'product:edit',
     'service:edit',
     'staff:edit',
+    'factory:view_queue',
+    'factory:update_job',
+    'factory:dispatch',
   ],
   barber: [
     'staff:edit', // restricted to own profile in application logic
+  ],
+  creator: [
+    'brand:manage_own',
+    'design:upload',
+    'product:create_custom',
+    'product:edit_own',
+    'job:view_own',
+    'earnings:view_own',
   ],
   customer: [],
 };

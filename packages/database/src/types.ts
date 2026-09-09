@@ -3,7 +3,7 @@
  * Aligned with docs/02-architecture/DATABASE.md and docs/05-users/USER_SYSTEM.md
  */
 
-export type AppRole = 'customer' | 'barber' | 'staff' | 'admin';
+export type AppRole = 'customer' | 'barber' | 'staff' | 'admin' | 'creator';
 
 export interface Profile {
   id: string; // References auth.users(id)
@@ -42,10 +42,81 @@ export interface Product {
   description?: string | null;
   base_price: number; // in cents or standard decimal
   category_id?: string | null;
+  brand_id?: string | null;
+  design_file_url?: string | null;
+  mockup_url?: string | null;
+  print_placement?: Record<string, any> | null;
+  is_custom_print?: boolean;
   is_active: boolean;
   images: string[];
   created_at: string;
   updated_at: string;
+}
+
+// Kasi Kollekt & Factory Production types
+export type DealType = 'stacked_returns' | 'drip_income';
+
+export interface Brand {
+  id: string;
+  user_id?: string | null;
+  name: string;
+  slug: string;
+  bio?: string | null;
+  logo_url?: string | null;
+  deal_type: DealType;
+  commission_rate: number;
+  created_at: string;
+  updated_at?: string;
+}
+
+export type PrintJobStatus =
+  | 'pending'
+  | 'printing'
+  | 'qc_passed'
+  | 'packed'
+  | 'ready_to_pack'
+  | 'dispatched'
+  | 'failed_qc'
+  | 'cancelled';
+
+export interface PrintJob {
+  id: string;
+  ticket_number?: string;
+  order_id: string;
+  order_item_id?: string;
+  product_id?: string | null;
+  product_name?: string;
+  variant_id?: string | null;
+  brand_id?: string | null;
+  brand_name?: string;
+  deal_type?: DealType;
+  garment_color: string;
+  garment_size: string;
+  quantity?: number;
+  print_technique: 'dtf' | 'screenprint' | 'embroidery' | string;
+  print_placement?: string;
+  design_file_url?: string | null;
+  mockup_url?: string | null;
+  status: PrintJobStatus;
+  tracking_number?: string | null;
+  courier_tracking_number?: string | null;
+  operator_notes?: string | null;
+  artwork_notes?: string | null;
+  created_at: string;
+  updated_at: string;
+  product?: Product;
+  brand?: Brand;
+}
+
+export interface CreatorPayout {
+  id: string;
+  brand_id: string;
+  order_id: string;
+  print_job_id?: string | null;
+  deal_type: DealType;
+  amount: number;
+  status: 'pending' | 'processing' | 'paid';
+  created_at: string;
 }
 
 export interface ProductVariant {

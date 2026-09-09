@@ -96,3 +96,16 @@ Database schemas and API design must follow confirmed business requirements.
 
 **Reason:** We should not design arbitrary database tables first and then force real-world business workflows to fit the database.
 
+---
+
+## Decision 010 — Dedicated Studio Application, Kasi Kollekt Marketplace & Factory OS
+
+**Status:** Accepted
+
+The platform commerce model expands from a single-brand store into a multi-brand urban marketplace (**Kasi Kollekt**) and an in-house **Micro-Factory Production OS**, served by a dedicated application (**`apps/studio`** on port 3002).
+
+**Reason:**
+- Separates creator upload/mockup workflows and factory print queuing from both customer storefront and high-level platform administration.
+- Provides local brand owners two commercial deal options: *Stacked Returns* (pre-funded wholesale batches on physical studio racks) and *Drip Income* (zero-risk print-on-demand per customer order).
+- Automatically mirrors customer purchase orders into factory production tickets (`public.print_jobs`), automating DTF/screenprint routing, quality inspection, and Courier Guy waybill dispatch.
+

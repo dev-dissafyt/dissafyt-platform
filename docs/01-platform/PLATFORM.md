@@ -4,10 +4,11 @@
 
 Dissafyt is a unified digital business platform intended to support multiple products and services through a common technical and customer infrastructure.
 
-The platform begins with two primary business experiences:
+The platform unifies three primary business experiences:
 
-1. A clothing/e-commerce experience
-2. A barbershop/service-booking experience
+1. **Barbershop & Grooming Studio Network**: Multi-location service appointments, chair scheduling, and monthly subscription memberships.
+2. **Kasi Kollekt Marketplace**: A curated urban storefront showcasing local brand streetwear, artist graphic drops, and culture merchandise alongside core Dissafyt apparel.
+3. **In-House Micro-Factory OS & Creator Studio**: A decentralized production engine enabling creators to upload artwork, generate mockups, and choose commercial deal structures (*Stacked Returns* wholesale vs *Drip Income* POD), while managing the physical print queue and fulfillment desk.
 
 The platform is intentionally designed so these experiences do not become isolated applications with separate customers, accounts, databases and administration systems.
 
@@ -18,10 +19,11 @@ Instead, Dissafyt has a shared platform core:
 - One PostgreSQL data layer
 - One backend/API boundary
 - Shared customer profiles
-- Shared roles and permissions
-- Shared payment infrastructure where appropriate
-- Shared notification infrastructure
-- A central administration application
+- Shared roles and permissions (Admin, Staff, Barber, Creator, Customer)
+- Shared payment infrastructure (PayFast ITN with automated signature verification)
+- Shared fulfillment infrastructure (The Courier Guy waybill automation)
+- A central administration application (`apps/admin`)
+- A dedicated creator & factory production OS (`apps/studio`)
 
 The long-term objective is to allow new Dissafyt products, services and applications to be added without rebuilding identity, customer management and core infrastructure.
 
@@ -36,31 +38,34 @@ Dissafyt is not simply:
 - an admin dashboard
 - a collection of unrelated pages
 
-It is a platform.
+It is a unified lifestyle, commerce, and manufacturing platform.
 
-The website, mobile application, admin dashboard and future interfaces are clients of the platform.
+The website, studio app, admin dashboard and future interfaces are clients of the platform.
 
 ```text
-                     Dissafyt Platform Core
-                              |
-          +-------------------+-------------------+
-          |                   |                   |
-      Customer Web         Admin Web          Future Apps
-          |                   |                   |
-          +-------------------+-------------------+
-                              |
-                         API / Backend
-                              |
-                 +------------+------------+
-                 |                         |
-          Authentication              PostgreSQL
-                 |                         |
-                 +------------+------------+
-                              |
-                       Business Modules
-                 +------------+------------+
-                 |                         |
-             Clothing                 Barbershop
+                             Dissafyt Platform Core
+                                       |
+           +---------------------------+---------------------------+
+           |                           |                           |
+     Customer Web                  Admin Web                  Studio Web
+   (apps/customer)               (apps/admin)               (apps/studio)
+    Storefront & Bookings     Governance & Operations    Creator Suite & Factory OS
+           |                           |                           |
+           +---------------------------+---------------------------+
+                                       |
+                                 API / Backend
+                                       |
+                        +--------------+--------------+
+                        |                             |
+                 Authentication                  PostgreSQL
+                        |                             |
+                        +--------------+--------------+
+                                       |
+                               Business Modules
+                        +--------------+--------------+
+                        |                             |
+                   Barbershop                   Kasi Kollekt &
+               (Multi-Location)                 Micro-Factory
 ```
 
 ---

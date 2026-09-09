@@ -161,3 +161,11 @@ Potential future features:
 - subscriptions
 - limited drops
 - stock alerts
+
+## 14. Relationship to Kasi Kollekt & In-House Factory
+
+Dissafyt commerce incorporates two complementary product offerings:
+1. **Core Dissafyt Apparel**: Signature in-house brand lines, outerwear, and core lifestyle staples.
+2. **Kasi Kollekt Creator Drops**: Urban marketplace merchandise from local designers and brands, manufactured on-demand via the in-house micro-factory or stocked via consignment runs (*Stacked Returns* vs *Drip Income*).
+
+Full production, job tickets, and creator economics are specified in [KASI_KOLLEKT.md](file:///Users/cl/Desktop/dissafyt-platform/docs/04-modules/KASI_KOLLEKT.md).
