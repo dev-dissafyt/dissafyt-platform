@@ -9,15 +9,20 @@ export interface StudioPersona {
 
 export const PRESET_PERSONAS: StudioPersona[] = [
   {
-    email: 'operator@dissafyt.com',
-    role: 'staff',
-    brandName: 'Factory Floor (All Brands)',
-  },
-  {
-    email: 'creator.skhanda@dissafyt.com',
+    email: 'creator@dissafyt.com',
     role: 'creator',
     brandId: 'b0000000-0000-0000-0000-000000000001',
-    brandName: 'Skhanda Heritage Co. (Stacked Returns)',
+    brandName: 'Skhanda Heritage Co. (Creator Studio)',
+  },
+  {
+    email: 'operator@dissafyt.com',
+    role: 'staff',
+    brandName: 'Factory Floor (Production & Dispatch)',
+  },
+  {
+    email: 'dissafyt@gmail.com',
+    role: 'admin',
+    brandName: 'Platform Owner (Full Access)',
   },
   {
     email: 'creator.vibecult@dissafyt.com',

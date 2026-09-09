@@ -19,6 +19,7 @@ import {
   X
 } from 'lucide-react';
 import type { PrintJob, PrintJobStatus } from '@dissafyt/database';
+import { getActivePersona, StudioPersona } from '../lib/persona';
 
 export default function FactoryQueuePage() {
   const [jobs, setJobs] = useState<PrintJob[]>([]);
@@ -27,6 +28,7 @@ export default function FactoryQueuePage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedJob, setSelectedJob] = useState<PrintJob | null>(null);
   const [updatingJobId, setUpdatingJobId] = useState<string | null>(null);
+  const [persona, setPersona] = useState<StudioPersona | null>(null);
 
   const fetchJobs = async () => {
     try {
@@ -45,6 +47,13 @@ export default function FactoryQueuePage() {
 
   useEffect(() => {
     fetchJobs();
+    setPersona(getActivePersona());
+
+    const handlePersonaChange = (e: any) => {
+      if (e.detail) setPersona(e.detail);
+    };
+    window.addEventListener('studio_persona_changed', handlePersonaChange);
+    return () => window.removeEventListener('studio_persona_changed', handlePersonaChange);
   }, []);
 
   const handleUpdateStatus = async (jobId: string, newStatus: PrintJobStatus) => {
@@ -167,13 +176,15 @@ export default function FactoryQueuePage() {
             <RefreshCw className={`w-3.5 h-3.5 ${loading ? 'animate-spin' : ''}`} />
             <span>Refresh Queue</span>
           </button>
-          <Link
-            href="/creator"
-            className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition"
-          >
-            <Layers className="w-3.5 h-3.5" />
-            <span>Creator Studio</span>
-          </Link>
+          {persona?.role !== 'staff' && (
+            <Link
+              href="/creator"
+              className="flex items-center space-x-2 px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-lg shadow-amber-500/20 transition"
+            >
+              <Layers className="w-3.5 h-3.5" />
+              <span>Creator Studio</span>
+            </Link>
+          )}
         </div>
       </div>
 

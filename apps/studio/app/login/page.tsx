@@ -24,13 +24,14 @@ function StudioLoginContent() {
   const redirectUrl = searchParams.get('redirect');
 
   const [activeTab, setActiveTab] = useState<'preset' | 'email'>('preset');
+  const [targetWorkstation, setTargetWorkstation] = useState<'creator' | 'factory'>('creator');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
   // Fast Persona Quick Login
-  const handleQuickLogin = (persona: StudioPersona) => {
+  const handleQuickLogin = (persona: StudioPersona, forceWorkstation?: 'creator' | 'factory') => {
     loginStudioPersona(persona);
     
     if (redirectUrl) {
@@ -38,11 +39,28 @@ function StudioLoginContent() {
       return;
     }
 
+    if (forceWorkstation) {
+      router.push(forceWorkstation === 'creator' ? '/creator' : '/');
+      return;
+    }
+
     if (persona.role === 'creator') {
       router.push('/creator');
-    } else {
+    } else if (persona.role === 'staff') {
       router.push('/');
+    } else {
+      // Admin defaults to creator workstation
+      router.push('/creator');
     }
+  };
+
+  // Quick fill demo account credentials
+  const fillCredentials = (accEmail: string, accPass: string, ws: 'creator' | 'factory') => {
+    setActiveTab('email');
+    setEmail(accEmail);
+    setPassword(accPass);
+    setTargetWorkstation(ws);
+    setErrorMsg(null);
   };
 
   // Supabase Email / Password Login
@@ -67,11 +85,11 @@ function StudioLoginContent() {
         const userEmail = data.session.user.email?.toLowerCase() || '';
         let role: 'staff' | 'creator' | 'admin' = 'creator';
         let brandId = 'b0000000-0000-0000-0000-000000000001';
-        let brandName = 'Verified Creator Brand';
+        let brandName = 'Skhanda Heritage Co. / Dissafyt';
 
         if (userEmail.includes('admin') || userEmail === 'dissafyt@gmail.com') {
           role = 'admin';
-          brandName = 'Platform Administrator';
+          brandName = 'Platform Owner (Full Access)';
         } else if (userEmail.includes('operator') || userEmail.includes('staff') || userEmail.includes('factory')) {
           role = 'staff';
           brandName = 'Factory Floor Operator';
@@ -83,7 +101,7 @@ function StudioLoginContent() {
         const persona: StudioPersona = {
           email: userEmail,
           role,
-          brandId: role === 'creator' ? brandId : undefined,
+          brandId: (role === 'creator' || role === 'admin') ? brandId : undefined,
           brandName,
         };
 
@@ -93,8 +111,11 @@ function StudioLoginContent() {
           router.push(redirectUrl);
         } else if (role === 'creator') {
           router.push('/creator');
-        } else {
+        } else if (role === 'staff') {
           router.push('/');
+        } else {
+          // Admin / Owner honors chosen workstation target
+          router.push(targetWorkstation === 'creator' ? '/creator' : '/');
         }
       }
     } catch (err: any) {
@@ -164,12 +185,40 @@ function StudioLoginContent() {
         {activeTab === 'preset' && (
           <div className="space-y-3">
             <p className="text-[11px] text-zinc-400 uppercase font-mono tracking-wider px-1">
-              Select your studio workstation profile to enter:
+              One-click access to studio workstations:
             </p>
 
-            {/* Operator (Factory Employee) */}
+            {/* Streetwear Creator: Skhanda / Dissafyt */}
             <div
-              onClick={() => handleQuickLogin(PRESET_PERSONAS[0])}
+              onClick={() => handleQuickLogin(PRESET_PERSONAS[0], 'creator')}
+              className="group cursor-pointer p-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-900 hover:border-amber-500/50 transition-all duration-200 flex items-center justify-between shadow-sm hover:shadow-amber-500/5"
+            >
+              <div className="flex items-center space-x-3.5">
+                <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform">
+                  <Shirt className="w-5 h-5" />
+                </div>
+                <div>
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm font-bold text-white">Streetwear Creator Studio</span>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold uppercase">
+                      Creator
+                    </span>
+                  </div>
+                  <p className="text-xs text-zinc-400 mt-0.5">
+                    Garment lab, 2D mockup designer, drop publishing, sales & payouts.
+                  </p>
+                  <span className="text-[10px] text-zinc-500 font-mono">creator@dissafyt.com</span>
+                </div>
+              </div>
+              <div className="flex items-center space-x-1.5 text-xs font-bold text-amber-400">
+                <span>Enter Lab</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-all" />
+              </div>
+            </div>
+
+            {/* Operator (Factory Floor Employee) */}
+            <div
+              onClick={() => handleQuickLogin(PRESET_PERSONAS[1], 'factory')}
               className="group cursor-pointer p-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-900 hover:border-cyan-500/50 transition-all duration-200 flex items-center justify-between shadow-sm hover:shadow-cyan-500/5"
             >
               <div className="flex items-center space-x-3.5">
@@ -184,74 +233,24 @@ function StudioLoginContent() {
                     </span>
                   </div>
                   <p className="text-xs text-zinc-400 mt-0.5">
-                    Production queue, DTG / sublimation batches & courier dispatch desk.
+                    Live heat press queue, DTF batches, fold & tag, courier dispatch desk.
                   </p>
                   <span className="text-[10px] text-zinc-500 font-mono">operator@dissafyt.com</span>
                 </div>
               </div>
-              <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-cyan-400 group-hover:translate-x-1 transition-all" />
-            </div>
-
-            {/* Streetwear Creator: Skhanda Heritage */}
-            <div
-              onClick={() => handleQuickLogin(PRESET_PERSONAS[1])}
-              className="group cursor-pointer p-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-900 hover:border-amber-500/50 transition-all duration-200 flex items-center justify-between shadow-sm hover:shadow-amber-500/5"
-            >
-              <div className="flex items-center space-x-3.5">
-                <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform">
-                  <Shirt className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm font-bold text-white">Creator: Skhanda Heritage Co.</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold uppercase">
-                      Creator
-                    </span>
-                  </div>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    Garment lab, product drop publishing, sales cashflow & banking payouts.
-                  </p>
-                  <span className="text-[10px] text-zinc-500 font-mono">creator.skhanda@dissafyt.com</span>
-                </div>
+              <div className="flex items-center space-x-1.5 text-xs font-bold text-cyan-400">
+                <span>Enter Floor</span>
+                <ArrowRight className="w-4 h-4 group-hover:translate-x-1 transition-all" />
               </div>
-              <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
             </div>
 
-            {/* Streetwear Creator: Vibe Cult */}
-            <div
-              onClick={() => handleQuickLogin(PRESET_PERSONAS[2])}
-              className="group cursor-pointer p-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-900 hover:border-amber-500/50 transition-all duration-200 flex items-center justify-between shadow-sm hover:shadow-amber-500/5"
-            >
+            {/* Platform Owner - Dual Access Choices */}
+            <div className="p-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 space-y-3">
               <div className="flex items-center space-x-3.5">
-                <div className="w-11 h-11 rounded-xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform">
-                  <TrendingUp className="w-5 h-5" />
-                </div>
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm font-bold text-white">Creator: Vibe Cult Cape Town</span>
-                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 font-bold uppercase">
-                      Creator
-                    </span>
-                  </div>
-                  <p className="text-xs text-zinc-400 mt-0.5">
-                    Drip income, royalty analytics & instant South African EFT remittance.
-                  </p>
-                  <span className="text-[10px] text-zinc-500 font-mono">creator.vibecult@dissafyt.com</span>
-                </div>
-              </div>
-              <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
-            </div>
-
-            {/* Platform Administrator */}
-            <div
-              onClick={() => handleQuickLogin(PRESET_PERSONAS[3])}
-              className="group cursor-pointer p-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 hover:bg-zinc-900 hover:border-rose-500/50 transition-all duration-200 flex items-center justify-between shadow-sm hover:shadow-rose-500/5"
-            >
-              <div className="flex items-center space-x-3.5">
-                <div className="w-11 h-11 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 group-hover:scale-105 transition-transform">
+                <div className="w-11 h-11 rounded-xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-center text-rose-400 shrink-0">
                   <Shield className="w-5 h-5" />
                 </div>
-                <div>
+                <div className="flex-1">
                   <div className="flex items-center space-x-2">
                     <span className="text-sm font-bold text-white">Platform Owner / Administrator</span>
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-rose-500/20 text-rose-300 font-bold uppercase">
@@ -259,12 +258,29 @@ function StudioLoginContent() {
                     </span>
                   </div>
                   <p className="text-xs text-zinc-400 mt-0.5">
-                    Full governance: factory queue, courier dispatch, creator brand ledger.
+                    dissafyt@gmail.com • Full dual-access to Creator Lab and Factory Operations.
                   </p>
-                  <span className="text-[10px] text-zinc-500 font-mono">admin@dissafyt.com</span>
                 </div>
               </div>
-              <ArrowRight className="w-4 h-4 text-zinc-600 group-hover:text-rose-400 group-hover:translate-x-1 transition-all" />
+
+              <div className="grid grid-cols-2 gap-2 pt-1 border-t border-zinc-800/60">
+                <button
+                  type="button"
+                  onClick={() => handleQuickLogin(PRESET_PERSONAS[2], 'creator')}
+                  className="py-2 px-3 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-400 text-xs font-bold flex items-center justify-center space-x-1.5 transition"
+                >
+                  <Shirt className="w-3.5 h-3.5" />
+                  <span>Enter as Creator</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleQuickLogin(PRESET_PERSONAS[2], 'factory')}
+                  className="py-2 px-3 rounded-xl bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-400 text-xs font-bold flex items-center justify-center space-x-1.5 transition"
+                >
+                  <Factory className="w-3.5 h-3.5" />
+                  <span>Enter Factory Floor</span>
+                </button>
+              </div>
             </div>
           </div>
         )}
@@ -272,6 +288,72 @@ function StudioLoginContent() {
         {/* TAB 2: Supabase Email & Password Form */}
         {activeTab === 'email' && (
           <form onSubmit={handleEmailLogin} className="p-6 rounded-2xl border border-zinc-800 bg-zinc-900/70 space-y-4 shadow-xl">
+            {/* Quick Demo Credentials Autofill */}
+            <div className="space-y-1.5 pb-2 border-b border-zinc-800/80">
+              <span className="text-[10px] font-mono uppercase text-zinc-500 block">
+                Quick-Fill Active Demo Credentials:
+              </span>
+              <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => fillCredentials('creator@dissafyt.com', 'Creator2026!', 'creator')}
+                  className="px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 text-amber-300 text-[11px] font-mono flex items-center space-x-1 transition"
+                >
+                  <Shirt className="w-3 h-3" />
+                  <span>🎨 creator@dissafyt.com</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fillCredentials('operator@dissafyt.com', 'Operator2026!', 'factory')}
+                  className="px-2.5 py-1 rounded-lg bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 text-cyan-300 text-[11px] font-mono flex items-center space-x-1 transition"
+                >
+                  <Factory className="w-3 h-3" />
+                  <span>🏭 operator@dissafyt.com</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => fillCredentials('dissafyt@gmail.com', 'Wat07081', 'creator')}
+                  className="px-2.5 py-1 rounded-lg bg-rose-500/10 hover:bg-rose-500/20 border border-rose-500/30 text-rose-300 text-[11px] font-mono flex items-center space-x-1 transition"
+                >
+                  <Shield className="w-3 h-3" />
+                  <span>👑 dissafyt@gmail.com</span>
+                </button>
+              </div>
+            </div>
+
+            {/* Workstation Target Selector */}
+            <div className="space-y-1.5">
+              <label className="text-xs font-mono text-zinc-300 uppercase tracking-wider block">
+                Target Workstation
+              </label>
+              <div className="grid grid-cols-2 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setTargetWorkstation('creator')}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 border transition ${
+                    targetWorkstation === 'creator'
+                      ? 'bg-amber-500/20 border-amber-500 text-amber-400 shadow-sm'
+                      : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <Shirt className="w-3.5 h-3.5" />
+                  <span>🎨 Creator Studio</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTargetWorkstation('factory')}
+                  className={`py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center space-x-1.5 border transition ${
+                    targetWorkstation === 'factory'
+                      ? 'bg-cyan-500/20 border-cyan-500 text-cyan-400 shadow-sm'
+                      : 'bg-zinc-950 border-zinc-800 text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  <Factory className="w-3.5 h-3.5" />
+                  <span>🏭 Factory Floor</span>
+                </button>
+              </div>
+            </div>
+
             <div className="space-y-1.5">
               <label className="text-xs font-mono text-zinc-300 uppercase tracking-wider block">
                 Studio Email Address
@@ -306,10 +388,12 @@ function StudioLoginContent() {
               className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider rounded-xl transition shadow-lg shadow-amber-500/20 disabled:opacity-50 flex items-center justify-center space-x-2"
             >
               {loading ? (
-                <span>Authenticating with Studio...</span>
+                <span>Authenticating with Supabase...</span>
               ) : (
                 <>
-                  <span>Sign In to Workstation</span>
+                  <span>
+                    Sign In to {targetWorkstation === 'creator' ? 'Creator Studio' : 'Factory Floor'}
+                  </span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

@@ -16,7 +16,7 @@ export function middleware(request: NextRequest) {
 
   const authCookie = request.cookies.get('dissafyt_studio_auth')?.value;
   const isLoginPage = pathname === '/login';
-  const role = request.cookies.get('dissafyt_studio_role')?.value || 'staff';
+  const role = request.cookies.get('dissafyt_studio_role')?.value || 'creator';
 
   // 2. Unauthenticated Guard: Redirect any unauthorized visitor to /login
   if (!authCookie) {
@@ -33,11 +33,16 @@ export function middleware(request: NextRequest) {
   if (authCookie && isLoginPage) {
     const url = request.nextUrl.clone();
     url.searchParams.delete('redirect');
-    url.pathname = role === 'creator' ? '/creator' : '/';
+    url.pathname = role === 'staff' ? '/' : '/creator';
     return NextResponse.redirect(url);
   }
 
   // 4. Role-Based Access Control (RBAC) Governance:
+  // - Platform Owner / Admin has full uninhibited access to all workstations
+  if (role === 'admin') {
+    return NextResponse.next();
+  }
+
   // - Streetwear Creators must NEVER see the factory production floor or courier waybills
   if (role === 'creator') {
     if (pathname === '/' || pathname.startsWith('/dispatch')) {

@@ -56,8 +56,36 @@ export function PersonaSwitcher() {
     router.push('/login');
   };
 
+  const isOnCreator = pathname.startsWith('/creator');
+
   return (
     <div className="flex items-center space-x-2">
+      {/* Admin Quick Workstation Toggle */}
+      {persona.role === 'admin' && (
+        <button
+          type="button"
+          onClick={() => router.push(isOnCreator ? '/' : '/creator')}
+          className={`hidden sm:flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border text-xs font-bold transition shadow-sm ${
+            isOnCreator
+              ? 'bg-cyan-500/10 hover:bg-cyan-500/20 text-cyan-400 border-cyan-500/30'
+              : 'bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border-amber-500/30'
+          }`}
+          title={isOnCreator ? 'Jump to Factory Floor' : 'Jump to Creator Studio'}
+        >
+          {isOnCreator ? (
+            <>
+              <Factory className="w-3.5 h-3.5" />
+              <span>To Factory Floor</span>
+            </>
+          ) : (
+            <>
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>To Creator Studio</span>
+            </>
+          )}
+        </button>
+      )}
+
       {/* Active Workstation / Persona Indicator */}
       <div className="relative inline-block text-left">
         <div className="flex items-center space-x-2 px-2.5 py-1.5 rounded-xl bg-zinc-900 border border-zinc-800 text-xs shadow-sm">
@@ -80,11 +108,13 @@ export function PersonaSwitcher() {
             >
               {PRESET_PERSONAS.map((p) => (
                 <option key={p.email} value={p.email} className="bg-zinc-900 text-zinc-100">
-                  {p.role === 'creator'
+                  {p.email === 'dissafyt@gmail.com'
+                    ? '👑 Owner: dissafyt@gmail.com'
+                    : p.role === 'creator'
                     ? `🎨 Creator: ${p.brandName?.split(' ')[0]}`
                     : p.role === 'staff'
                     ? '🏭 Operator: Factory Floor'
-                    : '🛡️ Admin: Full Governance'}
+                    : '🛡️ Admin: Full Access'}
                 </option>
               ))}
             </select>
