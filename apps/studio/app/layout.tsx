@@ -41,7 +41,7 @@ export default function RootLayout({
             <div className="flex items-center space-x-3">
               <PersonaSwitcher />
               <a
-                href="http://localhost:3000"
+                href={process.env.NODE_ENV === 'production' ? 'https://dissafyt.com' : 'http://localhost:3000'}
                 target="_blank"
                 rel="noreferrer"
                 className="hidden sm:inline-block px-2.5 py-1 rounded text-xs font-medium text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 transition"
@@ -49,7 +49,7 @@ export default function RootLayout({
                 Storefront ↗
               </a>
               <a
-                href="http://localhost:3001"
+                href={process.env.NODE_ENV === 'production' ? 'https://admin.dissafyt.com' : 'http://localhost:3001'}
                 target="_blank"
                 rel="noreferrer"
                 className="hidden sm:inline-block px-2.5 py-1 rounded text-xs font-medium text-zinc-400 hover:text-white bg-zinc-900 hover:bg-zinc-800 border border-zinc-800 transition"

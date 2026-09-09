@@ -682,7 +682,7 @@ export default function CreatorStudioPage() {
                     </p>
                     <div className="flex items-center justify-center space-x-3 pt-2">
                       <a
-                        href="http://localhost:3000/shop"
+                        href={process.env.NODE_ENV === 'production' ? 'https://dissafyt.com/shop' : 'http://localhost:3000/shop'}
                         target="_blank"
                         rel="noreferrer"
                         className="px-4 py-2 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-black text-xs font-bold transition flex items-center space-x-1.5"

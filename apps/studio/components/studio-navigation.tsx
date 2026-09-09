@@ -30,17 +30,8 @@ export function StudioNavigation() {
     return () => window.removeEventListener('studio_persona_changed', handlePersonaChange);
   }, []);
 
-  if (!mounted) {
-    return (
-      <nav className="hidden md:flex items-center space-x-1 pl-4 border-l border-zinc-800">
-        <Link
-          href="/"
-          className="px-3 py-1.5 rounded-md text-xs font-semibold text-zinc-300 hover:text-white hover:bg-zinc-900 transition-colors"
-        >
-          Factory Queue
-        </Link>
-      </nav>
-    );
+  if (!mounted || pathname === '/login') {
+    return null;
   }
 
   const isOperator = persona.role === 'staff';

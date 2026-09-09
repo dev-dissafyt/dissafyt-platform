@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, Suspense } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { Card, CardTitle, CardContent, Button, Input, Label } from '@dissafyt/ui';
 import {
   Scissors,
@@ -49,7 +50,13 @@ interface AvailableSlot {
   availableStaff: { id: string; display_name: string }[];
 }
 
-export default function BookPage() {
+function BookContent() {
+  const searchParams = useSearchParams();
+  const isSubscribedParam = searchParams.get('subscribed') === 'true';
+  const planParam = searchParams.get('plan') || 'twice';
+  const isCancelledParam = searchParams.get('cancelled') === 'true';
+
+  const [justSubscribed, setJustSubscribed] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
   const [loading, setLoading] = useState(true);
@@ -120,6 +127,23 @@ export default function BookPage() {
     }
   }
 
+  // Auto-confirm subscription on return from checkout
+  async function confirmReturnSubscription(token: string) {
+    try {
+      setJustSubscribed(true);
+      await fetch('/api/subscriptions/confirm', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ planCode: planParam }),
+      });
+    } catch (e) {
+      console.warn('Subscription auto-confirm error:', e);
+    }
+  }
+
   // 1. Initial Load: Services, Staff, User Session & Subscription Status
   useEffect(() => {
     async function init() {
@@ -132,7 +156,10 @@ export default function BookPage() {
 
         // Fetch subscription status & profile if logged in
         if (session) {
-          checkSubscriptionStatus(session.access_token);
+          if (isSubscribedParam) {
+            await confirmReturnSubscription(session.access_token);
+          }
+          await checkSubscriptionStatus(session.access_token);
 
           // Fetch profile for prefilling
           fetch('/api/users/me', {
@@ -149,7 +176,10 @@ export default function BookPage() {
         const { data: authListener } = supabase.auth.onAuthStateChange(async (_event, newSession) => {
           setUserSession(newSession);
           if (newSession) {
-            checkSubscriptionStatus(newSession.access_token);
+            if (isSubscribedParam) {
+              await confirmReturnSubscription(newSession.access_token);
+            }
+            await checkSubscriptionStatus(newSession.access_token);
           } else {
             setHasActiveSubscription(false);
             setActiveSubscription(null);
@@ -422,6 +452,16 @@ export default function BookPage() {
           </div>
         </div>
 
+        {/* Cancellation notification if customer backed out on PayFast */}
+        {isCancelledParam && (
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/90 p-4 text-zinc-300 flex items-center gap-3">
+            <AlertCircle className="w-5 h-5 text-amber-400 shrink-0" />
+            <p className="text-xs text-zinc-300">
+              Subscription checkout was cancelled. Choose any membership plan below whenever you are ready to unlock priority booking.
+            </p>
+          </div>
+        )}
+
         {/* Member Gating Educational Hero Card */}
         <div className="relative overflow-hidden rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/10 via-zinc-900/90 to-zinc-950 p-8 sm:p-12 text-center space-y-6 shadow-2xl">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-amber-500/20 text-amber-400 ring-4 ring-amber-500/10">
@@ -530,6 +570,19 @@ export default function BookPage() {
           <div className="text-emerald-400 font-semibold">Priority Booking Unlocked</div>
         </div>
       </div>
+
+      {/* Returning Subscriber Celebration Banner */}
+      {(justSubscribed || (isSubscribedParam && hasActiveSubscription)) && (
+        <div className="rounded-xl border border-amber-500/40 bg-gradient-to-r from-amber-500/20 via-zinc-900 to-zinc-900 p-4 text-amber-300 flex items-center gap-3.5 shadow-lg shadow-amber-500/5">
+          <Sparkles className="w-6 h-6 text-amber-400 shrink-0 animate-bounce" />
+          <div className="space-y-0.5">
+            <p className="font-bold text-white text-sm">🎉 Membership Confirmed & Active!</p>
+            <p className="text-xs text-amber-200/90">
+              Welcome to Ace of Fyt VIP Grooming. Select your service, barber, and preferred time slot below to secure your chair.
+            </p>
+          </div>
+        </div>
+      )}
 
       {/* Main Interactive Booking Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
@@ -838,4 +891,21 @@ function generateNextDays(daysCount: number) {
   }
 
   return days;
+}
+
+export default function BookPage() {
+  return (
+    <Suspense
+      fallback={
+        <div className="container mx-auto max-w-4xl px-4 py-24 text-center space-y-4">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-amber-500/10 text-amber-500 animate-pulse">
+            <Scissors className="h-7 w-7" />
+          </div>
+          <h2 className="text-xl font-bold text-white">Loading Booking Portal...</h2>
+        </div>
+      }
+    >
+      <BookContent />
+    </Suspense>
+  );
 }

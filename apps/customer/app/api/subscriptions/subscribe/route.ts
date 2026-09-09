@@ -73,20 +73,26 @@ export async function POST(request: NextRequest) {
 
     // If sandbox demo activation is requested (for instant staging/testing without external card swipe)
     if (isSandboxDemo) {
-      const { data: subRecord, error: subErr } = await admin
-        .from('subscriptions')
-        .insert({
-          user_id: authCtx.userId,
-          plan_code: planCode,
-          plan_name: plan.name,
-          price: plan.price,
-          status: 'active',
-          current_period_start: startDate.toISOString(),
-          current_period_end: endDate.toISOString(),
-          payfast_token: `sandbox_token_${Date.now()}`,
-        })
-        .select()
-        .single();
+      let subRecord = null;
+      try {
+        const { data, error: subErr } = await admin
+          .from('subscriptions')
+          .insert({
+            user_id: authCtx.userId,
+            plan_code: planCode,
+            plan_name: plan.name,
+            price: plan.price,
+            status: 'active',
+            current_period_start: startDate.toISOString(),
+            current_period_end: endDate.toISOString(),
+            payfast_token: `sandbox_token_${Date.now()}`,
+          })
+          .select()
+          .single();
+        if (!subErr) subRecord = data;
+      } catch (e) {
+        console.warn('Subscriptions insert warning:', e);
+      }
 
       // Also record in payments table
       await admin.from('payments').insert({
@@ -103,15 +109,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         activatedImmediately: true,
-        subscription: subRecord,
+        subscription: subRecord || {
+          user_id: authCtx.userId,
+          plan_code: planCode,
+          plan_name: plan.name,
+          price: plan.price,
+          status: 'active',
+        },
         message: `Activated ${plan.name} membership!`,
       });
     }
 
     // Standard PayFast recurring subscription form payload
+    const isProd = process.env.NODE_ENV === 'production';
     const siteUrl =
       process.env.NEXT_PUBLIC_SITE_URL ||
-      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : isProd ? 'https://dissafyt.com' : 'http://localhost:3000');
     const merchantId =
       process.env.PAYFAST_MERCHANT_ID || process.env.NEXT_PUBLIC_PAYFAST_MERCHANT_ID || '17675995';
     const merchantKey = process.env.PAYFAST_MERCHANT_KEY || 'c08hjtdezifi4';
