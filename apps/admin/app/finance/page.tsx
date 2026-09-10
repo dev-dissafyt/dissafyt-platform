@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button } from '@dissafyt/ui';
 import { DollarSign, ShieldCheck, ArrowUpRight, Search, RefreshCw, CreditCard, ShoppingBag, Scissors } from 'lucide-react';
 import Link from 'next/link';
+import { adminFetch } from '@/lib/operator';
 
 interface PaymentAuditRecord {
   id: string;
@@ -29,7 +30,7 @@ export default function FinancePage() {
   async function fetchPayments() {
     setLoading(true);
     try {
-      const res = await fetch('/api/payments');
+      const res = await adminFetch('/api/payments');
       if (res.ok) {
         const data = await res.json();
         setRecords(data);

@@ -13,8 +13,15 @@ export type Permission =
   | 'location:create'
   | 'location:edit'
   | 'location:delete'
+  | 'user:view'
   | 'user:manage_roles'
   | 'audit:view'
+  | 'order:view'
+  | 'order:edit'
+  | 'booking:view'
+  | 'booking:edit'
+  | 'reporting:view'
+  | 'payment:view'
   | 'factory:view_queue'
   | 'factory:update_job'
   | 'factory:dispatch'
@@ -47,8 +54,15 @@ export const ROLE_PERMISSIONS: Record<AppRole, Permission[]> = {
     'location:create',
     'location:edit',
     'location:delete',
+    'user:view',
     'user:manage_roles',
     'audit:view',
+    'order:view',
+    'order:edit',
+    'booking:view',
+    'booking:edit',
+    'reporting:view',
+    'payment:view',
     'factory:view_queue',
     'factory:update_job',
     'factory:dispatch',
@@ -63,6 +77,13 @@ export const ROLE_PERMISSIONS: Record<AppRole, Permission[]> = {
     'product:edit',
     'service:edit',
     'staff:edit',
+    'user:view',
+    'order:view',
+    'order:edit',
+    'booking:view',
+    'booking:edit',
+    'reporting:view',
+    'payment:view',
     'factory:view_queue',
     'factory:update_job',
     'factory:dispatch',

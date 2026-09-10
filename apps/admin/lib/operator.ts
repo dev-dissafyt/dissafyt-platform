@@ -1,15 +1,17 @@
-import { AppRole } from '@dissafyt/database';
+import { AppRole, getSupabaseBrowserClient } from '@dissafyt/database';
 
 export interface AdminOperator {
   email: string;
   role: AppRole;
+  fullName?: string;
 }
 
 const STORAGE_KEY = 'dissafyt_admin_operator';
 
 export const DEFAULT_OPERATOR: AdminOperator = {
-  email: 'admin@dissafyt.com',
+  email: 'curtislee@dissafyt.com',
   role: 'admin',
+  fullName: 'Curtis-Lee',
 };
 
 export function getActiveOperator(): AdminOperator {
@@ -33,12 +35,57 @@ export function setActiveOperator(operator: AdminOperator): void {
   }
 }
 
+export async function logoutAdmin(): Promise<void> {
+  if (typeof window === 'undefined') return;
+  try {
+    const supabase = getSupabaseBrowserClient();
+    await supabase.auth.signOut();
+  } catch {
+    // ignore
+  }
+
+  // Clear cookies
+  document.cookie = 'dissafyt_admin_token=; path=/; max-age=0; SameSite=Lax';
+  document.cookie = 'dissafyt_admin_email=; path=/; max-age=0; SameSite=Lax';
+  document.cookie = 'dissafyt_admin_role=; path=/; max-age=0; SameSite=Lax';
+
+  try {
+    localStorage.removeItem(STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+
+  window.location.href = '/login';
+}
+
+function getCookie(name: string): string | null {
+  if (typeof document === 'undefined') return null;
+  const match = document.cookie.match(new RegExp('(^| )' + name + '=([^;]+)'));
+  return match ? decodeURIComponent(match[2]) : null;
+}
+
 /**
- * Fetch wrapper that automatically appends active operator RBAC headers.
+ * Fetch wrapper that automatically appends active operator session token and RBAC headers.
  */
 export async function adminFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const operator = getActiveOperator();
   const headers = new Headers(init?.headers || {});
+
+  // 1. Attach Bearer token from cookie or browser Supabase session
+  let token = getCookie('dissafyt_admin_token');
+  if (!token && typeof window !== 'undefined') {
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { data } = await supabase.auth.getSession();
+      token = data?.session?.access_token || null;
+    } catch {
+      // ignore
+    }
+  }
+
+  if (token && !headers.has('Authorization')) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
 
   if (!headers.has('x-admin-role')) {
     headers.set('x-admin-role', operator.role);

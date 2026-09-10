@@ -45,7 +45,10 @@ export class AdminBarbershopService {
   /**
    * Creates a service or subscription plan in the database.
    */
-  static async createService(input: CreateServiceInput): Promise<{ success: boolean; service?: BarberService; error?: string }> {
+  static async createService(
+    input: CreateServiceInput,
+    actor?: { email?: string; role?: string }
+  ): Promise<{ success: boolean; service?: BarberService; error?: string }> {
     const admin = getSupabaseAdminClient();
 
     // Prepare insert object
@@ -72,10 +75,17 @@ export class AdminBarbershopService {
     }
 
     try {
-      const { data, error } = await admin.from('services').insert(payload).select().single();
-      let createdService = data;
-      if (error) {
-        // Fall back without subscription fields if schema hasn't run migration 0002 yet
+      let createdService: any;
+      const { data, error } = await admin
+        .from('services')
+        .insert(payload)
+        .select()
+        .single();
+
+      if (!error && data) {
+        createdService = data;
+      } else if (error) {
+        // Fallback for schema variance if subscription columns don't exist
         if (error.code === 'PGRST204') {
           delete payload.is_subscription;
           delete payload.plan_code;
@@ -96,6 +106,8 @@ export class AdminBarbershopService {
 
       // Invisible Audit Trail
       await AuditService.recordLog({
+        actor_email: actor?.email || 'admin@dissafyt.com',
+        actor_role: actor?.role || 'admin',
         action: 'service.create',
         entity_type: 'service',
         entity_id: createdService.id,
@@ -441,12 +453,13 @@ export class AdminBarbershopService {
   }
 
   /**
-   * Updates an appointment's status (confirmed, completed, cancelled, no_show) and optional payment_status.
+   * Updates an appointment's status (confirmed, completed, cancelled, no_show) and optional payment_status with audit trail logging.
    */
   static async updateBookingStatus(
     id: string,
     status: string,
-    paymentStatus?: string
+    paymentStatus?: string,
+    actor?: { email?: string; role?: string }
   ): Promise<{ success: boolean; error?: string }> {
     const admin = getSupabaseAdminClient();
     const updatePayload: Record<string, any> = {
@@ -471,10 +484,25 @@ export class AdminBarbershopService {
           .update(updatePayload)
           .eq('id', id);
         if (fbErr) return { success: false, error: fbErr.message };
-        return { success: true };
+      } else {
+        return { success: false, error: error.message };
       }
-      return { success: false, error: error.message };
     }
+
+    // Invisible Audit Trail
+    try {
+      await AuditService.recordLog({
+        actor_email: actor?.email || 'admin@dissafyt.com',
+        actor_role: actor?.role || 'admin',
+        action: 'booking.status_change',
+        entity_type: 'booking',
+        entity_id: id,
+        changes: updatePayload,
+      });
+    } catch (auditErr) {
+      console.warn('Failed to record booking audit log:', auditErr);
+    }
+
     return { success: true };
   }
 }

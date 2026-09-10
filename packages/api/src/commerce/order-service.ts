@@ -1,6 +1,7 @@
 import { getSupabaseAdminClient, Order, OrderItem, OrderStatus } from '@dissafyt/database';
 import { StudioService } from '../studio/studio-service';
 import { BrandService } from '../studio/brand-service';
+import { AuditService } from '../audit/audit-service';
 
 export interface ShippingAddress {
   recipient_name: string;
@@ -419,11 +420,30 @@ export class OrderService {
   }
 
   /**
-   * Updates fulfillment state of an order.
+   * Updates fulfillment state of an order with inventory restocking and audit logging.
    */
-  static async updateOrderStatus(orderId: string, status: OrderStatus): Promise<{ success: boolean; error?: string }> {
+  static async updateOrderStatus(
+    orderId: string,
+    status: OrderStatus,
+    operator?: { email?: string; role?: string; userId?: string }
+  ): Promise<{ success: boolean; error?: string }> {
     const admin = getSupabaseAdminClient();
-    const { error } = await admin
+
+    // 1. Fetch current order to check previous status and items
+    const { data: order, error: fetchErr } = await admin
+      .from('orders')
+      .select('*, order_items(*)')
+      .eq('id', orderId)
+      .maybeSingle();
+
+    if (fetchErr || !order) {
+      return { success: false, error: fetchErr?.message || 'Order not found' };
+    }
+
+    const previousStatus = order.status;
+
+    // 2. Update status
+    const { error: updateErr } = await admin
       .from('orders')
       .update({
         status,
@@ -431,9 +451,58 @@ export class OrderService {
       })
       .eq('id', orderId);
 
-    if (error) {
-      return { success: false, error: error.message };
+    if (updateErr) {
+      return { success: false, error: updateErr.message };
     }
+
+    // 3. If cancelling or refunding an order that was previously paid/processing/shipped/completed, restock inventory
+    const shouldRestock =
+      (status === 'cancelled' || status === 'refunded') &&
+      ['paid', 'processing', 'shipped', 'fulfilled', 'completed'].includes(previousStatus);
+
+    if (shouldRestock && order.order_items && order.order_items.length > 0) {
+      for (const item of order.order_items) {
+        if (item.variant_id) {
+          try {
+            const { data: variant } = await admin
+              .from('product_variants')
+              .select('stock_quantity')
+              .eq('id', item.variant_id)
+              .single();
+
+            if (variant) {
+              await admin
+                .from('product_variants')
+                .update({ stock_quantity: variant.stock_quantity + (item.quantity || 1) })
+                .eq('id', item.variant_id);
+            }
+          } catch (restockErr) {
+            console.error(`Failed to restock variant ${item.variant_id}:`, restockErr);
+          }
+        }
+      }
+    }
+
+    // 4. Record audit log
+    try {
+      await AuditService.recordLog({
+        actor_id: operator?.userId || null,
+        actor_email: operator?.email || 'admin@dissafyt.com',
+        actor_role: operator?.role || 'admin',
+        action: 'order.status_change',
+        entity_type: 'order',
+        entity_id: orderId,
+        entity_name: `Order #${order.order_number || orderId}`,
+        changes: {
+          previous_status: previousStatus,
+          new_status: status,
+          restocked: shouldRestock,
+        },
+      });
+    } catch (auditErr) {
+      console.warn('Failed to record order status audit log:', auditErr);
+    }
+
     return { success: true };
   }
 

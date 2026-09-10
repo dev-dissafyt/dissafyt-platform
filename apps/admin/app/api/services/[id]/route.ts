@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AdminBarbershopService, RBACService } from '@dissafyt/api';
+import { AdminBarbershopService } from '@dissafyt/api';
+import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -8,21 +9,17 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const email = request.headers.get('x-admin-email') || 'admin@dissafyt.com';
-  const role = request.headers.get('x-admin-role') || 'admin';
-
-  if (!RBACService.hasPermission(role, 'service:edit')) {
-    return NextResponse.json(
-      { error: 'Forbidden: RBAC restricts service editing to administrators.' },
-      { status: 403 }
-    );
-  }
+  const auth = await requireAdminAuth(request, 'service:edit');
+  if (isAuthFailure(auth)) return auth;
 
   try {
     const id = params.id;
     const body = await request.json();
 
-    const result = await AdminBarbershopService.updateService(id, body, { email, role });
+    const result = await AdminBarbershopService.updateService(id, body, {
+      email: auth.email,
+      role: auth.role,
+    });
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }
@@ -37,21 +34,18 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const email = request.headers.get('x-admin-email') || 'admin@dissafyt.com';
-  const role = request.headers.get('x-admin-role') || 'admin';
-
-  if (!RBACService.hasPermission(role, 'service:delete')) {
-    return NextResponse.json(
-      { error: 'Forbidden: RBAC restricts service deletion to platform administrators.' },
-      { status: 403 }
-    );
-  }
+  const auth = await requireAdminAuth(request, 'service:delete');
+  if (isAuthFailure(auth)) return auth;
 
   const id = params.id;
-  const result = await AdminBarbershopService.deleteService(id, { email, role });
+  const result = await AdminBarbershopService.deleteService(id, {
+    email: auth.email,
+    role: auth.role,
+  });
   if (!result.success) {
     return NextResponse.json({ error: result.error }, { status: 400 });
   }
   return NextResponse.json({ success: true });
 }
+
 

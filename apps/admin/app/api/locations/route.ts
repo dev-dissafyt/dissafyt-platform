@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { BarbershopService, RBACService } from '@dissafyt/api';
+import { BarbershopService } from '@dissafyt/api';
+import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,7 +8,10 @@ export const dynamic = 'force-dynamic';
  * GET /api/locations
  * Returns barbershop locations with studio metadata for operations.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const auth = await requireAdminAuth(request);
+  if (isAuthFailure(auth)) return auth;
+
   try {
     const locations = await BarbershopService.listLocations();
     return NextResponse.json(locations);
@@ -22,19 +26,15 @@ export async function GET() {
  * Registers a new studio location with RBAC and audit trail.
  */
 export async function POST(request: NextRequest) {
-  const email = request.headers.get('x-admin-email') || 'admin@dissafyt.com';
-  const role = request.headers.get('x-admin-role') || 'admin';
-
-  if (!RBACService.hasPermission(role, 'location:create')) {
-    return NextResponse.json(
-      { error: 'Forbidden: RBAC restricts studio registration to administrators.' },
-      { status: 403 }
-    );
-  }
+  const auth = await requireAdminAuth(request, 'location:create');
+  if (isAuthFailure(auth)) return auth;
 
   try {
     const body = await request.json();
-    const result = await BarbershopService.createLocation(body, { email, role });
+    const result = await BarbershopService.createLocation(body, {
+      email: auth.email,
+      role: auth.role,
+    });
     if (!result.success) {
       return NextResponse.json({ error: result.error || 'Failed to create location' }, { status: 400 });
     }
@@ -43,4 +43,5 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error.message || 'Internal error' }, { status: 500 });
   }
 }
+
 

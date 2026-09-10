@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AdminBarbershopService, RBACService } from '@dissafyt/api';
+import { AdminBarbershopService } from '@dissafyt/api';
+import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,19 +12,15 @@ export async function PATCH(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const email = request.headers.get('x-admin-email') || 'admin@dissafyt.com';
-  const role = request.headers.get('x-admin-role') || 'admin';
-
-  if (!RBACService.hasPermission(role, 'staff:edit')) {
-    return NextResponse.json(
-      { error: 'Forbidden: RBAC restricts staff updates to authorized roles.' },
-      { status: 403 }
-    );
-  }
+  const auth = await requireAdminAuth(request, 'staff:edit');
+  if (isAuthFailure(auth)) return auth;
 
   try {
     const body = await request.json();
-    const result = await AdminBarbershopService.updateStaff(params.id, body, { email, role });
+    const result = await AdminBarbershopService.updateStaff(params.id, body, {
+      email: auth.email,
+      role: auth.role,
+    });
 
     if (!result.success) {
       return NextResponse.json({ error: result.error || 'Failed to update staff' }, { status: 400 });
@@ -43,18 +40,14 @@ export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
-  const email = request.headers.get('x-admin-email') || 'admin@dissafyt.com';
-  const role = request.headers.get('x-admin-role') || 'admin';
-
-  if (!RBACService.hasPermission(role, 'staff:delete')) {
-    return NextResponse.json(
-      { error: 'Forbidden: RBAC restricts staff deletion to platform administrators.' },
-      { status: 403 }
-    );
-  }
+  const auth = await requireAdminAuth(request, 'staff:delete');
+  if (isAuthFailure(auth)) return auth;
 
   try {
-    const result = await AdminBarbershopService.deleteStaff(params.id, { email, role });
+    const result = await AdminBarbershopService.deleteStaff(params.id, {
+      email: auth.email,
+      role: auth.role,
+    });
     if (!result.success) {
       return NextResponse.json({ error: result.error || 'Failed to delete staff' }, { status: 400 });
     }
@@ -63,4 +56,5 @@ export async function DELETE(
     return NextResponse.json({ error: error.message || 'Internal error' }, { status: 500 });
   }
 }
+
 

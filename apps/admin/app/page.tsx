@@ -19,6 +19,7 @@ import {
   Sparkles,
 } from 'lucide-react';
 import Link from 'next/link';
+import { adminFetch } from '@/lib/operator';
 
 interface OperationalMetrics {
   overview: {
@@ -74,7 +75,7 @@ export default function AdminDashboardPage() {
   async function fetchMetrics() {
     setLoading(true);
     try {
-      const res = await fetch('/api/reporting');
+      const res = await adminFetch('/api/reporting');
       if (res.ok) {
         const data = await res.json();
         setMetrics(data);

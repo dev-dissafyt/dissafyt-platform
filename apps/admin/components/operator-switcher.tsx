@@ -1,11 +1,15 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Shield, ShieldAlert, UserCheck, Scissors } from 'lucide-react';
-import { getActiveOperator, setActiveOperator, AdminOperator } from '../lib/operator';
+import { Shield, LogOut, User } from 'lucide-react';
+import { getActiveOperator, logoutAdmin, AdminOperator } from '../lib/operator';
 
 export function OperatorSwitcher() {
-  const [operator, setOperator] = useState<AdminOperator>({ email: 'admin@dissafyt.com', role: 'admin' });
+  const [operator, setOperator] = useState<AdminOperator>({
+    email: 'curtislee@dissafyt.com',
+    role: 'admin',
+    fullName: 'Curtis-Lee',
+  });
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
@@ -21,34 +25,35 @@ export function OperatorSwitcher() {
 
   if (!mounted) return null;
 
-  function handleRoleChange(newRole: 'admin' | 'staff' | 'barber') {
-    const updated: AdminOperator = {
-      email: newRole === 'admin' ? 'admin@dissafyt.com' : `${newRole}@dissafyt.com`,
-      role: newRole,
-    };
-    setActiveOperator(updated);
-    setOperator(updated);
-  }
-
   return (
-    <div className="flex items-center space-x-2 text-xs">
-      <div className="flex items-center space-x-1.5 px-2.5 py-1 rounded-md bg-stone-900 border border-stone-800">
-        {operator.role === 'admin' && <Shield className="h-3.5 w-3.5 text-amber-500" />}
-        {operator.role === 'staff' && <UserCheck className="h-3.5 w-3.5 text-sky-400" />}
-        {operator.role === 'barber' && <Scissors className="h-3.5 w-3.5 text-emerald-400" />}
-        <span className="text-stone-300 font-mono hidden sm:inline">{operator.email}</span>
+    <div className="flex items-center space-x-3 text-xs">
+      {/* Operator Identity Badge */}
+      <div className="flex items-center space-x-2 px-3 py-1.5 rounded-xl bg-stone-900 border border-stone-800 shadow-sm">
+        <div className="h-6 w-6 rounded-lg bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold">
+          <Shield className="h-3.5 w-3.5" />
+        </div>
+        <div className="flex flex-col text-left">
+          <span className="text-white font-semibold text-xs leading-none">
+            {operator.fullName || (operator.email.startsWith('curtis') ? 'Curtis-Lee' : 'Administrator')}
+          </span>
+          <span className="text-[10px] font-mono text-stone-400 leading-tight">
+            {operator.email}
+          </span>
+        </div>
+        <span className="rounded bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 text-[9px] font-mono uppercase text-amber-400 font-bold ml-1">
+          {operator.role}
+        </span>
       </div>
 
-      <select
-        value={operator.role}
-        onChange={(e) => handleRoleChange(e.target.value as any)}
-        className="bg-stone-900 border border-stone-800 text-stone-300 rounded px-2 py-1 text-xs font-semibold focus:outline-none focus:border-amber-500 cursor-pointer"
-        title="Simulate RBAC Operator Account Role"
+      {/* Sign Out Button */}
+      <button
+        onClick={() => logoutAdmin()}
+        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-stone-800 bg-stone-900/60 hover:bg-red-500/10 hover:border-red-500/30 text-stone-400 hover:text-red-300 transition-all text-xs font-semibold"
+        title="Sign Out of Admin Control Room"
       >
-        <option value="admin">Role: Admin (Full Access)</option>
-        <option value="staff">Role: Staff (Restricted)</option>
-        <option value="barber">Role: Barber (Provider)</option>
-      </select>
+        <LogOut className="h-3.5 w-3.5" />
+        <span className="hidden sm:inline">Sign Out</span>
+      </button>
     </div>
   );
 }

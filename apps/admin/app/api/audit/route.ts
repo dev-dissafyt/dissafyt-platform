@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AuditService, RBACService } from '@dissafyt/api';
+import { AuditService } from '@dissafyt/api';
+import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -10,14 +11,8 @@ export const revalidate = 0;
  * Strictly restricted by RBAC to 'admin' role (permission 'audit:view').
  */
 export async function GET(request: NextRequest) {
-  const role = request.headers.get('x-admin-role') || 'admin';
-
-  if (!RBACService.hasPermission(role, 'audit:view')) {
-    return NextResponse.json(
-      { error: 'Forbidden: RBAC requires admin permissions to view audit logs.' },
-      { status: 403 }
-    );
-  }
+  const auth = await requireAdminAuth(request, 'audit:view');
+  if (isAuthFailure(auth)) return auth;
 
   try {
     const logs = await AuditService.listLogs(100);

@@ -1,13 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AdminBarbershopService } from '@dissafyt/api';
+import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/bookings
- * Filters bookings by date, staffId, or status.
+ * Filters bookings by date, staffId, or status (requires booking:view).
  */
 export async function GET(request: NextRequest) {
+  const auth = await requireAdminAuth(request, 'booking:view');
+  if (isAuthFailure(auth)) return auth;
+
   try {
     const { searchParams } = new URL(request.url);
     const date = searchParams.get('date') || undefined;
@@ -29,9 +33,12 @@ export async function GET(request: NextRequest) {
 
 /**
  * PATCH /api/bookings
- * Updates booking status (confirmed, completed, cancelled, no_show).
+ * Updates booking status (confirmed, completed, cancelled, no_show) with audit logging (requires booking:edit).
  */
 export async function PATCH(request: NextRequest) {
+  const auth = await requireAdminAuth(request, 'booking:edit');
+  if (isAuthFailure(auth)) return auth;
+
   try {
     const body = await request.json();
     const { id, status, payment_status } = body;
@@ -40,7 +47,12 @@ export async function PATCH(request: NextRequest) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
     }
 
-    const result = await AdminBarbershopService.updateBookingStatus(id, status, payment_status);
+    const result = await AdminBarbershopService.updateBookingStatus(
+      id,
+      status,
+      payment_status,
+      { email: auth.email, role: auth.role }
+    );
     if (!result.success) {
       return NextResponse.json({ error: result.error || 'Failed to update booking status' }, { status: 400 });
     }
@@ -50,3 +62,4 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: error.message || 'Internal error' }, { status: 500 });
   }
 }
+

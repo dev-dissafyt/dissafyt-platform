@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input } from '@dissafyt/ui';
 import { Package, Truck, Clock, CheckCircle2, ArrowLeft, RefreshCw, Search, Phone, MapPin, ChevronRight, X } from 'lucide-react';
+import { adminFetch } from '@/lib/operator';
 
 interface OrderItem {
   id: string;
@@ -53,7 +54,7 @@ export default function AdminOrdersPage() {
   async function loadOrders() {
     setLoading(true);
     try {
-      const res = await fetch('/api/orders');
+      const res = await adminFetch('/api/orders');
       if (res.ok) setOrders(await res.json());
     } catch (e) {
       console.error(e);
@@ -69,7 +70,7 @@ export default function AdminOrdersPage() {
   async function handleUpdateStatus(orderId: string, newStatus: string) {
     setStatusMsg(null);
     try {
-      const res = await fetch(`/api/orders/${orderId}`, {
+      const res = await adminFetch(`/api/orders/${orderId}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),

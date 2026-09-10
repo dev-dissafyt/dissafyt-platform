@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input, Label } from '@dissafyt/ui';
 import { ShoppingBag, Plus, Trash2, CheckCircle, XCircle, Tag, Layers, RefreshCw, Package, Pencil } from 'lucide-react';
-import { adminFetch } from '../../lib/operator';
+import { adminFetch } from '@/lib/operator';
 
 interface Variant {
   id?: string;
@@ -66,8 +66,8 @@ export default function AdminCommercePage() {
     setLoading(true);
     try {
       const [prodRes, catRes] = await Promise.all([
-        fetch('/api/products'),
-        fetch('/api/categories'),
+        adminFetch('/api/products'),
+        adminFetch('/api/categories'),
       ]);
       if (prodRes.ok) setProducts(await prodRes.json());
       if (catRes.ok) setCategories(await catRes.json());
@@ -88,7 +88,7 @@ export default function AdminCommercePage() {
     setStatusMsg(null);
 
     try {
-      const res = await fetch('/api/products', {
+      const res = await adminFetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -131,7 +131,7 @@ export default function AdminCommercePage() {
     e.preventDefault();
     if (!categoryName) return;
     try {
-      const res = await fetch('/api/categories', {
+      const res = await adminFetch('/api/categories', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: categoryName }),
