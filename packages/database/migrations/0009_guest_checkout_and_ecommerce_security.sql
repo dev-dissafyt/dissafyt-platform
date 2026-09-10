@@ -9,17 +9,23 @@ ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_email TEXT;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_phone TEXT;
 ALTER TABLE public.orders ADD COLUMN IF NOT EXISTS customer_name TEXT;
 
--- 3. Upsert official guest fallback profile into public.profiles
-INSERT INTO public.profiles (id, email, full_name, role)
+-- 3. Upsert official guest fallback profile into public.profiles and public.user_roles
+INSERT INTO public.profiles (id, email, full_name)
 VALUES (
   '5554892b-dd35-4778-81cc-98da343dfbae',
   'guest@dissafyt.com',
-  'Dissafyt Guest Customer',
-  'customer'
+  'Dissafyt Guest Customer'
 )
 ON CONFLICT (id) DO UPDATE
 SET full_name = EXCLUDED.full_name,
-    role = EXCLUDED.role;
+    email = EXCLUDED.email;
+
+INSERT INTO public.user_roles (user_id, role)
+VALUES (
+  '5554892b-dd35-4778-81cc-98da343dfbae',
+  'customer'
+)
+ON CONFLICT (user_id, role) DO NOTHING;
 
 -- 4. Ensure Row Level Security on public.orders
 ALTER TABLE public.orders ENABLE ROW LEVEL SECURITY;
