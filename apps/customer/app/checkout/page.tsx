@@ -41,7 +41,7 @@ export default function CheckoutPage() {
   const [streetAddress, setStreetAddress] = useState('');
   const [suburb, setSuburb] = useState('');
   const [city, setCity] = useState('');
-  const [province, setProvince] = useState('Gauteng');
+  const [province, setProvince] = useState('Western Cape');
   const [postalCode, setPostalCode] = useState('');
 
   useEffect(() => {

@@ -38,6 +38,8 @@ export interface OrderWithItems extends Order {
   customer_name?: string;
 }
 
+export const GUEST_USER_ID = '5554892b-dd35-4778-81cc-98da343dfbae';
+
 export class OrderService {
   /**
    * Generates a distinct human-readable order number, e.g. DIS-2026-8921
@@ -49,7 +51,8 @@ export class OrderService {
   }
 
   /**
-   * Creates an order authoritatively: validates prices from DB and reserves inventory.
+   * Creates an order authoritatively: validates prices strictly from DB, verifies stock availability,
+   * and persists order in pending_payment state without premature stock decrement.
    */
   static async createOrder(input: CreateOrderInput): Promise<{ success: boolean; order?: OrderWithItems; error?: string }> {
     const admin = getSupabaseAdminClient();
@@ -58,7 +61,30 @@ export class OrderService {
       return { success: false, error: 'Order must contain at least one item' };
     }
 
-    const userId = input.user_id || input.customer_id || 'guest-user';
+    // Resolve guest user ID to official guest account or existing customer profile
+    let userId = input.user_id || input.customer_id;
+    const recipientEmail = input.customer_email || input.shipping_address?.recipient_email;
+
+    if (!userId || userId === '00000000-0000-0000-0000-000000000000' || userId === 'guest-user') {
+      if (recipientEmail) {
+        try {
+          const { data: profile } = await admin
+            .from('profiles')
+            .select('id')
+            .eq('email', recipientEmail)
+            .maybeSingle();
+          if (profile?.id) {
+            userId = profile.id;
+          }
+        } catch {
+          // Fallback to official guest account
+        }
+      }
+    }
+
+    if (!userId || userId === '00000000-0000-0000-0000-000000000000' || userId === 'guest-user') {
+      userId = GUEST_USER_ID;
+    }
 
     try {
       // 1. Fetch product & variant details to compute authoritative prices
@@ -101,7 +127,7 @@ export class OrderService {
         }
       }
 
-      // Calculate totals
+      // Calculate totals with strictly authoritative pricing
       let orderSubtotal = 0;
       const orderItemsToInsert: {
         id?: string;
@@ -115,31 +141,35 @@ export class OrderService {
 
       for (const item of input.items) {
         const product = products.find((p) => p.id === item.product_id);
-        let unitPrice = item.unit_price || (product ? Number(product.base_price) : 450);
-        let productName = product ? product.name : 'Dissafyt Apparel Item';
-
-        if (product && !product.is_active) {
-          return { success: false, error: `Product is no longer available` };
+        if (!product) {
+          return { success: false, error: `Product not found: ${item.product_id}` };
         }
+        if (!product.is_active) {
+          return { success: false, error: `Product is no longer available: ${product.name}` };
+        }
+
+        // Strictly authoritative server pricing; client-sent unit_price is ignored
+        let unitPrice = Number(product.base_price);
+        let productName = product.name;
 
         if (item.variant_id) {
           const variant = variants.find((v) => v.id === item.variant_id);
-          if (variant) {
-            if (variant.stock_quantity < item.quantity) {
-              return { success: false, error: `Insufficient stock for ${productName} (${variant.name})` };
-            }
-            if (variant.price_override) {
-              unitPrice = Number(variant.price_override);
-            }
-            productName = `${productName} - ${variant.name}`;
+          if (!variant) {
+            return { success: false, error: `Product variant not found: ${item.variant_id}` };
           }
+          if (variant.stock_quantity < item.quantity) {
+            return { success: false, error: `Insufficient stock for ${productName} (${variant.name}). Available: ${variant.stock_quantity}` };
+          }
+          if (variant.price_override !== null && variant.price_override !== undefined && Number(variant.price_override) > 0) {
+            unitPrice = Number(variant.price_override);
+          }
+          productName = `${productName} - ${variant.name}`;
         }
 
         const totalPrice = unitPrice * item.quantity;
         orderSubtotal += totalPrice;
 
         orderItemsToInsert.push({
-          id: `item-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
           product_id: item.product_id,
           variant_id: item.variant_id || null,
           product_name: productName,
@@ -149,7 +179,7 @@ export class OrderService {
         });
       }
 
-      // 2. Insert into orders table
+      // 2. Insert into orders table with valid user_id
       const orderNumber = this.generateOrderNumber();
       let order: any = null;
 
@@ -169,23 +199,15 @@ export class OrderService {
 
         if (!orderErr && dbOrder) {
           order = dbOrder;
+        } else if (orderErr) {
+          console.error('Failed to insert order into DB:', orderErr);
         }
-      } catch {
-        // Fallback
+      } catch (insertErr) {
+        console.error('Exception inserting order:', insertErr);
       }
 
       if (!order) {
-        order = {
-          id: `ord-${Date.now()}`,
-          user_id: userId,
-          order_number: orderNumber,
-          status: 'pending_payment',
-          subtotal: orderSubtotal,
-          total: orderSubtotal + (input.shipping_cost || 0),
-          shipping_address: input.shipping_address,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        };
+        return { success: false, error: 'Database order persistence failed. Please try again.' };
       }
 
       // 3. Insert items into order_items
@@ -203,65 +225,11 @@ export class OrderService {
 
         if (!itemsErr && dbItems && dbItems.length > 0) {
           insertedItems = dbItems;
+        } else if (itemsErr) {
+          console.error('Failed to insert order items:', itemsErr);
         }
-      } catch {
-        // Fallback
-      }
-
-      // 4. Decrement inventory stock
-      for (const item of input.items) {
-        if (item.variant_id) {
-          const variant = variants.find((v) => v.id === item.variant_id);
-          if (variant) {
-            try {
-              await admin
-                .from('product_variants')
-                .update({ stock_quantity: Math.max(0, variant.stock_quantity - item.quantity) })
-                .eq('id', item.variant_id);
-            } catch {
-              // Ignore stock decrement error on remote DB
-            }
-          }
-        }
-      }
-
-      // 5. Automatically mirror custom Kasi Kollekt apparel items to Factory Print Queue
-      const finalItems = insertedItems && insertedItems.length > 0 ? insertedItems : itemsPayload;
-      for (const orderItem of finalItems) {
-        const product = products.find((p) => p.id === orderItem.product_id) as any;
-        if (product && (product.is_custom_print || product.brand_id)) {
-          const variant = variants.find((v) => v.id === orderItem.variant_id);
-          const sizeMatch = variant?.name?.match(/Size\s+([A-Z0-9]+)/i);
-          const garmentSize = sizeMatch ? sizeMatch[1] : 'L';
-          const colorMatch = variant?.name?.match(/-\s*([A-Za-z]+)/);
-          const garmentColor = colorMatch ? colorMatch[1].trim() : 'Black';
-
-          const placement = typeof product.print_placement === 'string'
-            ? product.print_placement
-            : (product.print_placement?.location || 'front_chest');
-
-          try {
-            await StudioService.createPrintJob({
-              order_id: order.id,
-              order_item_id: orderItem.id || `item-${Date.now()}`,
-              product_id: product.id,
-              product_name: product.name,
-              variant_id: orderItem.variant_id || null,
-              brand_id: product.brand_id || null,
-              garment_color: garmentColor,
-              garment_size: garmentSize,
-              quantity: orderItem.quantity || 1,
-              print_placement: placement,
-              design_file_url: product.design_file_url || null,
-              mockup_url: product.mockup_url || null,
-              print_technique: 'dtf',
-              status: 'pending',
-              operator_notes: `Kasi Kollekt auto-mirrored from Order #${order.order_number}`,
-            });
-          } catch (jobErr) {
-            console.warn('Failed to mirror print job to studio queue:', jobErr);
-          }
-        }
+      } catch (itemsEx) {
+        console.error('Exception inserting order items:', itemsEx);
       }
 
       return {
@@ -274,6 +242,139 @@ export class OrderService {
     } catch (err: any) {
       return { success: false, error: err.message };
     }
+  }
+
+  /**
+   * Confirms payment for an order upon verified PayFast ITN notification.
+   * Verifies paid amount >= order total, sets status to 'paid', decrements stock, and enqueues factory print jobs.
+   */
+  static async confirmOrderPayment(
+    orderId: string,
+    amountPaid: number,
+    paymentRef?: string
+  ): Promise<{ success: boolean; error?: string }> {
+    const admin = getSupabaseAdminClient();
+
+    // Fetch order with items
+    const { data: order, error: orderErr } = await admin
+      .from('orders')
+      .select('*, order_items(*)')
+      .eq('id', orderId)
+      .maybeSingle();
+
+    if (orderErr || !order) {
+      return { success: false, error: `Order not found: ${orderId}` };
+    }
+
+    if (order.status === 'paid') {
+      return { success: true };
+    }
+
+    // Authoritative payment amount verification
+    // Must satisfy gross payment >= order total (with 0.05 margin for currency rounding)
+    if (amountPaid < Number(order.total) - 0.05) {
+      console.warn(`Payment underpaid for order ${order.id}: received R${amountPaid}, expected R${order.total}`);
+      await admin
+        .from('orders')
+        .update({
+          status: 'failed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', orderId);
+      return { success: false, error: `Payment underpaid: received R${amountPaid}, required R${order.total}` };
+    }
+
+    // Mark order as paid
+    const { error: updateErr } = await admin
+      .from('orders')
+      .update({
+        status: 'paid',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', orderId);
+
+    if (updateErr) {
+      return { success: false, error: updateErr.message };
+    }
+
+    // Decrement inventory stock on verified payment
+    const orderItems = order.order_items || [];
+    for (const item of orderItems) {
+      if (item.variant_id) {
+        try {
+          const { data: variant } = await admin
+            .from('product_variants')
+            .select('stock_quantity')
+            .eq('id', item.variant_id)
+            .single();
+
+          if (variant) {
+            await admin
+              .from('product_variants')
+              .update({ stock_quantity: Math.max(0, variant.stock_quantity - item.quantity) })
+              .eq('id', item.variant_id);
+          }
+        } catch (e) {
+          console.error(`Failed to decrement stock for variant ${item.variant_id}:`, e);
+        }
+      }
+    }
+
+    // Mirror custom apparel items to Factory Print Queue
+    for (const orderItem of orderItems) {
+      try {
+        const { data: product } = await admin
+          .from('products')
+          .select('id, name, is_custom_print, brand_id, print_placement, design_file_url, mockup_url')
+          .eq('id', orderItem.product_id)
+          .maybeSingle();
+
+        if (product && (product.is_custom_print || product.brand_id)) {
+          let garmentColor = 'Black';
+          let garmentSize = 'L';
+
+          if (orderItem.variant_id) {
+            const { data: v } = await admin
+              .from('product_variants')
+              .select('name')
+              .eq('id', orderItem.variant_id)
+              .maybeSingle();
+            if (v?.name) {
+              const sizeMatch = v.name.match(/Size\s+([A-Z0-9]+)/i);
+              if (sizeMatch) garmentSize = sizeMatch[1];
+              const colorMatch = v.name.match(/-\s*([A-Za-z]+)/);
+              if (colorMatch) garmentColor = colorMatch[1].trim();
+            }
+          }
+
+          const placement = typeof product.print_placement === 'string'
+            ? product.print_placement
+            : (product.print_placement?.location || 'front_chest');
+
+          await StudioService.createPrintJob({
+            order_id: order.id,
+            order_item_id: orderItem.id,
+            product_id: product.id,
+            product_name: product.name,
+            variant_id: orderItem.variant_id || null,
+            brand_id: product.brand_id || null,
+            garment_color: garmentColor,
+            garment_size: garmentSize,
+            quantity: orderItem.quantity || 1,
+            print_placement: placement,
+            design_file_url: product.design_file_url || null,
+            mockup_url: product.mockup_url || null,
+            print_technique: 'dtf',
+            status: 'pending',
+            operator_notes: `Auto-mirrored from Paid Order #${order.order_number}`,
+          });
+        }
+      } catch (jobErr) {
+        console.warn('Failed to mirror print job to studio queue:', jobErr);
+      }
+    }
+
+    return { success: true };
   }
 
   /**
@@ -312,8 +413,8 @@ export class OrderService {
 
     return orders.map((o: any) => ({
       ...o,
-      customer_email: o.profiles?.email || 'Guest',
-      customer_name: o.profiles?.full_name || 'Customer',
+      customer_email: o.shipping_address?.recipient_email || o.profiles?.email || 'Guest',
+      customer_name: o.shipping_address?.recipient_name || o.profiles?.full_name || 'Customer',
     }));
   }
 
@@ -351,8 +452,28 @@ export class OrderService {
 
     return {
       ...order,
-      customer_email: (order as any).profiles?.email,
-      customer_name: (order as any).profiles?.full_name,
+      customer_email: (order as any).shipping_address?.recipient_email || (order as any).profiles?.email,
+      customer_name: (order as any).shipping_address?.recipient_name || (order as any).profiles?.full_name,
+    };
+  }
+
+  /**
+   * Gets a single order by public order_number (e.g. for guest checkout success page).
+   */
+  static async getOrderByNumber(orderNumber: string): Promise<OrderWithItems | null> {
+    const admin = getSupabaseAdminClient();
+    const { data: order, error } = await admin
+      .from('orders')
+      .select('*, order_items(*), profiles(email, full_name)')
+      .eq('order_number', orderNumber)
+      .maybeSingle();
+
+    if (error || !order) return null;
+
+    return {
+      ...order,
+      customer_email: (order as any).shipping_address?.recipient_email || (order as any).profiles?.email,
+      customer_name: (order as any).shipping_address?.recipient_name || (order as any).profiles?.full_name,
     };
   }
 }

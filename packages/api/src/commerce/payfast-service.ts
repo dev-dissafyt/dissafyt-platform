@@ -1,5 +1,6 @@
 import crypto from 'crypto';
 import { getSupabaseAdminClient, Payment } from '@dissafyt/database';
+import { OrderService, GUEST_USER_ID } from './order-service';
 
 export interface PayfastNotifyPayload {
   m_payment_id?: string;
@@ -64,15 +65,11 @@ export class PayfastService {
    * Processes verified ITN webhook notification, updating payment and order records in PostgreSQL.
    */
   static async handleWebhook(payload: PayfastNotifyPayload): Promise<{ success: boolean; message: string; payment?: Payment }> {
-    // 1. Verify signature (try with configured passphrase, then fallback without passphrase)
-    let isValid = this.validateSignature(payload, this.passphrase);
-    if (!isValid && this.passphrase) {
-      isValid = this.validateSignature(payload, '');
-    }
+    // 1. Strictly verify signature with configured secret passphrase (no empty-passphrase bypass)
+    const isValid = this.validateSignature(payload, this.passphrase);
 
     if (!isValid) {
       console.warn('PayFast ITN signature mismatch for payload:', payload);
-      // In production/sandbox, log warning but if coming from valid PayFast IP or sandbox we can proceed or fail gracefully
       return { success: false, message: 'Invalid PayFast signature' };
     }
 
@@ -84,8 +81,8 @@ export class PayfastService {
     const isSubscription = Boolean(payload.token || payload.subscription_type);
     const relatedType = isSubscription ? 'subscription' : 'order';
 
-    // If userId not provided in custom_str2, lookup profile by email_address from PayFast
-    if ((!userId || userId === '00000000-0000-0000-0000-000000000000') && payload.email_address) {
+    // If userId not provided in custom_str2, lookup profile by email_address or fallback to official guest
+    if ((!userId || userId === '00000000-0000-0000-0000-000000000000' || userId === 'guest-user') && payload.email_address) {
       try {
         const { data: profile } = await admin
           .from('profiles')
@@ -102,6 +99,10 @@ export class PayfastService {
       }
     }
 
+    if (!userId || userId === '00000000-0000-0000-0000-000000000000' || userId === 'guest-user') {
+      userId = GUEST_USER_ID;
+    }
+
     const isUuid = (val?: string): boolean =>
       Boolean(val && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(val));
 
@@ -109,9 +110,9 @@ export class PayfastService {
       ? orderId!
       : isUuid(userId)
       ? userId!
-      : '00000000-0000-0000-0000-000000000000';
+      : GUEST_USER_ID;
 
-    const validUserId = isUuid(userId) ? userId! : '00000000-0000-0000-0000-000000000000';
+    const validUserId = isUuid(userId) ? userId! : GUEST_USER_ID;
 
     try {
       // 2. Idempotent insert or update in payments table
@@ -165,20 +166,17 @@ export class PayfastService {
         paymentRecord = newPay;
       }
 
-      // 3. Update order state if COMPLETE
+      // 3. Update order or subscription state authoritatively if COMPLETE
       if (isPaid) {
         if (orderId && !isSubscription) {
-          await admin
-            .from('orders')
-            .update({
-              status: 'paid',
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', orderId);
+          const confirmResult = await OrderService.confirmOrderPayment(orderId, amount, payload.pf_payment_id);
+          if (!confirmResult.success) {
+            console.warn(`Order payment confirmation failed for ${orderId}:`, confirmResult.error);
+          }
         }
 
         // 4. Activate or renew barbershop subscription if subscription payment
-        if (isSubscription && userId && userId !== '00000000-0000-0000-0000-000000000000') {
+        if (isSubscription && userId && userId !== GUEST_USER_ID) {
           const planCode = payload.custom_str1 || 'twice';
           const planNames: Record<string, string> = {
             solo: 'The Solo Membership',
@@ -228,6 +226,16 @@ export class PayfastService {
           } catch (subErr) {
             console.error('Failed to create/update subscription in table:', subErr);
           }
+        }
+      } else if (paymentStatus === 'FAILED') {
+        if (orderId && !isSubscription) {
+          await admin
+            .from('orders')
+            .update({
+              status: 'failed',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', orderId);
         }
       }
 

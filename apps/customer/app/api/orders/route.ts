@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AuthService, OrderService, PayfastService } from '@dissafyt/api';
+import { AuthService, OrderService, PayfastService, GUEST_USER_ID } from '@dissafyt/api';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -34,10 +34,10 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get('Authorization');
     const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
 
-    let userId = '00000000-0000-0000-0000-000000000000';
+    let userId = GUEST_USER_ID;
     if (token) {
       const authCtx = await AuthService.verifyToken(token);
-      if (authCtx) userId = authCtx.userId;
+      if (authCtx?.userId) userId = authCtx.userId;
     }
 
     const body = await request.json();
@@ -47,8 +47,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Items and shippingAddress are required' }, { status: 400 });
     }
 
+    const recipientEmail = (shippingAddress.recipient_email || '').trim();
+    const recipientPhone = (shippingAddress.recipient_phone || '').trim();
+
     const result = await OrderService.createOrder({
       user_id: userId,
+      customer_email: recipientEmail,
+      customer_phone: recipientPhone,
       items,
       shipping_address: shippingAddress,
     });
@@ -70,13 +75,11 @@ export async function POST(request: NextRequest) {
     const nameParts = recipientName ? recipientName.split(' ') : ['Customer'];
     const firstName = nameParts[0] || 'Customer';
     const lastName = nameParts.slice(1).join(' ') || '';
-    const recipientPhone = shippingAddress.recipient_phone || '';
-    const recipientEmail = shippingAddress.recipient_email || '';
 
     const payfastData: Record<string, string> = {
       merchant_id: merchantId,
       merchant_key: process.env.PAYFAST_MERCHANT_KEY || 'c08hjtdezifi4',
-      return_url: `${siteUrl}/account?order=${order.order_number}&status=success`,
+      return_url: `${siteUrl}/checkout/success?order=${order.order_number}`,
       cancel_url: `${siteUrl}/checkout?cancelled=1`,
       notify_url: `${siteUrl}/api/payments/payfast-notify`,
       m_payment_id: order.id,

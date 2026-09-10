@@ -132,60 +132,66 @@ export default function ShopPage() {
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
-          {products.map((product) => (
-            <Card
-              key={product.id}
-              className="border-zinc-800 hover:border-zinc-700 bg-zinc-950/80 p-6 flex flex-col justify-between transition-all duration-300 rounded-2xl group shadow-lg"
-            >
-              <div>
-                <div className="h-64 rounded-xl bg-zinc-900 flex items-center justify-center text-zinc-600 mb-5 overflow-hidden relative border border-zinc-800/80">
-                  {product.images && product.images.length > 0 ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img
-                      src={product.images[0]}
-                      alt={product.name}
-                      className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center text-zinc-500 text-xs p-4 text-center">
-                      <ShoppingBag className="h-10 w-10 mb-2 text-zinc-700" />
-                      <span className="font-mono text-[11px] uppercase tracking-wider">{product.name}</span>
+          {products.map((product) => {
+            const productHref = `/shop/${product.slug || product.id}`;
+            return (
+              <Card
+                key={product.id}
+                className="border-zinc-800 hover:border-zinc-700 bg-zinc-950/80 p-6 flex flex-col justify-between transition-all duration-300 rounded-2xl group shadow-lg"
+              >
+                <div>
+                  <Link href={productHref} className="block group">
+                    <div className="h-64 rounded-xl bg-zinc-900 flex items-center justify-center text-zinc-600 mb-5 overflow-hidden relative border border-zinc-800/80">
+                      {product.images && product.images.length > 0 ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={product.images[0]}
+                          alt={product.name}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="flex flex-col items-center justify-center text-zinc-500 text-xs p-4 text-center">
+                          <ShoppingBag className="h-10 w-10 mb-2 text-zinc-700" />
+                          <span className="font-mono text-[11px] uppercase tracking-wider">{product.name}</span>
+                        </div>
+                      )}
+                      <span className="absolute top-3 right-3 rounded-full bg-black/80 backdrop-blur px-2.5 py-0.5 text-[10px] font-mono text-zinc-300 border border-zinc-700">
+                        {product.category_name || 'STREETWEAR'}
+                      </span>
+                      <span className="absolute bottom-3 left-3 rounded-full bg-black/80 backdrop-blur px-2.5 py-0.5 text-[10px] font-mono text-amber-400 border border-amber-500/30">
+                        280GSM // CPT
+                      </span>
                     </div>
-                  )}
-                  <span className="absolute top-3 right-3 rounded-full bg-black/80 backdrop-blur px-2.5 py-0.5 text-[10px] font-mono text-zinc-300 border border-zinc-700">
-                    {product.category_name || 'STREETWEAR'}
-                  </span>
-                  <span className="absolute bottom-3 left-3 rounded-full bg-black/80 backdrop-blur px-2.5 py-0.5 text-[10px] font-mono text-amber-400 border border-amber-500/30">
-                    280GSM // CPT
-                  </span>
+
+                    <CardTitle className="font-display text-xl font-bold text-white tracking-tight uppercase group-hover:text-amber-400 transition-colors">
+                      {product.name}
+                    </CardTitle>
+                  </Link>
+                  <p className="text-xs text-zinc-400 mt-2 line-clamp-2 leading-relaxed">
+                    {product.description || 'Authentic Dissafyt heavyweight garment crafted in Cape Town.'}
+                  </p>
                 </div>
 
-                <CardTitle className="font-display text-xl font-bold text-white tracking-tight uppercase">
-                  {product.name}
-                </CardTitle>
-                <p className="text-xs text-zinc-400 mt-2 line-clamp-2 leading-relaxed">
-                  {product.description || 'Authentic Dissafyt heavyweight garment crafted in Cape Town.'}
-                </p>
-              </div>
+                <div className="mt-6 pt-5 border-t border-zinc-900 space-y-4">
+                  <div className="flex items-baseline justify-between">
+                    <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
+                      Price (incl. VAT)
+                    </span>
+                    <span className="font-display font-black text-2xl text-amber-400">
+                      R {Number(product.base_price).toFixed(2)}
+                    </span>
+                  </div>
 
-              <div className="mt-6 pt-5 border-t border-zinc-900 space-y-4">
-                <div className="flex items-baseline justify-between">
-                  <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
-                    Price (incl. VAT)
-                  </span>
-                  <span className="font-display font-black text-2xl text-amber-400">
-                    R {Number(product.base_price).toFixed(2)}
-                  </span>
+                  <Link
+                    href={productHref}
+                    className="w-full inline-flex items-center justify-center rounded-xl bg-amber-500 hover:bg-amber-400 text-black py-3 px-4 font-bold text-xs uppercase tracking-wider transition-all"
+                  >
+                    Select Size & Order
+                  </Link>
                 </div>
-
-                <PayfastProductButton
-                  productName={product.name}
-                  amount={product.base_price}
-                  description={product.description}
-                />
-              </div>
-            </Card>
-          ))}
+              </Card>
+            );
+          })}
         </div>
       )}
     </div>
