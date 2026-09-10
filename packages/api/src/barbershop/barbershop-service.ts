@@ -293,6 +293,7 @@ export class BarbershopService {
     // 3. Determine shop operating hours for the given day in SAST
     const midday = new Date(`${params.date}T12:00:00${SAST_OFFSET}`);
     const { weekday } = getSASTComponents(midday);
+    const weekdayKey = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][midday.getDay()];
 
     if (weekday === 'Sun') {
       // Barbershop closed on Sundays
@@ -343,6 +344,29 @@ export class BarbershopService {
 
         // Find which barbers are free during [slotStart, slotEnd)
         const freeStaff = activeStaff.filter((barber) => {
+          // 1. Verify barber's personal working hours on this weekday if configured
+          if (barber.working_hours && typeof barber.working_hours === 'object') {
+            const shift = (barber.working_hours as any)[weekdayKey];
+            if (shift) {
+              if (shift.active === false) {
+                return false; // Barber is off on this day
+              }
+              if (shift.start && shift.end) {
+                const [sH, sM] = shift.start.split(':').map((n: string) => parseInt(n, 10));
+                const [eH, eM] = shift.end.split(':').map((n: string) => parseInt(n, 10));
+                const shiftStartDecimal = sH + (sM || 0) / 60;
+                const shiftEndDecimal = eH + (eM || 0) / 60;
+                const slotStartDecimal = hour + minute / 60;
+                const slotEndDecimal = slotStartDecimal + effectiveDurationMinutes / 60;
+
+                if (slotStartDecimal < shiftStartDecimal || slotEndDecimal > shiftEndDecimal) {
+                  return false; // Slot falls outside this barber's working shift
+                }
+              }
+            }
+          }
+
+          // 2. Check collision against existing non-cancelled bookings
           const hasCollision = existingBookings.some((b) => {
             if (b.staff_id && b.staff_id !== barber.id) {
               return false; // Booking belongs to another barber
@@ -434,6 +458,22 @@ export class BarbershopService {
       };
     }
 
+    // Anti-collision: verify customer doesn't already have an active appointment during this window
+    const { data: customerCollisions } = await admin
+      .from('bookings')
+      .select('id')
+      .eq('customer_id', input.customer_id)
+      .neq('status', 'cancelled')
+      .lt('start_time', endTime.toISOString())
+      .gt('end_time', startTime.toISOString());
+
+    if (customerCollisions && customerCollisions.length > 0) {
+      return {
+        success: false,
+        error: 'You already have an appointment booked during this time window. Please select another slot or reschedule your existing booking.',
+      };
+    }
+
     // 2. Resolve and assign barber
     let assignedStaffId = input.staff_id || null;
 
@@ -489,30 +529,76 @@ export class BarbershopService {
       assignedStaffId = freeBarber.id;
     }
 
-    // 3. Determine if customer has active membership subscription
+    // 3. Determine if customer has active membership subscription with quota and tier verification
     let isCoveredBySubscription = false;
     let activeSubId: string | null = null;
+    let coverageNote: string | null = null;
 
     try {
       const { data: activeSub } = await admin
         .from('subscriptions')
-        .select('id, plan_code, status')
+        .select('*')
         .eq('user_id', input.customer_id)
         .eq('status', 'active')
         .maybeSingle();
 
       if (activeSub) {
-        isCoveredBySubscription = true;
         activeSubId = activeSub.id;
+
+        // Verify Service Tier eligibility
+        // - 'solo': 1 cut / cycle. Eligible for standard 30-min haircuts (Classic Haircut)
+        // - 'twice': 2 cuts / cycle. Eligible for standard 30-min haircuts (Classic Haircut)
+        // - 'executive': 2 combo cuts / cycle. Eligible for all grooming services
+        const planCode = activeSub.plan_code || 'solo';
+        let isEligibleTier = false;
+
+        if (planCode === 'executive') {
+          isEligibleTier = true;
+        } else {
+          // Solo and Regular (twice) only cover standard 30-min haircuts
+          // Excludes combos, beard packages, and executive services
+          const serviceName = (service.name || '').toLowerCase();
+          const isHigherTier = serviceName.includes('combo') || serviceName.includes('beard') || serviceName.includes('executive');
+          if (service.duration_minutes <= 30 && !isHigherTier) {
+            isEligibleTier = true;
+          }
+        }
+
+        if (isEligibleTier) {
+          const periodStart = activeSub.current_period_start || new Date(Date.now() - 30 * 86400000).toISOString();
+          const periodEnd = activeSub.current_period_end || new Date(Date.now() + 30 * 86400000).toISOString();
+          const maxQuota = (planCode === 'twice' || planCode === 'executive') ? 2 : 1;
+
+          const { count } = await admin
+            .from('bookings')
+            .select('id', { count: 'exact', head: true })
+            .eq('customer_id', input.customer_id)
+            .eq('is_subscription_covered', true)
+            .neq('status', 'cancelled')
+            .gte('start_time', periodStart)
+            .lte('start_time', periodEnd);
+
+          const usedQuota = count || 0;
+
+          if (usedQuota < maxQuota) {
+            isCoveredBySubscription = true;
+            coverageNote = `Included in ${activeSub.plan_name || 'Membership'} (${usedQuota + 1}/${maxQuota} cuts used)`;
+          } else {
+            coverageNote = `Monthly quota (${maxQuota}/${maxQuota}) exhausted for this billing cycle; billed at standard rate.`;
+          }
+        } else {
+          coverageNote = `Service not covered by ${activeSub.plan_name || 'Membership'} plan tier; billed at standard rate.`;
+        }
       }
-    } catch {
-      // Subscriptions table check fallback
+    } catch (subErr: any) {
+      console.warn('Subscription quota verification fallback:', subErr?.message);
     }
 
-    // Active members have haircut covered under monthly fee (R0.00 cash increment)
-    // Walk-ins and guest clients require payment settlement
     const totalAmount = isCoveredBySubscription ? 0.00 : Number(service.price || 0);
     const paymentStatus = isCoveredBySubscription ? 'membership_covered' : 'unpaid';
+    const bookingNote = input.notes
+      ? (coverageNote ? `${input.notes} (${coverageNote})` : input.notes)
+      : (coverageNote || (isCoveredBySubscription ? 'Included in Member Subscription' : null));
 
     // 4. Create booking record with audit attributes
     let bookingResult: any = null;
@@ -530,7 +616,7 @@ export class BarbershopService {
           payment_status: paymentStatus,
           is_subscription_covered: isCoveredBySubscription,
           subscription_id: activeSubId,
-          notes: input.notes || (isCoveredBySubscription ? 'Included in Member Subscription' : null),
+          notes: bookingNote,
         })
         .select()
         .single();
@@ -550,7 +636,7 @@ export class BarbershopService {
           end_time: endTime.toISOString(),
           status: 'confirmed',
           total_amount: totalAmount,
-          notes: input.notes || (isCoveredBySubscription ? 'Included in Member Subscription' : null),
+          notes: bookingNote,
         })
         .select()
         .single();
@@ -708,6 +794,26 @@ export class BarbershopService {
         success: false,
         error: `Appointments must fall within operating hours (09:00 - ${closeHour}:00 SAST).`,
       };
+    }
+
+    // Check collision for customer, excluding current booking
+    const customerId = params.customerId || existing.customer_id;
+    if (customerId) {
+      const { data: customerCollisions } = await admin
+        .from('bookings')
+        .select('id')
+        .eq('customer_id', customerId)
+        .neq('id', params.bookingId)
+        .neq('status', 'cancelled')
+        .lt('start_time', endTime.toISOString())
+        .gt('end_time', startTime.toISOString());
+
+      if (customerCollisions && customerCollisions.length > 0) {
+        return {
+          success: false,
+          error: 'You already have another appointment booked during this time window. Please select another slot.',
+        };
+      }
     }
 
     const targetStaffId = params.newStaffId || existing.staff_id;

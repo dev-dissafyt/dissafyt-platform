@@ -1044,12 +1044,18 @@ export default function AdminBarbershopPage() {
                             </Button>
                           )}
 
-                          {b.status !== 'no_show' && b.status !== 'completed' && (
+                          {b.status !== 'no_show' && b.status !== 'completed' && b.status !== 'cancelled' && (
                             <Button
                               size="sm"
                               variant="outline"
+                              disabled={new Date(b.start_time) > new Date()}
+                              title={
+                                new Date(b.start_time) > new Date()
+                                  ? 'Cannot mark upcoming appointment as no-show until start time has passed'
+                                  : 'Mark as No-Show'
+                              }
                               onClick={() => handleUpdateBookingStatus(b.id, 'no_show')}
-                              className="text-xs border-stone-700 text-stone-400 hover:bg-stone-800 h-8"
+                              className="text-xs border-stone-700 text-stone-400 hover:bg-stone-800 h-8 disabled:opacity-40 disabled:cursor-not-allowed"
                             >
                               <UserX className="mr-1 h-3 w-3" /> No-Show
                             </Button>

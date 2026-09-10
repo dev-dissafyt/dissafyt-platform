@@ -413,10 +413,10 @@ export class AdminBarbershopService {
     if (filters?.date && filters.date !== 'all') {
       if (filters.date === 'upcoming') {
         const now = new Date();
-        query = query.gte('start_time', now.toISOString());
+        query = query.gte('end_time', now.toISOString());
       } else if (filters.date === 'past') {
         const now = new Date();
-        query = query.lt('start_time', now.toISOString());
+        query = query.lt('end_time', now.toISOString());
       } else {
         const dayStart = new Date(`${filters.date}T00:00:00+02:00`).toISOString();
         const dayEnd = new Date(`${filters.date}T23:59:59.999+02:00`).toISOString();

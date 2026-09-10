@@ -972,22 +972,32 @@ function generateNextDays(daysCount: number) {
   const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
   const monthNames = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 
-  for (let i = 0; i < daysCount; i++) {
-    const d = new Date();
-    d.setDate(d.getDate() + i);
+  // Anchor base date to SAST (Africa/Johannesburg, UTC+2) to prevent midnight date rollover issues
+  const now = new Date();
+  const sastDateStr = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Africa/Johannesburg',
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).format(now);
 
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const dateNum = String(d.getDate()).padStart(2, '0');
+  const [baseYear, baseMonth, baseDay] = sastDateStr.split('-').map(Number);
+
+  for (let i = 0; i < daysCount; i++) {
+    const d = new Date(Date.UTC(baseYear, baseMonth - 1, baseDay + i, 12, 0, 0));
+
+    const year = d.getUTCFullYear();
+    const month = String(d.getUTCMonth() + 1).padStart(2, '0');
+    const dateNum = String(d.getUTCDate()).padStart(2, '0');
     const iso = `${year}-${month}-${dateNum}`;
 
-    const isSunday = d.getDay() === 0;
+    const isSunday = d.getUTCDay() === 0;
 
     days.push({
       iso,
-      dayName: dayNames[d.getDay()],
-      dayNumber: d.getDate(),
-      monthName: monthNames[d.getMonth()],
+      dayName: dayNames[d.getUTCDay()],
+      dayNumber: d.getUTCDate(),
+      monthName: monthNames[d.getUTCMonth()],
       isSunday,
     });
   }
