@@ -36,7 +36,7 @@ export async function GET(request: NextRequest) {
       .from('products')
       .select('*, variants:product_variants(*)')
       .eq('is_active', true)
-      .order('title', { ascending: true });
+      .order('name', { ascending: true });
 
     if (pErr) throw pErr;
 
@@ -46,7 +46,8 @@ export async function GET(request: NextRequest) {
       staff: staff || [],
       products: (products || []).map((p: any) => ({
         id: p.id,
-        title: p.title,
+        name: p.name,
+        title: p.name,
         description: p.description,
         base_price: Number(p.base_price || 0),
         images: p.images || [],
