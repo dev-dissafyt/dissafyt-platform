@@ -98,6 +98,19 @@ export interface CreateBookingInput {
   location_id?: string | null;
 }
 
+export interface SubscriptionQuota {
+  hasActiveSubscription: boolean;
+  subscription: any | null;
+  planCode: string | null;
+  planName: string | null;
+  totalCuts: number;
+  usedCuts: number;
+  availableCuts: number;
+  periodStart: string | null;
+  periodEnd: string | null;
+  canBookCovered: boolean;
+}
+
 export class BarbershopService {
   /**
    * Lists all barbershop physical locations / studios from DB or runtime fallback.
@@ -401,6 +414,161 @@ export class BarbershopService {
   }
 
   /**
+   * Evaluates if a given service is covered by the subscriber's membership tier.
+   * - 'solo': 1 standard haircut (<= 30 min, excluding combos/beards/executive)
+   * - 'twice': 2 standard haircuts (<= 30 min, excluding combos/beards/executive)
+   * - 'executive': 2 combo cuts (all grooming services included)
+   */
+  static isServiceEligibleForPlan(
+    planCode: string | null | undefined,
+    service: { name?: string; duration_minutes?: number }
+  ): boolean {
+    if (!service) return false;
+    const plan = (planCode || '').toLowerCase();
+    if (plan === 'executive') return true;
+
+    // Solo and Regular (twice) only cover standard 30-min haircuts (e.g. Classic Haircut)
+    // Excludes combos, beard packages, and executive services
+    const serviceName = (service.name || '').toLowerCase();
+    const isHigherTier =
+      serviceName.includes('combo') ||
+      serviceName.includes('beard') ||
+      serviceName.includes('executive');
+
+    return (service.duration_minutes || 0) <= 30 && !isHigherTier;
+  }
+
+  /**
+   * Computes authoritative subscription quota and remaining cut balance for a customer.
+   * Decrements available cuts on 'confirmed' bookings.
+   * Restores available cuts (+1) when bookings are 'cancelled' or 'no_show'.
+   */
+  static async getCustomerSubscriptionQuota(userId: string): Promise<SubscriptionQuota> {
+    const admin = getSupabaseAdminClient();
+    const nowIso = new Date().toISOString();
+
+    const emptyResult: SubscriptionQuota = {
+      hasActiveSubscription: false,
+      subscription: null,
+      planCode: null,
+      planName: null,
+      totalCuts: 0,
+      usedCuts: 0,
+      availableCuts: 0,
+      periodStart: null,
+      periodEnd: null,
+      canBookCovered: false,
+    };
+
+    if (!userId) return emptyResult;
+
+    try {
+      // 1. Query public.subscriptions for active membership
+      let activeSub: any = null;
+      const { data: subs, error: subErr } = await admin
+        .from('subscriptions')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .gte('current_period_end', nowIso)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (!subErr && subs && subs.length > 0) {
+        activeSub = subs[0];
+      } else {
+        // Fallback: Check payments table for recent subscription payment (within 30 days)
+        const thirtyDaysAgo = new Date(Date.now() - 30 * 86400000).toISOString();
+        const { data: payments } = await admin
+          .from('payments')
+          .select('*')
+          .eq('user_id', userId)
+          .eq('related_type', 'subscription')
+          .eq('status', 'paid')
+          .gte('created_at', thirtyDaysAgo)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (payments && payments.length > 0) {
+          const p = payments[0];
+          activeSub = {
+            id: p.id,
+            user_id: p.user_id,
+            plan_code: 'solo',
+            plan_name: 'The Solo Membership',
+            price: p.amount,
+            status: 'active',
+            current_period_start: p.created_at,
+            current_period_end: new Date(new Date(p.created_at).getTime() + 30 * 86400000).toISOString(),
+          };
+        }
+      }
+
+      if (!activeSub) return emptyResult;
+
+      const planCode = activeSub.plan_code || 'solo';
+      const planName =
+        activeSub.plan_name ||
+        (planCode === 'twice'
+          ? 'The Regular Membership'
+          : planCode === 'executive'
+          ? 'The Executive'
+          : 'The Solo Membership');
+
+      const totalCuts = (planCode === 'twice' || planCode === 'executive') ? 2 : 1;
+      const periodStart = activeSub.current_period_start || new Date(Date.now() - 30 * 86400000).toISOString();
+      const periodEnd = activeSub.current_period_end || new Date(Date.now() + 30 * 86400000).toISOString();
+
+      // 2. Fetch all bookings for this customer within the active billing cycle
+      const { data: bookings, error: bErr } = await admin
+        .from('bookings')
+        .select('id, status, is_subscription_covered, payment_status, total_amount, start_time')
+        .eq('customer_id', userId)
+        .gte('start_time', periodStart)
+        .lte('start_time', periodEnd);
+
+      if (bErr) {
+        console.warn('Error fetching bookings for quota calculation:', bErr.message);
+      }
+
+      // 3. Count used quota:
+      // Exclude 'cancelled' and 'no_show'.
+      // Count if marked as subscription covered, membership covered, or total_amount is 0.
+      const memberBookings = (bookings || []).filter((b) => {
+        const st = (b.status || '').toLowerCase();
+        if (st === 'cancelled' || st === 'no_show') {
+          return false;
+        }
+        const isCovered =
+          b.is_subscription_covered === true ||
+          b.payment_status === 'membership_covered' ||
+          Number(b.total_amount) === 0;
+
+        return isCovered;
+      });
+
+      const usedCuts = memberBookings.length;
+      const availableCuts = Math.max(0, totalCuts - usedCuts);
+
+      return {
+        hasActiveSubscription: true,
+        subscription: activeSub,
+        planCode,
+        planName,
+        totalCuts,
+        usedCuts,
+        availableCuts,
+        periodStart,
+        periodEnd,
+        canBookCovered: availableCuts > 0,
+      };
+    } catch (err: any) {
+      console.error('Failed to compute subscription quota:', err);
+      return emptyResult;
+    }
+  }
+
+  /**
    * Authoritatively creates an appointment with concurrency and anti-collision checks.
    */
   static async createBooking(input: CreateBookingInput): Promise<{
@@ -535,59 +703,19 @@ export class BarbershopService {
     let coverageNote: string | null = null;
 
     try {
-      const { data: activeSub } = await admin
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', input.customer_id)
-        .eq('status', 'active')
-        .maybeSingle();
+      const quota = await BarbershopService.getCustomerSubscriptionQuota(input.customer_id);
 
-      if (activeSub) {
-        activeSubId = activeSub.id;
+      if (quota.hasActiveSubscription && quota.subscription) {
+        activeSubId = quota.subscription.id;
+        const isEligibleTier = BarbershopService.isServiceEligibleForPlan(quota.planCode, service);
 
-        // Verify Service Tier eligibility
-        // - 'solo': 1 cut / cycle. Eligible for standard 30-min haircuts (Classic Haircut)
-        // - 'twice': 2 cuts / cycle. Eligible for standard 30-min haircuts (Classic Haircut)
-        // - 'executive': 2 combo cuts / cycle. Eligible for all grooming services
-        const planCode = activeSub.plan_code || 'solo';
-        let isEligibleTier = false;
-
-        if (planCode === 'executive') {
-          isEligibleTier = true;
+        if (!isEligibleTier) {
+          coverageNote = `Service not covered by ${quota.planName} tier; billed at standard rate.`;
+        } else if (quota.availableCuts <= 0) {
+          coverageNote = `Monthly quota (${quota.totalCuts}/${quota.totalCuts}) exhausted for this billing cycle; billed at standard rate.`;
         } else {
-          // Solo and Regular (twice) only cover standard 30-min haircuts
-          // Excludes combos, beard packages, and executive services
-          const serviceName = (service.name || '').toLowerCase();
-          const isHigherTier = serviceName.includes('combo') || serviceName.includes('beard') || serviceName.includes('executive');
-          if (service.duration_minutes <= 30 && !isHigherTier) {
-            isEligibleTier = true;
-          }
-        }
-
-        if (isEligibleTier) {
-          const periodStart = activeSub.current_period_start || new Date(Date.now() - 30 * 86400000).toISOString();
-          const periodEnd = activeSub.current_period_end || new Date(Date.now() + 30 * 86400000).toISOString();
-          const maxQuota = (planCode === 'twice' || planCode === 'executive') ? 2 : 1;
-
-          const { count } = await admin
-            .from('bookings')
-            .select('id', { count: 'exact', head: true })
-            .eq('customer_id', input.customer_id)
-            .eq('is_subscription_covered', true)
-            .neq('status', 'cancelled')
-            .gte('start_time', periodStart)
-            .lte('start_time', periodEnd);
-
-          const usedQuota = count || 0;
-
-          if (usedQuota < maxQuota) {
-            isCoveredBySubscription = true;
-            coverageNote = `Included in ${activeSub.plan_name || 'Membership'} (${usedQuota + 1}/${maxQuota} cuts used)`;
-          } else {
-            coverageNote = `Monthly quota (${maxQuota}/${maxQuota}) exhausted for this billing cycle; billed at standard rate.`;
-          }
-        } else {
-          coverageNote = `Service not covered by ${activeSub.plan_name || 'Membership'} plan tier; billed at standard rate.`;
+          isCoveredBySubscription = true;
+          coverageNote = `Included in ${quota.planName} (${quota.usedCuts + 1}/${quota.totalCuts} cuts used)`;
         }
       }
     } catch (subErr: any) {

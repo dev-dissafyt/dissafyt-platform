@@ -1,13 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AuthService } from '@dissafyt/api';
-import { getSupabaseAdminClient } from '@dissafyt/database';
+import { AuthService, BarbershopService } from '@dissafyt/api';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
  * GET /api/subscriptions/status
- * Returns current authenticated user's active membership/subscription status.
+ * Returns current authenticated user's active membership/subscription status and live quota.
  */
 export async function GET(request: NextRequest) {
   try {
@@ -15,77 +14,43 @@ export async function GET(request: NextRequest) {
     const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
 
     if (!token) {
-      return NextResponse.json({ hasActiveSubscription: false, subscription: null });
+      return NextResponse.json({ hasActiveSubscription: false, subscription: null, quota: null });
     }
 
     const authCtx = await AuthService.verifyToken(token);
     if (!authCtx) {
-      return NextResponse.json({ hasActiveSubscription: false, subscription: null });
+      return NextResponse.json({ hasActiveSubscription: false, subscription: null, quota: null });
     }
 
-    const admin = getSupabaseAdminClient();
-    const nowIso = new Date().toISOString();
+    const quota = await BarbershopService.getCustomerSubscriptionQuota(authCtx.userId);
 
-    // 1. Check public.subscriptions table
-    try {
-      const { data: subs, error: subErr } = await admin
-        .from('subscriptions')
-        .select('*')
-        .eq('user_id', authCtx.userId)
-        .eq('status', 'active')
-        .gte('current_period_end', nowIso)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (!subErr && subs && subs.length > 0) {
-        return NextResponse.json({
-          hasActiveSubscription: true,
-          subscription: subs[0],
-        });
-      }
-    } catch (e) {
-      console.warn('Subscriptions table query failed, attempting payment fallback:', e);
-    }
-
-    // 2. Fallback check on public.payments for recent paid subscription
-    try {
-      const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      const { data: payments, error: payErr } = await admin
-        .from('payments')
-        .select('*')
-        .eq('user_id', authCtx.userId)
-        .eq('related_type', 'subscription')
-        .eq('status', 'paid')
-        .gte('created_at', thirtyDaysAgo)
-        .order('created_at', { ascending: false })
-        .limit(1);
-
-      if (!payErr && payments && payments.length > 0) {
-        const p = payments[0];
-        return NextResponse.json({
-          hasActiveSubscription: true,
-          subscription: {
-            id: p.id,
-            user_id: p.user_id,
-            plan_code: 'twice',
-            plan_name: 'The Regular Membership',
-            price: p.amount,
-            status: 'active',
-            current_period_start: p.created_at,
-            current_period_end: new Date(new Date(p.created_at).getTime() + 30 * 24 * 60 * 60 * 1000).toISOString(),
-          },
-        });
-      }
-    } catch (e) {
-      console.warn('Payments fallback query error:', e);
+    if (!quota.hasActiveSubscription || !quota.subscription) {
+      return NextResponse.json({
+        hasActiveSubscription: false,
+        subscription: null,
+        quota: null,
+      });
     }
 
     return NextResponse.json({
-      hasActiveSubscription: false,
-      subscription: null,
+      hasActiveSubscription: true,
+      subscription: quota.subscription,
+      quota: {
+        total_cuts: quota.totalCuts,
+        used_cuts: quota.usedCuts,
+        available_cuts: quota.availableCuts,
+        plan_code: quota.planCode,
+        plan_name: quota.planName,
+        period_start: quota.periodStart,
+        period_end: quota.periodEnd,
+        can_book_covered: quota.canBookCovered,
+      },
     });
   } catch (err: any) {
     console.error('Subscription status check error:', err);
-    return NextResponse.json({ hasActiveSubscription: false, subscription: null, error: err.message }, { status: 500 });
+    return NextResponse.json(
+      { hasActiveSubscription: false, subscription: null, quota: null, error: err.message },
+      { status: 500 }
+    );
   }
 }

@@ -65,7 +65,32 @@ function BookContent() {
   const [checkingSubscription, setCheckingSubscription] = useState(false);
   const [hasActiveSubscription, setHasActiveSubscription] = useState(false);
   const [activeSubscription, setActiveSubscription] = useState<any>(null);
+  const [subscriptionQuota, setSubscriptionQuota] = useState<any>(null);
   const [customerProfile, setCustomerProfile] = useState<any>(null);
+
+  // Helper to determine if service is covered by subscription and quota
+  function isServiceCovered(service: Service | null): { covered: boolean; reason?: string } {
+    if (!hasActiveSubscription || !activeSubscription) {
+      return { covered: false };
+    }
+    if (subscriptionQuota && subscriptionQuota.available_cuts <= 0) {
+      return { covered: false, reason: 'Monthly quota reached (0 cuts left)' };
+    }
+    if (!service) return { covered: false };
+
+    const planCode = (subscriptionQuota?.plan_code || activeSubscription?.plan_code || 'solo').toLowerCase();
+    if (planCode === 'executive') {
+      return { covered: true };
+    }
+
+    const name = (service.name || '').toLowerCase();
+    const isHigherTier = name.includes('combo') || name.includes('beard') || name.includes('executive');
+    if ((service.duration_minutes || 0) <= 30 && !isHigherTier) {
+      return { covered: true };
+    }
+
+    return { covered: false, reason: 'Service tier excluded' };
+  }
 
   // Wizard Selection States
   const [selectedService, setSelectedService] = useState<Service | null>(null);
@@ -103,6 +128,7 @@ function BookContent() {
     if (!token) {
       setHasActiveSubscription(false);
       setActiveSubscription(null);
+      setSubscriptionQuota(null);
       setCheckingSubscription(false);
       return;
     }
@@ -124,15 +150,18 @@ function BookContent() {
         const data = await res.json();
         setHasActiveSubscription(Boolean(data.hasActiveSubscription));
         setActiveSubscription(data.subscription || null);
+        setSubscriptionQuota(data.quota || null);
       } else {
         setHasActiveSubscription(false);
         setActiveSubscription(null);
+        setSubscriptionQuota(null);
       }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
         console.warn('Subscription check error:', err.message);
       }
       setHasActiveSubscription(false);
+      setSubscriptionQuota(null);
     } finally {
       clearTimeout(timeoutId);
       setCheckingSubscription(false);
@@ -497,29 +526,82 @@ function BookContent() {
 
       {/* Active Member VIP Status Banner vs Standard Booking Banner */}
       {hasActiveSubscription ? (
-        <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg">
+        <div
+          className={`rounded-xl border p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg ${
+            subscriptionQuota && subscriptionQuota.available_cuts <= 0
+              ? 'border-amber-500/40 bg-zinc-900/90'
+              : 'border-emerald-500/30 bg-emerald-500/10'
+          }`}
+        >
           <div className="flex items-center space-x-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-500/20 text-emerald-400">
+            <div
+              className={`flex h-10 w-10 items-center justify-center rounded-full ${
+                subscriptionQuota && subscriptionQuota.available_cuts <= 0
+                  ? 'bg-amber-500/20 text-amber-400'
+                  : 'bg-emerald-500/20 text-emerald-400'
+              }`}
+            >
               <Crown className="h-5 w-5" />
             </div>
             <div>
               <div className="flex items-center space-x-2">
                 <span className="text-sm font-bold text-white">
-                  Active Member: {activeSubscription?.plan_name || 'Ace of Fyt Member'}
+                  Active Member: {subscriptionQuota?.plan_name || activeSubscription?.plan_name || 'Ace of Fyt Member'}
                 </span>
-                <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 uppercase tracking-wider">
-                  Priority Access Active
-                </span>
+                {subscriptionQuota && subscriptionQuota.available_cuts <= 0 ? (
+                  <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-300 uppercase tracking-wider border border-amber-500/30">
+                    Monthly Quota Reached
+                  </span>
+                ) : (
+                  <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-300 uppercase tracking-wider border border-emerald-500/30">
+                    Priority Pass Active
+                  </span>
+                )}
               </div>
               <p className="text-xs text-zinc-400">
-                Welcome back{customerProfile?.full_name ? `, ${customerProfile.full_name}` : ''}! All grooming appointments are included (R0.00) in your membership.
+                {subscriptionQuota && subscriptionQuota.available_cuts <= 0 ? (
+                  <span>
+                    Welcome back{customerProfile?.full_name ? `, ${customerProfile.full_name}` : ''}! You have used all monthly cuts (0 remaining). Additional bookings are billed at standard rates. Quota renews on{' '}
+                    <span className="text-amber-400 font-medium">
+                      {subscriptionQuota.period_end
+                        ? new Date(subscriptionQuota.period_end).toLocaleDateString('en-ZA', {
+                            day: 'numeric',
+                            month: 'short',
+                          })
+                        : 'renewal date'}
+                    </span>
+                    .
+                  </span>
+                ) : (
+                  <span>
+                    Welcome back{customerProfile?.full_name ? `, ${customerProfile.full_name}` : ''}! You have{' '}
+                    <span className="text-emerald-400 font-semibold">
+                      {subscriptionQuota ? `${subscriptionQuota.available_cuts} covered cut${subscriptionQuota.available_cuts > 1 ? 's' : ''}` : 'covered haircut'}
+                    </span>{' '}
+                    available this billing cycle (R0.00).
+                  </span>
+                )}
               </p>
             </div>
           </div>
 
           <div className="text-xs text-zinc-400 border-l border-zinc-800 pl-3 hidden sm:block">
-            <div>Next Renewal: {activeSubscription?.current_period_end ? new Date(activeSubscription.current_period_end).toLocaleDateString() : 'Active'}</div>
-            <div className="text-emerald-400 font-semibold">Included / R0.00 Booking</div>
+            <div>
+              Renewal:{' '}
+              {subscriptionQuota?.period_end || activeSubscription?.current_period_end
+                ? new Date(subscriptionQuota?.period_end || activeSubscription?.current_period_end).toLocaleDateString('en-ZA', {
+                    day: 'numeric',
+                    month: 'short',
+                  })
+                : 'Active'}
+            </div>
+            {subscriptionQuota && subscriptionQuota.available_cuts <= 0 ? (
+              <div className="text-amber-400 font-semibold">0 Cuts Remaining • Standard Rate</div>
+            ) : (
+              <div className="text-emerald-400 font-semibold">
+                {subscriptionQuota ? `${subscriptionQuota.available_cuts} of ${subscriptionQuota.total_cuts} Available` : 'Included / R0.00'}
+              </div>
+            )}
           </div>
         </div>
       ) : (
@@ -606,16 +688,27 @@ function BookContent() {
                       <span className="text-zinc-500 flex items-center">
                         <Clock className="mr-1 h-3 w-3" /> {service.duration_minutes} mins
                       </span>
-                      {hasActiveSubscription ? (
-                        <span className="text-sm font-bold text-emerald-400 flex items-center">
-                          <CheckCircle className="w-3.5 h-3.5 mr-1" />
-                          Included
-                        </span>
-                      ) : (
-                        <span className="text-sm font-bold text-white">
-                          R {Number(service.price).toFixed(2)}
-                        </span>
-                      )}
+                      {(() => {
+                        const cov = isServiceCovered(service);
+                        if (hasActiveSubscription && cov.covered) {
+                          return (
+                            <span className="text-sm font-bold text-emerald-400 flex items-center">
+                              <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                              Included
+                            </span>
+                          );
+                        }
+                        return (
+                          <div className="text-right">
+                            <span className="text-sm font-bold text-white">
+                              R {Number(service.price).toFixed(2)}
+                            </span>
+                            {hasActiveSubscription && cov.reason && (
+                              <div className="text-[9px] text-zinc-400">{cov.reason}</div>
+                            )}
+                          </div>
+                        );
+                      })()}
                     </div>
                   </div>
                 );
@@ -809,15 +902,28 @@ function BookContent() {
 
             <div className="flex justify-between items-center text-sm font-bold">
               <span className="text-zinc-300">Appointment Fee</span>
-              {hasActiveSubscription ? (
-                <span className="text-lg text-emerald-400">
-                  Included <span className="text-[10px] text-zinc-500 font-normal">in Membership</span>
-                </span>
-              ) : (
-                <span className="text-lg text-white">
-                  R {selectedService ? Number(selectedService.price).toFixed(2) : '0.00'}
-                </span>
-              )}
+              {(() => {
+                const cov = isServiceCovered(selectedService);
+                if (hasActiveSubscription && cov.covered) {
+                  return (
+                    <span className="text-lg text-emerald-400">
+                      Included <span className="text-[10px] text-zinc-500 font-normal">in Membership (R0.00)</span>
+                    </span>
+                  );
+                }
+                return (
+                  <div className="text-right">
+                    <span className="text-lg text-white">
+                      R {selectedService ? Number(selectedService.price).toFixed(2) : '0.00'}
+                    </span>
+                    {hasActiveSubscription && cov.reason && (
+                      <div className="text-[10px] text-amber-400 font-normal">
+                        {cov.reason}
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Special Requests / Notes */}
@@ -842,7 +948,15 @@ function BookContent() {
               onClick={handleConfirmBooking}
               className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm py-5"
             >
-              {submitting ? 'Confirming Appointment...' : 'Confirm Appointment'}
+              {submitting
+                ? 'Confirming Appointment...'
+                : (() => {
+                    const cov = isServiceCovered(selectedService);
+                    if (hasActiveSubscription && cov.covered) {
+                      return 'Confirm Appointment (Included in Membership)';
+                    }
+                    return `Confirm Appointment (R ${selectedService ? Number(selectedService.price).toFixed(2) : '0.00'})`;
+                  })()}
             </Button>
           </Card>
         </div>

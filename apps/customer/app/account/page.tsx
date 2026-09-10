@@ -80,6 +80,17 @@ interface AvailableSlot {
   endTime: string;
 }
 
+interface SubscriptionQuotaData {
+  total_cuts: number;
+  used_cuts: number;
+  available_cuts: number;
+  plan_code: string;
+  plan_name: string;
+  period_start: string;
+  period_end: string;
+  can_book_covered: boolean;
+}
+
 export default function AccountPage() {
   const router = useRouter();
   const [user, setUser] = useState<UserData | null>(null);
@@ -87,6 +98,7 @@ export default function AccountPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [subscription, setSubscription] = useState<any>(null);
+  const [subscriptionQuota, setSubscriptionQuota] = useState<SubscriptionQuotaData | null>(null);
   const [loading, setLoading] = useState(true);
   const [updating, setUpdating] = useState(false);
   const [cancellingBookingId, setCancellingBookingId] = useState<string | null>(null);
@@ -172,6 +184,7 @@ export default function AccountPage() {
         if (subRes.ok) {
           const subData = await subRes.json();
           setSubscription(subData.subscription || null);
+          setSubscriptionQuota(subData.quota || null);
         }
       } catch (e) {
         console.error('Error fetching account data:', e);
@@ -196,9 +209,17 @@ export default function AccountPage() {
         body: JSON.stringify({ action: 'cancel' }),
       });
       if (res.ok) {
-        const refRes = await fetch('/api/bookings', { headers: { Authorization: `Bearer ${token}` } });
+        const [refRes, subRefRes] = await Promise.all([
+          fetch('/api/bookings', { headers: { Authorization: `Bearer ${token}` } }),
+          fetch('/api/subscriptions/status', { headers: { Authorization: `Bearer ${token}` } }),
+        ]);
         if (refRes.ok) setBookings(await refRes.json());
-        setStatusMsg('Appointment cancelled successfully.');
+        if (subRefRes.ok) {
+          const subData = await subRefRes.json();
+          setSubscription(subData.subscription || null);
+          setSubscriptionQuota(subData.quota || null);
+        }
+        setStatusMsg('Appointment cancelled successfully. Any subscription quota has been restored.');
       }
     } catch (e) {
       console.error(e);
@@ -802,24 +823,101 @@ export default function AccountPage() {
                   Ace of Fyt Recurring Chair Pass
                 </CardDescription>
               </CardHeader>
-              <CardContent className="space-y-3 text-xs">
+              <CardContent className="space-y-3.5 text-xs">
                 <div className="flex items-baseline justify-between border-b border-zinc-800 pb-2">
                   <span className="font-bold text-white text-sm">
-                    {subscription.plan_name || 'The Solo Membership'}
+                    {subscriptionQuota?.plan_name || subscription.plan_name || 'The Solo Membership'}
                   </span>
                   <span className="font-mono font-bold text-amber-400">
                     R {Number(subscription.price || 100).toFixed(2)}/mo
                   </span>
                 </div>
-                <p className="text-zinc-400 text-[11px] leading-relaxed">
-                  Your monthly haircut allotment is active. Book your fresh cut anytime with guaranteed chair time.
-                </p>
+
+                {/* Quota Telemetry & Cut Count Display */}
+                {subscriptionQuota ? (
+                  <div className="rounded-lg bg-zinc-900/90 border border-zinc-800 p-3 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-zinc-400 font-medium text-[11px]">Monthly Allotment</span>
+                      <span
+                        className={`font-semibold text-xs px-2 py-0.5 rounded-full ${
+                          subscriptionQuota.available_cuts > 0
+                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                            : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                        }`}
+                      >
+                        {subscriptionQuota.available_cuts} of {subscriptionQuota.total_cuts} cut
+                        {subscriptionQuota.total_cuts > 1 ? 's' : ''} available
+                      </span>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="w-full bg-zinc-950 rounded-full h-2 overflow-hidden border border-zinc-800">
+                      <div
+                        className={`h-full transition-all duration-500 ${
+                          subscriptionQuota.available_cuts > 0 ? 'bg-amber-500' : 'bg-zinc-600'
+                        }`}
+                        style={{
+                          width: `${Math.min(
+                            100,
+                            Math.round(
+                              (subscriptionQuota.available_cuts / Math.max(1, subscriptionQuota.total_cuts)) * 100
+                            )
+                          )}%`,
+                        }}
+                      />
+                    </div>
+
+                    <div className="flex items-center justify-between text-[10px] text-zinc-500 pt-0.5">
+                      <span>{subscriptionQuota.used_cuts} used this cycle</span>
+                      <span>
+                        Renews{' '}
+                        {subscriptionQuota.period_end
+                          ? new Date(subscriptionQuota.period_end).toLocaleDateString('en-ZA', {
+                              day: 'numeric',
+                              month: 'short',
+                              year: 'numeric',
+                            })
+                          : 'next month'}
+                      </span>
+                    </div>
+                  </div>
+                ) : (
+                  <p className="text-zinc-400 text-[11px] leading-relaxed">
+                    Your monthly haircut allotment is active. Book your fresh cut anytime with guaranteed chair time.
+                  </p>
+                )}
+
+                {/* Dynamic Action Button */}
                 <div className="pt-1">
-                  <Link href="/book">
-                    <Button size="sm" className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-8">
-                      Book Included Cut (R0.00)
-                    </Button>
-                  </Link>
+                  {subscriptionQuota && subscriptionQuota.available_cuts <= 0 ? (
+                    <div className="space-y-1.5">
+                      <Link href="/book">
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="w-full border-zinc-700 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-200 text-xs h-8"
+                        >
+                          Book Extra Cut (Standard Rate)
+                        </Button>
+                      </Link>
+                      <p className="text-[10px] text-center text-zinc-500">
+                        Monthly included cuts used. Renews on{' '}
+                        {subscriptionQuota.period_end
+                          ? new Date(subscriptionQuota.period_end).toLocaleDateString('en-ZA', {
+                              day: 'numeric',
+                              month: 'short',
+                            })
+                          : 'cycle end'}
+                        .
+                      </p>
+                    </div>
+                  ) : (
+                    <Link href="/book">
+                      <Button size="sm" className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-8 shadow-md shadow-amber-500/10">
+                        Book Included Cut (R0.00)
+                      </Button>
+                    </Link>
+                  )}
                 </div>
               </CardContent>
             </Card>
