@@ -23,7 +23,7 @@ export async function GET() {
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { display_name, bio, is_active, user_id } = body;
+    const { display_name, bio, phone, is_active, user_id } = body;
 
     if (!display_name) {
       return NextResponse.json({ error: 'Display name is required' }, { status: 400 });
@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
     const result = await AdminBarbershopService.createStaff({
       display_name,
       bio,
+      phone: phone || undefined,
       is_active: is_active !== undefined ? is_active : true,
       user_id: user_id || null,
     });

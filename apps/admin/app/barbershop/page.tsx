@@ -103,6 +103,7 @@ export default function AdminBarbershopPage() {
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
   const [staffDisplayName, setStaffDisplayName] = useState('');
   const [staffBio, setStaffBio] = useState('');
+  const [staffPhone, setStaffPhone] = useState('');
   const [staffSubmitting, setStaffSubmitting] = useState(false);
 
   // --- TAB 3: SERVICES STATE ---
@@ -357,6 +358,7 @@ export default function AdminBarbershopPage() {
         body: JSON.stringify({
           display_name: staffDisplayName,
           bio: staffBio,
+          phone: staffPhone,
           is_active: true,
         }),
       });
@@ -365,6 +367,7 @@ export default function AdminBarbershopPage() {
         setStatusMsg(`Barber ${staffDisplayName} added successfully & logged to audit trail!`);
         setStaffDisplayName('');
         setStaffBio('');
+        setStaffPhone('');
         setShowAddStaffModal(false);
         loadStaff();
       } else {
@@ -1108,6 +1111,15 @@ export default function AdminBarbershopPage() {
                   />
                 </div>
 
+                <div className="space-y-1">
+                  <Label>Direct Phone Number</Label>
+                  <Input
+                    value={staffPhone}
+                    onChange={(e) => setStaffPhone(e.target.value)}
+                    placeholder="e.g. +27 82 123 4567"
+                  />
+                </div>
+
                 <div className="flex justify-end space-x-3 pt-3">
                   <Button
                     type="button"
@@ -1249,6 +1261,12 @@ export default function AdminBarbershopPage() {
                   <p className="text-xs text-stone-400">{staff.bio || 'Master Barber at Ace of Fyt'}</p>
 
                   <div className="text-[11px] text-stone-500 border-t border-stone-800/80 pt-3 space-y-1.5">
+                    {staff.phone && (
+                      <div className="flex items-center text-stone-300">
+                        <Phone className="h-3 w-3 mr-1 text-amber-500" />
+                        <span>{staff.phone}</span>
+                      </div>
+                    )}
                     <div className="flex items-center text-stone-300">
                       <MapPin className="h-3 w-3 mr-1 text-amber-500" />
                       <span>Stationed: Dissafyt Studio, Cape Town (Flagship)</span>

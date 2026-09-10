@@ -189,6 +189,9 @@ export interface Staff {
   user_id?: string | null;
   display_name: string;
   bio?: string | null;
+  phone?: string | null;
+  avatar_url?: string | null;
+  working_hours?: any;
   is_active: boolean;
   created_at: string;
 }

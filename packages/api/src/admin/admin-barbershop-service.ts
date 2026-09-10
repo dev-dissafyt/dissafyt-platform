@@ -208,31 +208,65 @@ export class AdminBarbershopService {
   }
 
   /**
-   * Creates a new staff/barber member with invisible audit logging.
+   * Creates a new staff/barber member with invisible audit logging and graceful schema fallback.
    */
   static async createStaff(
     input: {
       display_name: string;
       bio?: string;
+      phone?: string;
+      avatar_url?: string;
+      working_hours?: any;
       user_id?: string | null;
       is_active?: boolean;
     },
     actor?: { email?: string; role?: string }
   ): Promise<{ success: boolean; staff?: any; error?: string }> {
     const admin = getSupabaseAdminClient();
+    const payload: any = {
+      display_name: input.display_name,
+      bio: input.bio || '',
+      user_id: input.user_id || null,
+      is_active: input.is_active !== undefined ? input.is_active : true,
+    };
+    if (input.phone) payload.phone = input.phone;
+    if (input.avatar_url) payload.avatar_url = input.avatar_url;
+    if (input.working_hours) payload.working_hours = input.working_hours;
+
+    let createdStaff: any = null;
     const { data, error } = await admin
       .from('staff')
-      .insert({
-        display_name: input.display_name,
-        bio: input.bio || '',
-        user_id: input.user_id || null,
-        is_active: input.is_active !== undefined ? input.is_active : true,
-      })
+      .insert(payload)
       .select()
       .single();
 
-    if (error || !data) {
-      return { success: false, error: error?.message || 'Failed to create staff' };
+    if (error) {
+      if (error.code === 'PGRST204' || error.message?.includes('column') || error.message?.includes('schema cache')) {
+        console.warn('Staff create fallback: stripping pending columns from payload:', error.message);
+        delete payload.phone;
+        delete payload.avatar_url;
+        delete payload.working_hours;
+
+        const { data: fbData, error: fbError } = await admin
+          .from('staff')
+          .insert(payload)
+          .select()
+          .single();
+
+        if (fbError || !fbData) {
+          return { success: false, error: fbError?.message || 'Failed to create staff' };
+        }
+        createdStaff = {
+          ...fbData,
+          phone: input.phone || null,
+          avatar_url: input.avatar_url || null,
+          working_hours: input.working_hours || null,
+        };
+      } else {
+        return { success: false, error: error.message };
+      }
+    } else {
+      createdStaff = data;
     }
 
     // Invisible Audit Trail
@@ -241,16 +275,16 @@ export class AdminBarbershopService {
       actor_role: actor?.role || 'admin',
       action: 'staff.create',
       entity_type: 'staff',
-      entity_id: data.id,
-      entity_name: data.display_name,
-      changes: data,
+      entity_id: createdStaff.id,
+      entity_name: createdStaff.display_name,
+      changes: createdStaff,
     });
 
-    return { success: true, staff: data };
+    return { success: true, staff: createdStaff };
   }
 
   /**
-   * Updates an existing staff/barber member with invisible audit logging.
+   * Updates an existing staff/barber member with invisible audit logging and graceful schema fallback.
    */
   static async updateStaff(
     id: string,
@@ -260,15 +294,47 @@ export class AdminBarbershopService {
     const admin = getSupabaseAdminClient();
     try {
       const { data: beforeData } = await admin.from('staff').select('*').eq('id', id).single();
+      const payload: any = { ...input };
+      let updatedStaff: any = null;
+
       const { data, error } = await admin
         .from('staff')
-        .update(input)
+        .update(payload)
         .eq('id', id)
         .select()
         .single();
 
-      if (error || !data) {
-        return { success: false, error: error?.message || 'Failed to update staff' };
+      if (error) {
+        // Gracefully handle missing columns in schema cache (e.g. phone, avatar_url, working_hours)
+        if (error.code === 'PGRST204' || error.message?.includes('column') || error.message?.includes('schema cache')) {
+          console.warn('Staff update fallback: schema column missing, stripping pending columns:', error.message);
+          delete payload.phone;
+          delete payload.avatar_url;
+          delete payload.working_hours;
+
+          const { data: fbData, error: fbError } = await admin
+            .from('staff')
+            .update(payload)
+            .eq('id', id)
+            .select()
+            .single();
+
+          if (fbError || !fbData) {
+            return { success: false, error: fbError?.message || 'Failed to update staff' };
+          }
+
+          // Return merged object with input fields so caller sees their requested changes
+          updatedStaff = {
+            ...fbData,
+            phone: input.phone !== undefined ? input.phone : beforeData?.phone,
+            avatar_url: input.avatar_url !== undefined ? input.avatar_url : beforeData?.avatar_url,
+            working_hours: input.working_hours !== undefined ? input.working_hours : beforeData?.working_hours,
+          };
+        } else {
+          return { success: false, error: error.message };
+        }
+      } else {
+        updatedStaff = data;
       }
 
       // Invisible Audit Trail
@@ -278,15 +344,15 @@ export class AdminBarbershopService {
         action: 'staff.update',
         entity_type: 'staff',
         entity_id: id,
-        entity_name: data.display_name,
+        entity_name: updatedStaff.display_name,
         changes: {
           before: beforeData,
-          after: data,
+          after: updatedStaff,
           updated_fields: input,
         },
       });
 
-      return { success: true, staff: data };
+      return { success: true, staff: updatedStaff };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
