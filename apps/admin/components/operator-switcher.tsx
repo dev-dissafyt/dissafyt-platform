@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Shield, LogOut, User } from 'lucide-react';
+import { Shield, LogOut, User, ShoppingBag } from 'lucide-react';
 import { getActiveOperator, logoutAdmin, AdminOperator } from '../lib/operator';
 
 export function OperatorSwitcher() {
@@ -44,6 +44,18 @@ export function OperatorSwitcher() {
           {operator.role}
         </span>
       </div>
+
+      {/* Launch POS Register */}
+      <a
+        href="https://pos.dissafyt.com"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center space-x-1.5 px-3 py-1.5 rounded-xl border border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 transition-all text-xs font-semibold"
+        title="Open In-Store POS Register (pos.dissafyt.com)"
+      >
+        <ShoppingBag className="h-3.5 w-3.5 text-amber-400" />
+        <span className="hidden sm:inline">POS Register</span>
+      </a>
 
       {/* Sign Out Button */}
       <button
