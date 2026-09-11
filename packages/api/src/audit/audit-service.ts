@@ -57,7 +57,15 @@ export class AuditService {
       });
 
       if (error) {
-        console.warn('AuditLog DB insert fallback to memory buffer:', error.message);
+        // If actor_id failed foreign key constraint against profiles(id), retry with actor_id: null
+        if (error.message?.includes('actor_id_fkey') || error.code === '23503') {
+          await admin.from('audit_logs').insert({
+            ...newEntry,
+            actor_id: null,
+          });
+        } else {
+          console.warn('AuditLog DB insert fallback to memory buffer:', error.message);
+        }
       }
     } catch (err: any) {
       console.warn('AuditLog DB exception fallback to memory buffer:', err.message);

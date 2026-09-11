@@ -1,40 +1,15 @@
-'use client';
-
-import { useEffect, useState } from 'react';
-import { Card, CardTitle, Button, PayfastProductButton } from '@dissafyt/ui';
+import { Card, CardTitle, Button } from '@dissafyt/ui';
 import { ShoppingBag, ArrowLeft, Tag, Sparkles, Truck, ShieldCheck, Layers } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { AdminProductService } from '@dissafyt/api';
 
-interface Product {
-  id: string;
-  name: string;
-  slug: string;
-  description: string;
-  base_price: number;
-  category_name?: string;
-  images: string[];
-}
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
-export default function ShopPage() {
-  const [products, setProducts] = useState<Product[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    async function loadProducts() {
-      try {
-        const res = await fetch('/api/products');
-        if (res.ok) {
-          setProducts(await res.json());
-        }
-      } catch (err) {
-        console.error('Failed to load products:', err);
-      } finally {
-        setLoading(false);
-      }
-    }
-    loadProducts();
-  }, []);
+export default async function ShopPage() {
+  const allProducts = await AdminProductService.listProducts();
+  const products = allProducts.filter((p) => p.is_active);
 
   return (
     <div className="container mx-auto max-w-7xl px-4 sm:px-6 py-12 sm:py-16 space-y-12">
@@ -100,11 +75,7 @@ export default function ShopPage() {
       </div>
 
       {/* Catalog Grid or Capsule Teaser */}
-      {loading ? (
-        <div className="py-24 text-center text-zinc-500 font-mono text-sm">
-          Accessing Cape Town Studio Vault...
-        </div>
-      ) : products.length === 0 ? (
+      {products.length === 0 ? (
         <div className="rounded-3xl border border-zinc-800 bg-gradient-to-b from-zinc-900/80 to-zinc-950 p-8 sm:p-12 text-center max-w-2xl mx-auto space-y-6">
           <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
             <ShoppingBag className="h-8 w-8 stroke-[1.5]" />

@@ -40,7 +40,7 @@ export default function ProductDetailPage() {
     async function loadProduct() {
       if (!slug) return;
       try {
-        const res = await fetch(`/api/products/${slug}`);
+        const res = await fetch(`/api/products/${slug}`, { cache: 'no-store' });
         if (res.ok) {
           const data: Product = await res.json();
           setProduct(data);

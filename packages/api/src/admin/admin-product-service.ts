@@ -70,9 +70,16 @@ export class AdminProductService {
     actor?: { email?: string; role?: string; id?: string }
   ): Promise<{ success: boolean; product?: Product; error?: string }> {
     const admin = getSupabaseAdminClient();
-    const slug = input.slug || input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    let slug = input.slug || input.name.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '');
+    if (!slug) slug = `product-${Date.now().toString().slice(-6)}`;
 
     try {
+      // Ensure slug uniqueness
+      const { data: existingSlug } = await admin.from('products').select('id').eq('slug', slug).maybeSingle();
+      if (existingSlug) {
+        slug = `${slug}-${Math.floor(100 + Math.random() * 900)}`;
+      }
+
       const { data: product, error } = await admin
         .from('products')
         .insert({
@@ -91,20 +98,20 @@ export class AdminProductService {
         return { success: false, error: error?.message || 'Failed to insert product' };
       }
 
-      // Add variants if provided, or default variant
+      // Add variants if provided, or default variant with guaranteed unique SKU
       const variantsToInsert = (input.variants && input.variants.length > 0)
-        ? input.variants.map((v) => ({
+        ? input.variants.map((v, idx) => ({
             product_id: product.id,
-            name: v.name,
-            sku: v.sku,
+            name: v.name || 'Standard',
+            sku: v.sku?.trim() ? `${v.sku.trim()}-${Math.floor(100 + Math.random() * 900)}` : `${slug.toUpperCase().slice(0, 8)}-VAR${idx + 1}-${Math.floor(100 + Math.random() * 900)}`,
             price_override: v.price_override || null,
-            stock_quantity: v.stock_quantity,
+            stock_quantity: v.stock_quantity ?? 10,
             is_active: true,
           }))
         : [{
             product_id: product.id,
             name: 'Standard',
-            sku: `${slug.toUpperCase()}-STD`,
+            sku: `${slug.toUpperCase().slice(0, 10)}-STD-${Math.floor(100 + Math.random() * 900)}`,
             price_override: null,
             stock_quantity: 10,
             is_active: true,
@@ -161,10 +168,28 @@ export class AdminProductService {
 
       // Update variant stock if stock_quantity was supplied
       if (stock_quantity !== undefined) {
-        await admin
+        const safeStock = Math.max(0, stock_quantity);
+        const { data: existingVariants } = await admin
           .from('product_variants')
-          .update({ stock_quantity: Math.max(0, stock_quantity) })
+          .select('id')
           .eq('product_id', id);
+
+        if (existingVariants && existingVariants.length > 0) {
+          await admin
+            .from('product_variants')
+            .update({ stock_quantity: safeStock })
+            .eq('product_id', id);
+        } else {
+          // If product had no variant, create a standard variant with this stock
+          await admin.from('product_variants').insert({
+            product_id: id,
+            name: 'Standard',
+            sku: `${(data.slug || id).toUpperCase().slice(0, 8)}-STD-${Math.floor(100 + Math.random() * 900)}`,
+            price_override: null,
+            stock_quantity: safeStock,
+            is_active: true,
+          });
+        }
       }
 
       // Invisible Audit Trail

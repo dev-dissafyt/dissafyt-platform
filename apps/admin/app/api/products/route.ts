@@ -10,7 +10,13 @@ export async function GET(request: NextRequest) {
   if (isAuthFailure(auth)) return auth;
 
   const products = await AdminProductService.listProducts();
-  return NextResponse.json(products);
+  return NextResponse.json(products, {
+    headers: {
+      'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+      'Pragma': 'no-cache',
+      'Expires': '0',
+    },
+  });
 }
 
 export async function POST(request: NextRequest) {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdminClient } from '@dissafyt/database';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 export async function GET(
   _request: NextRequest,
@@ -28,9 +29,18 @@ export async function GET(
     .select('*')
     .eq('product_id', product.id);
 
-  return NextResponse.json({
-    ...product,
-    category_name: (product as any).categories?.name,
-    variants: variants || [],
-  });
+  return NextResponse.json(
+    {
+      ...product,
+      category_name: (product as any).categories?.name,
+      variants: variants || [],
+    },
+    {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate, max-age=0',
+        'Pragma': 'no-cache',
+        'Expires': '0',
+      },
+    }
+  );
 }

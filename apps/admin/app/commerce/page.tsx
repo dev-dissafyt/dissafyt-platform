@@ -66,8 +66,8 @@ export default function AdminCommercePage() {
     setLoading(true);
     try {
       const [prodRes, catRes] = await Promise.all([
-        adminFetch('/api/products'),
-        adminFetch('/api/categories'),
+        adminFetch('/api/products', { cache: 'no-store' }),
+        adminFetch('/api/categories', { cache: 'no-store' }),
       ]);
       if (prodRes.ok) setProducts(await prodRes.json());
       if (catRes.ok) setCategories(await catRes.json());
