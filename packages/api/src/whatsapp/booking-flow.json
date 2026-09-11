@@ -1,0 +1,131 @@
+{
+  "version": "7.3",
+  "screens": [
+    {
+      "id": "APPOINTMENT_SELECTION",
+      "title": "Book Haircut",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Dissafyt Barbershop"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Select your cut, barber, date and time"
+          },
+          {
+            "type": "Dropdown",
+            "name": "service",
+            "label": "Select Service",
+            "required": true,
+            "data-source": [
+              {
+                "id": "Classic Haircut",
+                "title": "Classic Haircut (R120)"
+              },
+              {
+                "id": "Beard Trim & Shape",
+                "title": "Beard Trim & Shape (R70)"
+              },
+              {
+                "id": "Signature Haircut & Beard",
+                "title": "Haircut & Beard (R160)"
+              },
+              {
+                "id": "Student / Scholar Cut",
+                "title": "Student Cut (R100)"
+              },
+              {
+                "id": "Hot Towel Shave & Treatment",
+                "title": "Hot Towel Shave (R100)"
+              }
+            ]
+          },
+          {
+            "type": "Dropdown",
+            "name": "barber",
+            "label": "Select Barber",
+            "required": true,
+            "data-source": [
+              {
+                "id": "Curtis Lee",
+                "title": "Curtis Lee (Master Barber)"
+              },
+              {
+                "id": "First Available Barber",
+                "title": "First Available Barber"
+              }
+            ]
+          },
+          {
+            "type": "DatePicker",
+            "name": "date",
+            "label": "Appointment Date"
+          },
+          {
+            "type": "Dropdown",
+            "name": "time",
+            "label": "Appointment Time",
+            "required": true,
+            "data-source": [
+              {
+                "id": "09:00",
+                "title": "09:00 AM"
+              },
+              {
+                "id": "10:00",
+                "title": "10:00 AM"
+              },
+              {
+                "id": "11:00",
+                "title": "11:00 AM"
+              },
+              {
+                "id": "12:00",
+                "title": "12:00 PM"
+              },
+              {
+                "id": "13:00",
+                "title": "01:00 PM"
+              },
+              {
+                "id": "14:00",
+                "title": "02:00 PM"
+              },
+              {
+                "id": "15:00",
+                "title": "03:00 PM"
+              },
+              {
+                "id": "16:00",
+                "title": "04:00 PM"
+              },
+              {
+                "id": "17:00",
+                "title": "05:00 PM"
+              }
+            ]
+          },
+          {
+            "type": "Footer",
+            "label": "Confirm & Reserve",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "service": "${form.service}",
+                "barber": "${form.barber}",
+                "date": "${form.date}",
+                "time": "${form.time}"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
