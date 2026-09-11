@@ -1,0 +1,167 @@
+{
+  "version": "7.3",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "FEEDBACK": [
+      "SUCCESS"
+    ],
+    "SUCCESS": []
+  },
+  "screens": [
+    {
+      "id": "FEEDBACK",
+      "title": "Haircut Review",
+      "terminal": false,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "feedback_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Dissafyt Chair Experience"
+              },
+              {
+                "type": "TextSubheading",
+                "text": "How was your appointment today? Your feedback shapes our craft."
+              },
+              {
+                "type": "Dropdown",
+                "name": "rating",
+                "label": "Overall Rating",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "5",
+                    "title": "⭐⭐⭐⭐⭐ Outstanding (5/5)"
+                  },
+                  {
+                    "id": "4",
+                    "title": "⭐⭐⭐⭐ Great Cut (4/5)"
+                  },
+                  {
+                    "id": "3",
+                    "title": "⭐⭐⭐ Good / Satisfactory (3/5)"
+                  },
+                  {
+                    "id": "2",
+                    "title": "⭐⭐ Needs Improvement (2/5)"
+                  },
+                  {
+                    "id": "1",
+                    "title": "⭐ Poor Experience (1/5)"
+                  }
+                ]
+              },
+              {
+                "type": "Dropdown",
+                "name": "barber",
+                "label": "Barber",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "Curtis Lee",
+                    "title": "Curtis Lee (Master Barber)"
+                  },
+                  {
+                    "id": "First Available Barber",
+                    "title": "First Available Barber"
+                  },
+                  {
+                    "id": "Other Barber",
+                    "title": "Other Dissafyt Barber"
+                  }
+                ]
+              },
+              {
+                "type": "CheckboxGroup",
+                "name": "highlights",
+                "label": "What stood out during your cut?",
+                "data-source": [
+                  {
+                    "id": "precision_fade",
+                    "title": "Precision Fade / Blend"
+                  },
+                  {
+                    "id": "beard_lineup",
+                    "title": "Sharp Beard Lineup & Razor"
+                  },
+                  {
+                    "id": "punctuality",
+                    "title": "Punctual & No Wait Time"
+                  },
+                  {
+                    "id": "atmosphere",
+                    "title": "Lounge Vibes & Music"
+                  },
+                  {
+                    "id": "espresso_bar",
+                    "title": "Specialty Espresso Bar"
+                  },
+                  {
+                    "id": "styling_advice",
+                    "title": "Grooming & Styling Advice"
+                  }
+                ]
+              },
+              {
+                "type": "TextInput",
+                "name": "comments",
+                "label": "Comments or notes for Curtis",
+                "input-type": "text",
+                "required": false
+              },
+              {
+                "type": "Footer",
+                "label": "Submit Review",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "action_type": "feedback",
+                    "rating": "${form.rating}",
+                    "barber": "${form.barber}",
+                    "highlights": "${form.highlights}",
+                    "comments": "${form.comments}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUCCESS",
+      "title": "Thank You!",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Thank You!"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your review has been submitted. Curtis and the Ace of Fyt team appreciate your support. See you in the chair soon!"
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "status": "completed"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

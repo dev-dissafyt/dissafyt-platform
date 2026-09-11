@@ -1,0 +1,126 @@
+{
+  "version": "7.3",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "SUPPORT_TICKET": [
+      "SUCCESS"
+    ],
+    "SUCCESS": []
+  },
+  "screens": [
+    {
+      "id": "SUPPORT_TICKET",
+      "title": "Appointment & Help",
+      "terminal": false,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "support_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Dissafyt Support & Concierge"
+              },
+              {
+                "type": "TextSubheading",
+                "text": "Need to reschedule, cancel, get hair styling advice, or talk to Curtis?"
+              },
+              {
+                "type": "Dropdown",
+                "name": "topic",
+                "label": "How can we help?",
+                "required": true,
+                "data-source": [
+                  {
+                    "id": "reschedule",
+                    "title": "🔄 Reschedule Appointment"
+                  },
+                  {
+                    "id": "cancel",
+                    "title": "❌ Cancel Appointment"
+                  },
+                  {
+                    "id": "haircut_advice",
+                    "title": "✂️ Haircut / Beard Advice"
+                  },
+                  {
+                    "id": "payment_query",
+                    "title": "💳 Payment / Pay-Me Link Query"
+                  },
+                  {
+                    "id": "studio_hours",
+                    "title": "📍 Directions / Studio Hours"
+                  },
+                  {
+                    "id": "talk_curtis",
+                    "title": "💬 Speak Directly with Curtis"
+                  }
+                ]
+              },
+              {
+                "type": "TextInput",
+                "name": "booking_ref",
+                "label": "Booking Ref (optional)",
+                "input-type": "text",
+                "required": false
+              },
+              {
+                "type": "TextInput",
+                "name": "details",
+                "label": "Your message or request",
+                "input-type": "text",
+                "required": true
+              },
+              {
+                "type": "Footer",
+                "label": "Submit Request",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "action_type": "support",
+                    "topic": "${form.topic}",
+                    "booking_ref": "${form.booking_ref}",
+                    "details": "${form.details}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUCCESS",
+      "title": "Request Received",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "We are on it!"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your request has been sent to Curtis Lee and the Dissafyt Concierge. We will reply to you directly in this WhatsApp chat shortly."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "status": "completed"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

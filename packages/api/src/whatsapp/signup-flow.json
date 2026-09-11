@@ -1,0 +1,311 @@
+{
+  "version": "7.3",
+  "data_api_version": "3.0",
+  "routing_model": {
+    "SIGN_IN": [
+      "SIGN_UP",
+      "FORGOT_PASSWORD",
+      "SUCCESS"
+    ],
+    "SIGN_UP": [
+      "TERMS_AND_CONDITIONS",
+      "SUCCESS"
+    ],
+    "FORGOT_PASSWORD": [
+      "SUCCESS"
+    ],
+    "TERMS_AND_CONDITIONS": [
+      "SIGN_UP"
+    ],
+    "SUCCESS": []
+  },
+  "screens": [
+    {
+      "id": "SIGN_IN",
+      "title": "Sign In",
+      "terminal": false,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "sign_in_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Dissafyt Member Sign In"
+              },
+              {
+                "type": "TextSubheading",
+                "text": "Sign in to view your bookings and member perks"
+              },
+              {
+                "type": "TextInput",
+                "required": true,
+                "label": "Email address",
+                "name": "email",
+                "input-type": "email"
+              },
+              {
+                "type": "TextInput",
+                "required": true,
+                "label": "Password",
+                "name": "password",
+                "input-type": "password"
+              },
+              {
+                "type": "EmbeddedLink",
+                "text": "Don't have an account? Sign up",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "SIGN_UP"
+                  },
+                  "payload": {}
+                }
+              },
+              {
+                "type": "EmbeddedLink",
+                "text": "Forgot password",
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "FORGOT_PASSWORD"
+                  },
+                  "payload": {}
+                }
+              },
+              {
+                "type": "Footer",
+                "label": "Sign In",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "action_type": "sign_in",
+                    "email": "${form.email}",
+                    "password": "${form.password}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "SIGN_UP",
+      "title": "Create Account",
+      "terminal": false,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "sign_up_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Join Dissafyt Guild"
+              },
+              {
+                "type": "TextSubheading",
+                "text": "Create your account for instant chair bookings & VIP perks"
+              },
+              {
+                "type": "TextInput",
+                "required": true,
+                "label": "First Name",
+                "name": "first_name",
+                "input-type": "text"
+              },
+              {
+                "type": "TextInput",
+                "required": true,
+                "label": "Last Name",
+                "name": "last_name",
+                "input-type": "text"
+              },
+              {
+                "type": "TextInput",
+                "required": true,
+                "label": "Email address",
+                "name": "email",
+                "input-type": "email"
+              },
+              {
+                "type": "TextInput",
+                "required": true,
+                "label": "Set password",
+                "name": "password",
+                "input-type": "password"
+              },
+              {
+                "type": "TextInput",
+                "required": true,
+                "label": "Confirm password",
+                "name": "confirm_password",
+                "input-type": "password"
+              },
+              {
+                "type": "OptIn",
+                "name": "terms_agreement",
+                "label": "I agree to the Terms and Conditions.",
+                "required": true,
+                "on-click-action": {
+                  "name": "navigate",
+                  "next": {
+                    "type": "screen",
+                    "name": "TERMS_AND_CONDITIONS"
+                  },
+                  "payload": {}
+                }
+              },
+              {
+                "type": "OptIn",
+                "name": "offers_acceptance",
+                "label": "Receive exclusive member grooming offers and news."
+              },
+              {
+                "type": "Footer",
+                "label": "Create Account",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "action_type": "sign_up",
+                    "first_name": "${form.first_name}",
+                    "last_name": "${form.last_name}",
+                    "email": "${form.email}",
+                    "password": "${form.password}",
+                    "confirm_password": "${form.confirm_password}",
+                    "terms_agreement": "${form.terms_agreement}",
+                    "offers_acceptance": "${form.offers_acceptance}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "FORGOT_PASSWORD",
+      "title": "Reset Password",
+      "terminal": false,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "Form",
+            "name": "forgot_password_form",
+            "children": [
+              {
+                "type": "TextHeading",
+                "text": "Password Assistance"
+              },
+              {
+                "type": "TextBody",
+                "text": "Enter the email associated with your Dissafyt account. We will send a secure password reset link."
+              },
+              {
+                "type": "TextInput",
+                "required": true,
+                "label": "Email address",
+                "name": "email",
+                "input-type": "email"
+              },
+              {
+                "type": "Footer",
+                "label": "Send Reset Link",
+                "on-click-action": {
+                  "name": "data_exchange",
+                  "payload": {
+                    "action_type": "forgot_password",
+                    "email": "${form.email}"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "id": "TERMS_AND_CONDITIONS",
+      "title": "Terms & Conditions",
+      "terminal": false,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Dissafyt & Ace of Fyt Terms"
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Appointments & Cancellations"
+          },
+          {
+            "type": "TextBody",
+            "text": "Appointments at Ace of Fyt Cape Town can be rescheduled or cancelled anytime via WhatsApp. Please give at least 2 hours advance notice so another client can book the chair."
+          },
+          {
+            "type": "TextSubheading",
+            "text": "Privacy & POPIA Compliance"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your personal data is encrypted and strictly used for booking confirmations, reminders, and account security. We never share or sell your information."
+          },
+          {
+            "type": "Footer",
+            "label": "Back to Sign Up",
+            "on-click-action": {
+              "name": "navigate",
+              "next": {
+                "type": "screen",
+                "name": "SIGN_UP"
+              },
+              "payload": {}
+            }
+          }
+        ]
+      }
+    },
+    {
+      "id": "SUCCESS",
+      "title": "Account Ready",
+      "terminal": true,
+      "success": true,
+      "data": {},
+      "layout": {
+        "type": "SingleColumnLayout",
+        "children": [
+          {
+            "type": "TextHeading",
+            "text": "Welcome to Dissafyt!"
+          },
+          {
+            "type": "TextBody",
+            "text": "Your account details have been processed. Tap Done to return to chat and book your next haircut."
+          },
+          {
+            "type": "Footer",
+            "label": "Done",
+            "on-click-action": {
+              "name": "complete",
+              "payload": {
+                "status": "completed"
+              }
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

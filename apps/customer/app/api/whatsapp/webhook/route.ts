@@ -11,6 +11,8 @@ import { getSupabaseAdminClient } from '@dissafyt/database';
 
 export const dynamic = 'force-dynamic';
 
+const CURTIS_PHONE = process.env.ADMIN_ALERT_PHONE || '27818082570';
+
 /**
  * GET /api/whatsapp/webhook
  * Meta WhatsApp Webhook Challenge Verification.
@@ -62,7 +64,7 @@ export async function POST(request: NextRequest) {
     console.log(`[WhatsApp Inbound] From: ${fromPhone} (${senderName}), Type: ${messageType}`);
 
     // =========================================================================
-    // CASE 1: WhatsApp Flow Submission (Flow_ID = 4355963527988248)
+    // CASE 1: WhatsApp Flow Submission (interactive.nfm_reply)
     // =========================================================================
     if (messageType === 'interactive' && message.interactive?.type === 'nfm_reply') {
       const nfmReply = message.interactive.nfm_reply;
@@ -76,6 +78,167 @@ export async function POST(request: NextRequest) {
 
       console.log('[WhatsApp Flow Submitted]', flowData);
 
+      const actionType = flowData.action_type || '';
+
+      // -----------------------------------------------------------------------
+      // SUB-CASE 1A: MEMBER SIGN-UP / SIGN-IN FLOW SUBMISSION
+      // -----------------------------------------------------------------------
+      if (
+        actionType === 'sign_up' ||
+        actionType === 'sign_in' ||
+        flowData.status === 'registered' ||
+        flowData.status === 'signed_in' ||
+        flowData.first_name ||
+        flowData.confirm_password
+      ) {
+        const clientName = flowData.name || flowData.first_name || senderName;
+        await WhatsAppService.sendInteractiveButtons(
+          fromPhone,
+          `🎉 *WELCOME TO THE DISSAFYT GUILD, ${clientName.toUpperCase()}!*\n\n` +
+          `Your membership profile is active and linked to WhatsApp (+${fromPhone}).\n\n` +
+          `Enjoy priority appointment booking, member perks, and direct concierge access to master barber Curtis Lee.`,
+          [
+            { id: 'btn_book_flow', title: '✂️ Book Haircut' },
+            { id: 'btn_support', title: '🆘 Appointment Help' },
+            { id: 'btn_talk_curtis', title: '💬 Talk with Curtis' },
+          ],
+          'Account Active',
+          'Ace of Fyt Guild'
+        );
+
+        await AuditService.recordLog({
+          actor_email: `whatsapp:${fromPhone}`,
+          actor_role: 'customer',
+          action: 'whatsapp.flow_auth_completed',
+          entity_type: 'profile',
+          entity_id: fromPhone,
+          changes: { flowData },
+        });
+
+        return NextResponse.json({ status: 'auth_flow_processed' }, { status: 200 });
+      }
+
+      // -----------------------------------------------------------------------
+      // SUB-CASE 1B: POST-HAIRCUT FEEDBACK FLOW SUBMISSION
+      // -----------------------------------------------------------------------
+      if (
+        actionType === 'feedback' ||
+        flowData.rating ||
+        flowData.status === 'feedback_received'
+      ) {
+        const rating = Number(flowData.rating) || 5;
+        const barber = flowData.barber || 'Curtis Lee';
+        const comments = flowData.comments || '';
+
+        await AuditService.recordLog({
+          actor_email: `whatsapp:${fromPhone}`,
+          actor_role: 'customer',
+          action: 'whatsapp.flow_feedback_completed',
+          entity_type: 'customer_review',
+          entity_id: fromPhone,
+          changes: { rating, barber, comments, flowData },
+        });
+
+        if (rating >= 4) {
+          await WhatsAppService.sendInteractiveButtons(
+            fromPhone,
+            `🌟 *THANK YOU FOR YOUR FEEDBACK!*\n\n` +
+            `We are thrilled you had an outstanding cut with *${barber}* at Ace of Fyt Cape Town!\n\n` +
+            `⭐⭐⭐⭐⭐ If you have 30 seconds, please drop a review on our Google Maps profile:\n` +
+            `👉 https://maps.google.com/?q=Dissafyt+Studio+Cape+Town\n\n` +
+            `🎁 *10% VIP Perk on Next Visit:* Use code *FYTVIP10* when booking!`,
+            [
+              { id: 'btn_book_flow', title: '✂️ Book Next Cut' },
+              { id: 'btn_talk_curtis', title: '💬 Talk with Curtis' },
+            ],
+            'Ace of Fyt Review',
+            'Dissafyt Platform'
+          );
+        } else {
+          await WhatsAppService.sendInteractiveButtons(
+            fromPhone,
+            `🙏 *THANK YOU FOR YOUR HONEST FEEDBACK*\n\n` +
+            `Hi *${senderName}*, at Dissafyt we hold our craft to the absolute highest standard. Curtis has been notified of your comments and will follow up with you personally to make sure your next cut is 100% dialled in.`,
+            [
+              { id: 'btn_talk_curtis', title: '💬 Talk with Curtis' },
+              { id: 'btn_support', title: '🆘 Appointment Help' },
+            ],
+            'We Hear You',
+            'Dissafyt Concierge'
+          );
+
+          try {
+            await WhatsAppService.sendTextMessage(
+              CURTIS_PHONE,
+              `🚨 *CRITICAL CLIENT REVIEW NOTIFICATION*\n\n` +
+              `• *Client:* ${senderName} (+${fromPhone})\n` +
+              `• *Rating:* ${rating}/5 Stars ⚠️\n` +
+              `• *Barber:* ${barber}\n` +
+              `• *Comments:* "${comments || 'No comment provided'}"\n\n` +
+              `👉 Chat with client to resolve: https://wa.me/${fromPhone}`
+            );
+          } catch (curtisErr) {
+            console.warn('Failed to notify Curtis of low rating:', curtisErr);
+          }
+        }
+
+        return NextResponse.json({ status: 'feedback_flow_processed' }, { status: 200 });
+      }
+
+      // -----------------------------------------------------------------------
+      // SUB-CASE 1C: SUPPORT / HELP FLOW SUBMISSION
+      // -----------------------------------------------------------------------
+      if (
+        actionType === 'support' ||
+        flowData.topic ||
+        flowData.status === 'ticket_created'
+      ) {
+        const topic = flowData.topic || 'General Support';
+        const details = flowData.details || '';
+        const bookingRef = flowData.booking_ref || 'N/A';
+
+        await AuditService.recordLog({
+          actor_email: `whatsapp:${fromPhone}`,
+          actor_role: 'customer',
+          action: 'whatsapp.flow_support_completed',
+          entity_type: 'support_ticket',
+          entity_id: fromPhone,
+          changes: { topic, details, bookingRef, flowData },
+        });
+
+        try {
+          await WhatsAppService.sendTextMessage(
+            CURTIS_PHONE,
+            `🆘 *CLIENT CONCIERGE HELP REQUEST*\n\n` +
+            `• *Client:* ${senderName} (+${fromPhone})\n` +
+            `• *Topic:* ${topic}\n` +
+            `• *Ref:* ${bookingRef}\n` +
+            `• *Details:* "${details}"\n\n` +
+            `👉 Chat with client: https://wa.me/${fromPhone}`
+          );
+        } catch (curtisErr) {
+          console.warn('Failed to notify Curtis of support request:', curtisErr);
+        }
+
+        await WhatsAppService.sendInteractiveButtons(
+          fromPhone,
+          `🆘 *SUPPORT REQUEST LOGGED*\n\n` +
+          `Hi *${senderName}*, your request regarding *${topic}* has been sent directly to Curtis Lee and our studio concierge.\n\n` +
+          `We will reply right here in WhatsApp shortly.`,
+          [
+            { id: 'btn_support', title: '📅 Check Booking' },
+            { id: 'btn_talk_curtis', title: '💬 Talk with Curtis' },
+          ],
+          'Concierge Support',
+          'Ace of Fyt Studio'
+        );
+
+        return NextResponse.json({ status: 'support_flow_processed' }, { status: 200 });
+      }
+
+      // -----------------------------------------------------------------------
+      // SUB-CASE 1D: HAIRCUT BOOKING FLOW SUBMISSION (DEFAULT)
+      // -----------------------------------------------------------------------
       // 1. Resolve or create customer account in Supabase
       const admin = getSupabaseAdminClient();
       let customerId = GUEST_USER_ID;
@@ -179,9 +342,132 @@ export async function POST(request: NextRequest) {
       const buttonId = message.interactive.button_reply.id;
 
       if (buttonId === 'btn_book_flow' || buttonId === 'btn_book') {
-        // Send WhatsApp Flow
         await WhatsAppService.sendBookingFlowMessage(fromPhone, WHATSAPP_FLOW_ID);
         return NextResponse.json({ status: 'flow_sent' }, { status: 200 });
+      }
+
+      if (buttonId === 'btn_signup_flow') {
+        await WhatsAppService.sendSignUpFlowMessage(fromPhone);
+        return NextResponse.json({ status: 'signup_flow_sent' }, { status: 200 });
+      }
+
+      if (buttonId === 'btn_review_flow') {
+        await WhatsAppService.sendFeedbackFlowMessage(fromPhone);
+        return NextResponse.json({ status: 'feedback_flow_sent' }, { status: 200 });
+      }
+
+      if (buttonId === 'btn_review_5') {
+        await AuditService.recordLog({
+          actor_email: `whatsapp:${fromPhone}`,
+          actor_role: 'customer',
+          action: 'whatsapp.quick_5_star_review',
+          entity_type: 'customer_review',
+          entity_id: fromPhone,
+          changes: { rating: 5, senderName },
+        });
+
+        await WhatsAppService.sendInteractiveButtons(
+          fromPhone,
+          `⭐⭐⭐⭐⭐ *THANK YOU, ${senderName.toUpperCase()}!*\n\n` +
+          `We appreciate you! Please take 20 seconds to drop your 5-star review on our Google Maps profile:\n` +
+          `👉 https://maps.google.com/?q=Dissafyt+Studio+Cape+Town\n\n` +
+          `🎁 *VIP Discount Code:* Use *FYTVIP10* when booking for 10% off your next session!`,
+          [
+            { id: 'btn_book_flow', title: '✂️ Book Haircut' },
+            { id: 'btn_talk_curtis', title: '💬 Talk with Curtis' },
+          ],
+          '5-Star Review',
+          'Ace of Fyt Flagship'
+        );
+        return NextResponse.json({ status: 'quick_review_handled' }, { status: 200 });
+      }
+
+      if (buttonId === 'btn_support') {
+        const admin = getSupabaseAdminClient();
+        const { data: profile } = await admin
+          .from('profiles')
+          .select('id')
+          .or(`phone.eq.${fromPhone},phone.eq.+${fromPhone}`)
+          .maybeSingle();
+
+        let query = admin
+          .from('bookings')
+          .select('*, service:services(*), staff:staff(*)')
+          .neq('status', 'cancelled')
+          .gte('start_time', new Date().toISOString())
+          .order('start_time', { ascending: true })
+          .limit(1);
+
+        if (profile?.id) {
+          query = query.or(`customer_id.eq.${profile.id},notes.ilike.%${fromPhone}%`);
+        } else {
+          query = query.ilike('notes', `%${fromPhone}%`);
+        }
+
+        const { data: bookings } = await query;
+        const activeBooking = bookings?.[0];
+        await WhatsAppService.sendSupportOverview(fromPhone, senderName, activeBooking);
+        return NextResponse.json({ status: 'support_overview_sent' }, { status: 200 });
+      }
+
+      if (buttonId.startsWith('btn_cancel_')) {
+        const bookingId = buttonId.replace('btn_cancel_', '');
+        const cancelResult = await BarbershopService.cancelBooking(bookingId, GUEST_USER_ID, true);
+
+        if (cancelResult.success) {
+          await WhatsAppService.sendInteractiveButtons(
+            fromPhone,
+            `✅ *APPOINTMENT CANCELLED*\n\n` +
+            `Your booking (\`${bookingId.slice(0, 8)}\`) has been cancelled successfully.\n\n` +
+            `Your chair slot has been released. Whenever you are ready to book a new appointment, tap below:`,
+            [
+              { id: 'btn_book_flow', title: '✂️ Book Haircut' },
+              { id: 'btn_talk_curtis', title: '💬 Talk with Curtis' },
+            ],
+            'Cancelled',
+            'Dissafyt Studio'
+          );
+
+          try {
+            await WhatsAppService.sendTextMessage(
+              CURTIS_PHONE,
+              `⚠️ *CHAIR SLOT CANCELLED VIA WHATSAPP*\n\n` +
+              `• *Client:* ${senderName} (+${fromPhone})\n` +
+              `• *Booking Ref:* \`${bookingId.slice(0, 8)}\`\n` +
+              `• *Slot Released:* Studio calendar updated.`
+            );
+          } catch (curtisErr) {
+            console.warn('Could not alert Curtis of cancellation:', curtisErr);
+          }
+
+          await AuditService.recordLog({
+            actor_email: `whatsapp:${fromPhone}`,
+            actor_role: 'customer',
+            action: 'whatsapp.appointment_cancelled',
+            entity_type: 'booking',
+            entity_id: bookingId,
+            changes: { senderName, fromPhone, cancelled_at: new Date().toISOString() },
+          });
+        } else {
+          await WhatsAppService.sendTextMessage(
+            fromPhone,
+            `⚠️ We could not cancel booking \`${bookingId.slice(0, 8)}\`: ${cancelResult.error || 'Please talk to Curtis'}.`
+          );
+          await WhatsAppService.sendMainMenu(fromPhone, senderName);
+        }
+
+        return NextResponse.json({ status: 'cancel_processed' }, { status: 200 });
+      }
+
+      if (buttonId.startsWith('btn_reschedule_')) {
+        const bookingId = buttonId.replace('btn_reschedule_', '');
+        await WhatsAppService.sendTextMessage(
+          fromPhone,
+          `🔄 *RESCHEDULING APPOINTMENT \`${bookingId.slice(0, 8)}\`*\n\n` +
+          `Tap below to select your new preferred service, barber, day, and time:`
+        );
+        await WhatsAppService.sendBookingFlowMessage(fromPhone, WHATSAPP_FLOW_ID);
+        return NextResponse.json({ status: 'reschedule_flow_sent' }, { status: 200 });
       }
 
       if (buttonId === 'btn_talk_curtis') {
@@ -196,11 +482,10 @@ export async function POST(request: NextRequest) {
         await WhatsAppService.sendTextMessage(fromPhone, reply);
 
         // Notify Curtis on his studio WhatsApp with a direct link to the customer
-        const curtisPhone = process.env.ADMIN_ALERT_PHONE || '27818082570';
-        if (curtisPhone && curtisPhone !== fromPhone) {
+        if (CURTIS_PHONE && CURTIS_PHONE !== fromPhone) {
           try {
             await WhatsAppService.sendTextMessage(
-              curtisPhone,
+              CURTIS_PHONE,
               `🚨 *CLIENT CONCIERGE REQUEST*\n\n*${senderName}* (+${fromPhone}) tapped *Talk with Curtis* on WhatsApp!\n\n👉 Click to chat with client: https://wa.me/${fromPhone}`
             );
           } catch (notifyErr) {
@@ -259,6 +544,61 @@ export async function POST(request: NextRequest) {
     // =========================================================================
     if (messageType === 'text') {
       const textBody = (message.text?.body || '').trim().toLowerCase();
+
+      // If user asks for post-haircut review / feedback
+      if (textBody.includes('review') || textBody.includes('feedback') || textBody.includes('rate') || textBody.includes('star')) {
+        await WhatsAppService.sendPostHaircutReviewPrompt(fromPhone, senderName);
+        return NextResponse.json({ status: 'review_prompt_sent' }, { status: 200 });
+      }
+
+      // If user asks for appointment help, cancel, reschedule, or status
+      if (
+        textBody.includes('support') ||
+        textBody.includes('help') ||
+        textBody.includes('cancel') ||
+        textBody.includes('reschedule') ||
+        textBody.includes('my booking') ||
+        textBody.includes('status')
+      ) {
+        const admin = getSupabaseAdminClient();
+        const { data: profile } = await admin
+          .from('profiles')
+          .select('id')
+          .or(`phone.eq.${fromPhone},phone.eq.+${fromPhone}`)
+          .maybeSingle();
+
+        let query = admin
+          .from('bookings')
+          .select('*, service:services(*), staff:staff(*)')
+          .neq('status', 'cancelled')
+          .gte('start_time', new Date().toISOString())
+          .order('start_time', { ascending: true })
+          .limit(1);
+
+        if (profile?.id) {
+          query = query.or(`customer_id.eq.${profile.id},notes.ilike.%${fromPhone}%`);
+        } else {
+          query = query.ilike('notes', `%${fromPhone}%`);
+        }
+
+        const { data: bookings } = await query;
+        const activeBooking = bookings?.[0];
+        await WhatsAppService.sendSupportOverview(fromPhone, senderName, activeBooking);
+        return NextResponse.json({ status: 'support_overview_sent' }, { status: 200 });
+      }
+
+      // If user asks for account, signup, login
+      if (
+        textBody.includes('signup') ||
+        textBody.includes('sign up') ||
+        textBody.includes('register') ||
+        textBody.includes('join') ||
+        textBody.includes('login') ||
+        textBody.includes('account')
+      ) {
+        await WhatsAppService.sendSignUpFlowMessage(fromPhone);
+        return NextResponse.json({ status: 'signup_flow_sent' }, { status: 200 });
+      }
 
       // If user asks to book
       if (textBody.includes('book') || textBody.includes('haircut') || textBody.includes('cut') || textBody.includes('fade')) {

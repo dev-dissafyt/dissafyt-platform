@@ -2,7 +2,10 @@ import { getSupabaseAdminClient } from '@dissafyt/database';
 import { PayfastService } from '../commerce/payfast-service';
 import { AuditService } from '../audit/audit-service';
 
-export const WHATSAPP_FLOW_ID = '4355963527988248';
+export const WHATSAPP_FLOW_ID = process.env.WHATSAPP_FLOW_ID || '4355963527988248';
+export const WHATSAPP_SIGNUP_FLOW_ID = process.env.WHATSAPP_SIGNUP_FLOW_ID || WHATSAPP_FLOW_ID;
+export const WHATSAPP_FEEDBACK_FLOW_ID = process.env.WHATSAPP_FEEDBACK_FLOW_ID || WHATSAPP_FLOW_ID;
+export const WHATSAPP_SUPPORT_FLOW_ID = process.env.WHATSAPP_SUPPORT_FLOW_ID || WHATSAPP_FLOW_ID;
 export const WHATSAPP_API_VERSION = 'v20.0';
 export const DEFAULT_VERIFY_TOKEN = 'dissafyt_whatsapp_verify_2026';
 
@@ -226,15 +229,224 @@ export class WhatsAppService {
   }
 
   /**
-   * Sends the primary Interactive Main Menu for greeting and self-service.
+   * Sends the native WhatsApp Sign-Up / Login Flow.
    */
-  static async sendMainMenu(to: string, userName = 'there'): Promise<WhatsAppSendResult> {
+  static async sendSignUpFlowMessage(
+    to: string,
+    flowId = WHATSAPP_SIGNUP_FLOW_ID,
+    flowCta = 'Sign In / Join',
+    screen = 'SIGN_IN'
+  ): Promise<WhatsAppSendResult> {
+    const formattedTo = this.formatPhoneNumber(to);
+    const flowToken = `auth_${Date.now()}_${formattedTo.slice(-4)}`;
+
+    return this.sendGraphPayload({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: formattedTo,
+      type: 'interactive',
+      interactive: {
+        type: 'flow',
+        header: {
+          type: 'text',
+          text: 'Dissafyt Membership',
+        },
+        body: {
+          text: 'Sign in to your Dissafyt account or register as a new client to unlock VIP barber scheduling and grooming perks.',
+        },
+        footer: {
+          text: 'Dissafyt Platform • Cape Town',
+        },
+        action: {
+          name: 'flow',
+          parameters: {
+            flow_message_version: '3',
+            flow_token: flowToken,
+            flow_id: flowId,
+            flow_cta: flowCta,
+            flow_action: 'navigate',
+            flow_action_payload: {
+              screen,
+            },
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Sends the native WhatsApp Feedback / Review Flow.
+   */
+  static async sendFeedbackFlowMessage(
+    to: string,
+    flowId = WHATSAPP_FEEDBACK_FLOW_ID,
+    flowCta = 'Review Haircut',
+    screen = 'FEEDBACK'
+  ): Promise<WhatsAppSendResult> {
+    const formattedTo = this.formatPhoneNumber(to);
+    const flowToken = `rev_${Date.now()}_${formattedTo.slice(-4)}`;
+
+    return this.sendGraphPayload({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: formattedTo,
+      type: 'interactive',
+      interactive: {
+        type: 'flow',
+        header: {
+          type: 'text',
+          text: 'Ace of Fyt Reviews',
+        },
+        body: {
+          text: 'How was your haircut today? Share your thoughts with Curtis Lee and the team to help us continually elevate your studio experience.',
+        },
+        footer: {
+          text: 'Dissafyt Platform • Cape Town',
+        },
+        action: {
+          name: 'flow',
+          parameters: {
+            flow_message_version: '3',
+            flow_token: flowToken,
+            flow_id: flowId,
+            flow_cta: flowCta,
+            flow_action: 'navigate',
+            flow_action_payload: {
+              screen,
+            },
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Sends the native WhatsApp Customer Support & Appointment Help Flow.
+   */
+  static async sendSupportFlowMessage(
+    to: string,
+    flowId = WHATSAPP_SUPPORT_FLOW_ID,
+    flowCta = 'Appointment Help',
+    screen = 'SUPPORT_TICKET'
+  ): Promise<WhatsAppSendResult> {
+    const formattedTo = this.formatPhoneNumber(to);
+    const flowToken = `sup_${Date.now()}_${formattedTo.slice(-4)}`;
+
+    return this.sendGraphPayload({
+      messaging_product: 'whatsapp',
+      recipient_type: 'individual',
+      to: formattedTo,
+      type: 'interactive',
+      interactive: {
+        type: 'flow',
+        header: {
+          type: 'text',
+          text: 'Dissafyt Concierge Support',
+        },
+        body: {
+          text: 'Need to reschedule, cancel, or ask Curtis about haircut styling? Submit your inquiry directly and we will assist you immediately.',
+        },
+        footer: {
+          text: 'Dissafyt Platform • Cape Town',
+        },
+        action: {
+          name: 'flow',
+          parameters: {
+            flow_message_version: '3',
+            flow_token: flowToken,
+            flow_id: flowId,
+            flow_cta: flowCta,
+            flow_action: 'navigate',
+            flow_action_payload: {
+              screen,
+            },
+          },
+        },
+      },
+    });
+  }
+
+  /**
+   * Sends an automated post-haircut review prompt with interactive buttons.
+   */
+  static async sendPostHaircutReviewPrompt(
+    to: string,
+    clientName = 'there',
+    barberName = 'Curtis Lee'
+  ): Promise<WhatsAppSendResult> {
     const body = [
-      `🔥 *WELCOME TO DISSAFYT & ACE OF FYT*`,
+      `💈 *HOW WAS YOUR CHAIR SESSION?*`,
       ``,
-      `Hi *${userName}*, how can we help you today?`,
+      `Hi *${clientName}*, we hope you are looking and feeling fresh after your session with *${barberName}* at Ace of Fyt Cape Town!`,
       ``,
-      `Choose an option below to book your chair session, settle payment, check studio details, or talk directly with Curtis.`,
+      `Your feedback directly shapes our craft. Tap below to share your rating with Curtis:`,
+    ].join('\n');
+
+    return this.sendInteractiveButtons(
+      to,
+      body,
+      [
+        { id: 'btn_review_flow', title: '⭐ Review Haircut' },
+        { id: 'btn_review_5', title: '⭐⭐⭐⭐⭐ 5 Stars' },
+        { id: 'btn_talk_curtis', title: '💬 Talk with Curtis' },
+      ],
+      'Ace of Fyt Review',
+      'Dissafyt Platform'
+    );
+  }
+
+  /**
+   * Sends customer appointment support overview with one-tap reschedule and cancellation actions.
+   */
+  static async sendSupportOverview(
+    to: string,
+    clientName = 'there',
+    booking?: any
+  ): Promise<WhatsAppSendResult> {
+    if (booking) {
+      const formattedDate = new Date(booking.start_time).toLocaleString('en-ZA', {
+        timeZone: 'Africa/Johannesburg',
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false,
+      });
+
+      const body = [
+        `💈 *YOUR UPCOMING APPOINTMENT*`,
+        ``,
+        `Hi *${clientName}*, here are the details for your chair session:`,
+        ``,
+        `• *Ref:* \`${booking.id.slice(0, 8)}\``,
+        `• *Service:* ${booking.service?.name || 'Haircut'}`,
+        `• *Barber:* ${booking.staff?.display_name || 'Assigned Barber'}`,
+        `• *Time:* ${formattedDate} SAST`,
+        `• *Status:* ${booking.status === 'confirmed' ? '✅ Confirmed' : '⏳ ' + booking.status}`,
+        ``,
+        `How would you like to proceed?`,
+      ].join('\n');
+
+      return this.sendInteractiveButtons(
+        to,
+        body,
+        [
+          { id: `btn_reschedule_${booking.id}`, title: '🔄 Reschedule' },
+          { id: `btn_cancel_${booking.id}`, title: '❌ Cancel Booking' },
+          { id: 'btn_talk_curtis', title: '💬 Talk with Curtis' },
+        ],
+        'Appointment Support',
+        'Ace of Fyt Flagship'
+      );
+    }
+
+    const body = [
+      `ℹ️ *APPOINTMENT & STUDIO HELP*`,
+      ``,
+      `Hi *${clientName}*, we do not see an active upcoming booking linked to your number.`,
+      ``,
+      `Would you like to reserve a chair session, view our studio details, or talk directly with Curtis?`,
     ].join('\n');
 
     return this.sendInteractiveButtons(
@@ -244,6 +456,31 @@ export class WhatsAppService {
         { id: 'btn_book_flow', title: '✂️ Book Haircut' },
         { id: 'btn_talk_curtis', title: '💬 Talk with Curtis' },
         { id: 'btn_studio_info', title: '📍 Studio & Hours' },
+      ],
+      'Dissafyt Support',
+      'Ace of Fyt Flagship'
+    );
+  }
+
+  /**
+   * Sends the primary Interactive Main Menu for greeting and self-service.
+   */
+  static async sendMainMenu(to: string, userName = 'there'): Promise<WhatsAppSendResult> {
+    const body = [
+      `🔥 *WELCOME TO DISSAFYT & ACE OF FYT*`,
+      ``,
+      `Hi *${userName}*, welcome to our WhatsApp concierge.`,
+      ``,
+      `Reserve your chair, manage appointments, sign in, or chat directly with master barber Curtis Lee.`,
+    ].join('\n');
+
+    return this.sendInteractiveButtons(
+      to,
+      body,
+      [
+        { id: 'btn_book_flow', title: '✂️ Book Haircut' },
+        { id: 'btn_support', title: '🆘 Appointment Help' },
+        { id: 'btn_signup_flow', title: '👤 Join / Sign-In' },
       ],
       'Dissafyt Flagship Cape Town',
       'Ace of Fyt Guild'
