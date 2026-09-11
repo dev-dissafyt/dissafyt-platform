@@ -137,6 +137,23 @@ export class BarbershopService {
   }
 
   /**
+   * Lists all barbershop services and subscription plans.
+   */
+  static async listServices(): Promise<BarberService[]> {
+    const admin = getSupabaseAdminClient();
+    const { data, error } = await admin
+      .from('services')
+      .select('*')
+      .order('price', { ascending: true });
+
+    if (error || !data) {
+      console.error('Failed to list services:', error);
+      return [];
+    }
+    return data as BarberService[];
+  }
+
+  /**
    * Registers a new studio location with invisible audit logging.
    */
   static async createLocation(
