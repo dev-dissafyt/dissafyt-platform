@@ -195,6 +195,19 @@ export async function POST(request: NextRequest) {
 
         await WhatsAppService.sendTextMessage(fromPhone, reply);
 
+        // Notify Curtis on his studio WhatsApp with a direct link to the customer
+        const curtisPhone = process.env.ADMIN_ALERT_PHONE || '27818082570';
+        if (curtisPhone && curtisPhone !== fromPhone) {
+          try {
+            await WhatsAppService.sendTextMessage(
+              curtisPhone,
+              `🚨 *CLIENT CONCIERGE REQUEST*\n\n*${senderName}* (+${fromPhone}) tapped *Talk with Curtis* on WhatsApp!\n\n👉 Click to chat with client: https://wa.me/${fromPhone}`
+            );
+          } catch (notifyErr) {
+            console.warn('Failed to notify Curtis on WhatsApp:', notifyErr);
+          }
+        }
+
         // Audit & alert
         await AuditService.recordLog({
           actor_email: `whatsapp:${fromPhone}`,
