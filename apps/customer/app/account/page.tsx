@@ -599,13 +599,25 @@ export default function AccountPage() {
                             >
                               {booking.status}
                             </span>
-                            {Number(booking.total_amount) === 0 || (booking as any).is_subscription_covered ? (
+                            {Number(booking.total_amount) === 0 || (booking as any).is_subscription_covered || (booking as any).payment_status === 'membership_covered' ? (
                               <span className="font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
                                 Included in Membership (R0.00)
                               </span>
+                            ) : (booking as any).payment_status === 'paid_online' ? (
+                              <span className="font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
+                                Paid Online (R {Number(booking.total_amount).toFixed(2)})
+                              </span>
+                            ) : (booking as any).payment_status === 'paid_in_chair' ? (
+                              <span className="font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
+                                Paid in Chair (R {Number(booking.total_amount).toFixed(2)})
+                              </span>
+                            ) : booking.status === 'pending' ? (
+                              <span className="font-bold text-yellow-400 text-xs bg-yellow-500/10 px-2 py-0.5 rounded border border-yellow-500/20 whitespace-nowrap">
+                                Payment Pending (R {Number(booking.total_amount).toFixed(2)})
+                              </span>
                             ) : (
-                              <span className="font-extrabold text-amber-400 text-sm whitespace-nowrap">
-                                R {Number(booking.total_amount).toFixed(2)}
+                              <span className="font-bold text-amber-400 text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 whitespace-nowrap">
+                                Due in Chair (R {Number(booking.total_amount).toFixed(2)})
                               </span>
                             )}
                           </div>

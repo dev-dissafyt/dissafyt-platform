@@ -58,3 +58,39 @@ export async function PATCH(
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
   }
 }
+
+/**
+ * GET /api/bookings/[id]
+ * Retrieves a single appointment for the authenticated customer.
+ */
+export async function GET(
+  request: NextRequest,
+  { params }: { params: { id: string } }
+) {
+  try {
+    const authHeader = request.headers.get('Authorization');
+    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+
+    if (!token) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const authCtx = await AuthService.verifyToken(token);
+    if (!authCtx) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+
+    const bookings = await BarbershopService.getCustomerBookings(authCtx.userId);
+    const booking = bookings.find((b) => b.id === params.id);
+
+    if (!booking) {
+      return NextResponse.json({ error: 'Appointment not found' }, { status: 404 });
+    }
+
+    return NextResponse.json({ success: true, booking });
+  } catch (error: any) {
+    console.error('Failed to get booking:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
+

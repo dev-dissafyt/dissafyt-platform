@@ -1,6 +1,7 @@
 import crypto from 'crypto';
 import { getSupabaseAdminClient, Payment } from '@dissafyt/database';
 import { OrderService, GUEST_USER_ID } from './order-service';
+import { AuditService } from '../audit/audit-service';
 
 export interface PayfastNotifyPayload {
   m_payment_id?: string;
@@ -79,7 +80,8 @@ export class PayfastService {
     const paymentStatus = payload.payment_status?.toUpperCase();
     const amount = parseFloat(payload.amount_gross || '0');
     const isSubscription = Boolean(payload.token || payload.subscription_type);
-    const relatedType = isSubscription ? 'subscription' : 'order';
+    const isBooking = payload.custom_str3 === 'booking';
+    const relatedType = isSubscription ? 'subscription' : isBooking ? 'booking' : 'order';
 
     // If userId not provided in custom_str2, lookup profile by email_address or fallback to official guest
     if ((!userId || userId === '00000000-0000-0000-0000-000000000000' || userId === 'guest-user') && payload.email_address) {
@@ -166,12 +168,51 @@ export class PayfastService {
         paymentRecord = newPay;
       }
 
-      // 3. Update order or subscription state authoritatively if COMPLETE
+      // 3. Update order, booking or subscription state authoritatively if COMPLETE
       if (isPaid) {
         if (orderId && !isSubscription) {
-          const confirmResult = await OrderService.confirmOrderPayment(orderId, amount, payload.pf_payment_id);
-          if (!confirmResult.success) {
-            console.warn(`Order payment confirmation failed for ${orderId}:`, confirmResult.error);
+          if (isBooking) {
+            // Confirm the barbershop appointment
+            const { data: updatedBooking, error: bkErr } = await admin
+              .from('bookings')
+              .update({
+                status: 'confirmed',
+                payment_status: 'paid_online',
+                payment_id: paymentRecord?.id || null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', orderId)
+              .select('*, service:services(name), customer:profiles(email, full_name)')
+              .single();
+
+            if (bkErr) {
+              console.error(`Booking payment confirmation failed for ${orderId}:`, bkErr);
+            } else {
+              console.log(`Booking ${orderId} successfully confirmed via PayFast payment.`);
+              try {
+                await AuditService.recordLog({
+                  actor_email: payload.email_address || updatedBooking?.customer?.email || 'payfast-webhook@dissafyt.com',
+                  actor_role: 'system',
+                  action: 'booking.payment_received',
+                  entity_type: 'booking',
+                  entity_id: orderId,
+                  entity_name: `Booking ${orderId} (${updatedBooking?.service?.name || 'Haircut'})`,
+                  changes: {
+                    status: 'confirmed',
+                    payment_status: 'paid_online',
+                    amount,
+                    pf_payment_id: payload.pf_payment_id,
+                  },
+                });
+              } catch (auditErr) {
+                console.warn('Booking payment audit log warning:', auditErr);
+              }
+            }
+          } else {
+            const confirmResult = await OrderService.confirmOrderPayment(orderId, amount, payload.pf_payment_id);
+            if (!confirmResult.success) {
+              console.warn(`Order payment confirmation failed for ${orderId}:`, confirmResult.error);
+            }
           }
         }
 

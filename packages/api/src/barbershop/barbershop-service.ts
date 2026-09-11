@@ -96,6 +96,7 @@ export interface CreateBookingInput {
   start_time: string; // ISO string
   notes?: string;
   location_id?: string | null;
+  payment_choice?: 'membership_covered' | 'payfast' | 'pay_in_chair';
 }
 
 export interface SubscriptionQuota {
@@ -626,6 +627,18 @@ export class BarbershopService {
       };
     }
 
+    // 0. Clean up stale pending bookings older than 15 minutes to release slots
+    try {
+      const staleThreshold = new Date(Date.now() - 15 * 60 * 1000).toISOString();
+      await admin
+        .from('bookings')
+        .update({ status: 'cancelled', updated_at: new Date().toISOString() })
+        .eq('status', 'pending')
+        .lt('created_at', staleThreshold);
+    } catch {
+      // Non-blocking cleanup
+    }
+
     // Anti-collision: verify customer doesn't already have an active appointment during this window
     const { data: customerCollisions } = await admin
       .from('bookings')
@@ -723,10 +736,30 @@ export class BarbershopService {
     }
 
     const totalAmount = isCoveredBySubscription ? 0.00 : Number(service.price || 0);
-    const paymentStatus = isCoveredBySubscription ? 'membership_covered' : 'unpaid';
+    const paymentStatus: 'membership_covered' | 'unpaid' = isCoveredBySubscription ? 'membership_covered' : 'unpaid';
+    
+    // Determine booking status and audit note based on payment choice
+    let bookingStatus: 'confirmed' | 'pending' = 'confirmed';
+    let statusNote = coverageNote;
+
+    if (!isCoveredBySubscription) {
+      if (input.payment_choice === 'payfast') {
+        bookingStatus = 'pending';
+        statusNote = coverageNote
+          ? `${coverageNote} [PayFast payment pending]`
+          : 'PayFast payment pending';
+      } else {
+        // 'pay_in_chair' or unspecified
+        bookingStatus = 'confirmed';
+        statusNote = coverageNote
+          ? `${coverageNote} [Pay in chair: R ${totalAmount.toFixed(2)} due on arrival]`
+          : `Pay in chair: R ${totalAmount.toFixed(2)} due on arrival`;
+      }
+    }
+
     const bookingNote = input.notes
-      ? (coverageNote ? `${input.notes} (${coverageNote})` : input.notes)
-      : (coverageNote || (isCoveredBySubscription ? 'Included in Member Subscription' : null));
+      ? (statusNote ? `${input.notes} (${statusNote})` : input.notes)
+      : (statusNote || (isCoveredBySubscription ? 'Included in Member Subscription' : null));
 
     // 4. Create booking record with audit attributes
     let bookingResult: any = null;
@@ -739,7 +772,7 @@ export class BarbershopService {
           staff_id: assignedStaffId,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
-          status: 'confirmed',
+          status: bookingStatus,
           total_amount: totalAmount,
           payment_status: paymentStatus,
           is_subscription_covered: isCoveredBySubscription,
@@ -762,7 +795,7 @@ export class BarbershopService {
           staff_id: assignedStaffId,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
-          status: 'confirmed',
+          status: bookingStatus,
           total_amount: totalAmount,
           notes: bookingNote,
         })

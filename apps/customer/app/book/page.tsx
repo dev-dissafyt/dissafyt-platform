@@ -109,6 +109,7 @@ function BookContent() {
   const [submitting, setSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [confirmedBooking, setConfirmedBooking] = useState<any>(null);
+  const [paymentChoice, setPaymentChoice] = useState<'payfast' | 'pay_in_chair'>('payfast');
 
   // Quick Auth Form (if guest wants to log in or register right here)
   const [showAuthForm, setShowAuthForm] = useState(false);
@@ -238,6 +239,63 @@ function BookContent() {
             await confirmReturnSubscription(session.access_token);
           }
           await checkSubscriptionStatus(session.access_token);
+
+          // Handle returning from PayFast for confirmed appointment
+          const confirmedBkId = searchParams.get('confirmed_booking');
+          if (confirmedBkId && mounted) {
+            try {
+              const bRes = await fetch(`/api/bookings/${confirmedBkId}`, {
+                headers: { Authorization: `Bearer ${session.access_token}` },
+              });
+              if (bRes.ok) {
+                const bData = await bRes.json();
+                if (bData.booking) {
+                  const bk = bData.booking;
+                  const d = new Date(bk.start_time);
+                  const dateLabel = new Intl.DateTimeFormat('en-CA', {
+                    timeZone: 'Africa/Johannesburg',
+                    year: 'numeric',
+                    month: '2-digit',
+                    day: '2-digit',
+                  }).format(d);
+                  const timeLabel = new Intl.DateTimeFormat('en-GB', {
+                    timeZone: 'Africa/Johannesburg',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                  }).format(d);
+
+                  setConfirmedBooking({
+                    ...bk,
+                    serviceName: bk.service?.name || 'Haircut',
+                    servicePrice: bk.total_amount || bk.service?.price || 0,
+                    slotTime: timeLabel,
+                    date: dateLabel,
+                  });
+                }
+              }
+            } catch (e) {
+              console.warn('Failed to load confirmed booking from return:', e);
+            }
+          }
+
+          // Handle returning from PayFast when cancelled
+          const cancelledBkId = searchParams.get('cancelled_booking');
+          if (cancelledBkId && mounted) {
+            try {
+              await fetch(`/api/bookings/${cancelledBkId}`, {
+                method: 'PATCH',
+                headers: {
+                  'Content-Type': 'application/json',
+                  Authorization: `Bearer ${session.access_token}`,
+                },
+                body: JSON.stringify({ action: 'cancel' }),
+              });
+              setBookingError('PayFast payment was cancelled. Your appointment slot has been freed up.');
+            } catch (e) {
+              console.warn('Failed to release cancelled booking:', e);
+            }
+          }
 
           // Fetch profile for prefilling
           fetch('/api/users/me', {
@@ -375,6 +433,10 @@ function BookContent() {
     setBookingError(null);
 
     try {
+      const cov = isServiceCovered(selectedService);
+      const isCovered = hasActiveSubscription && cov.covered;
+      const chosenPayment = isCovered ? 'membership_covered' : paymentChoice;
+
       const res = await fetch('/api/bookings', {
         method: 'POST',
         headers: {
@@ -386,20 +448,44 @@ function BookContent() {
           staff_id: selectedStaffId !== 'any' ? selectedStaffId : null,
           start_time: selectedSlot.startTime,
           notes,
+          payment_choice: chosenPayment,
         }),
       });
 
       const data = await res.json();
-      if (res.ok && data.booking) {
-        setConfirmedBooking({
-          ...data.booking,
-          serviceName: selectedService.name,
-          servicePrice: selectedService.price,
-          slotTime: selectedSlot.time,
-          date: selectedDate,
-        });
-      } else {
+      if (!res.ok || !data.booking) {
         setBookingError(data.error || 'Failed to confirm booking.');
+        return;
+      }
+
+      // If PayFast payment is required, redirect to PayFast gateway
+      if (data.payfast) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = data.payfast.action;
+        for (const [key, value] of Object.entries(data.payfast.fields)) {
+          const input = document.createElement('input');
+          input.type = 'hidden';
+          input.name = key;
+          input.value = value as string;
+          form.appendChild(input);
+        }
+        document.body.appendChild(form);
+        form.submit();
+        return;
+      }
+
+      setConfirmedBooking({
+        ...data.booking,
+        serviceName: selectedService.name,
+        servicePrice: selectedService.price,
+        slotTime: selectedSlot.time,
+        date: selectedDate,
+      });
+
+      // Refresh subscription quota if covered
+      if (isCovered) {
+        checkSubscriptionStatus(userSession.access_token);
       }
     } catch (err: any) {
       setBookingError(err.message || 'An error occurred while confirming your booking.');
@@ -450,11 +536,43 @@ function BookContent() {
                 Confirmed
               </span>
             </div>
+            <div className="flex justify-between border-b border-zinc-800 pb-2">
+              <span className="text-xs text-zinc-400 uppercase tracking-wider">Payment</span>
+              {confirmedBooking.payment_status === 'membership_covered' || Number(confirmedBooking.total_amount) === 0 ? (
+                <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
+                  Included in Membership (R0.00)
+                </span>
+              ) : confirmedBooking.payment_status === 'paid_online' ? (
+                <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
+                  Paid Online via PayFast
+                </span>
+              ) : (
+                <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">
+                  Due in Chair (R {Number(confirmedBooking.total_amount || confirmedBooking.servicePrice).toFixed(2)})
+                </span>
+              )}
+            </div>
             <div className="flex justify-between pt-1">
               <span className="text-xs text-zinc-400 uppercase tracking-wider">Total</span>
-              <span className="text-sm font-bold text-white">R {Number(confirmedBooking.servicePrice).toFixed(2)}</span>
+              <span className="text-sm font-bold text-white">
+                {confirmedBooking.payment_status === 'membership_covered' || Number(confirmedBooking.total_amount) === 0
+                  ? 'R 0.00'
+                  : `R ${Number(confirmedBooking.total_amount || confirmedBooking.servicePrice).toFixed(2)}`}
+              </span>
             </div>
           </div>
+
+          {confirmedBooking.payment_status === 'unpaid' && Number(confirmedBooking.total_amount || confirmedBooking.servicePrice) > 0 && (
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-left space-y-1.5">
+              <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
+                <AlertCircle className="h-4 w-4 text-amber-400 shrink-0" />
+                Payment Due Upon Arrival
+              </div>
+              <p className="text-xs text-zinc-300 leading-relaxed">
+                Please settle your appointment fee of <strong className="text-white">R {Number(confirmedBooking.total_amount || confirmedBooking.servicePrice).toFixed(2)}</strong> at the studio counter via our PayFast card machine or cash before your haircut.
+              </p>
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row gap-3 pt-4">
             <Link href="/account" className="flex-1">
@@ -926,6 +1044,95 @@ function BookContent() {
               })()}
             </div>
 
+            {/* Payment Method Selector (When service requires payment) */}
+            {(() => {
+              const cov = isServiceCovered(selectedService);
+              if (hasActiveSubscription && cov.covered) {
+                return (
+                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-300 flex items-center space-x-2">
+                    <Crown className="h-4 w-4 text-emerald-400 shrink-0" />
+                    <span>Included in your active membership quota (R0.00).</span>
+                  </div>
+                );
+              }
+              return (
+                <div className="space-y-2 pt-2 border-t border-zinc-800">
+                  <Label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
+                    Select Payment Method
+                  </Label>
+                  <div className="grid grid-cols-1 gap-2">
+                    {/* Option A: Pay Online (PayFast) */}
+                    <button
+                      type="button"
+                      onClick={() => setPaymentChoice('payfast')}
+                      className={`flex items-start text-left p-3 rounded-xl border transition-all ${
+                        paymentChoice === 'payfast'
+                          ? 'border-amber-500 bg-amber-500/10 text-white'
+                          : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700'
+                      }`}
+                    >
+                      <div className="flex h-5 items-center mr-3">
+                        <input
+                          type="radio"
+                          name="payment_choice"
+                          checked={paymentChoice === 'payfast'}
+                          onChange={() => setPaymentChoice('payfast')}
+                          className="h-4 w-4 text-amber-500 focus:ring-amber-500 border-zinc-700 bg-zinc-800"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                            <CreditCard className="h-3.5 w-3.5 text-amber-400" /> Pay Online (PayFast)
+                          </span>
+                          <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                            Instant Confirm
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-zinc-400 mt-0.5">
+                          Cards, Instant EFT, Capitec Pay, SnapScan
+                        </p>
+                      </div>
+                    </button>
+
+                    {/* Option B: Pay in the Chair */}
+                    <button
+                      type="button"
+                      onClick={() => setPaymentChoice('pay_in_chair')}
+                      className={`flex items-start text-left p-3 rounded-xl border transition-all ${
+                        paymentChoice === 'pay_in_chair'
+                          ? 'border-amber-500 bg-amber-500/10 text-white'
+                          : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700'
+                      }`}
+                    >
+                      <div className="flex h-5 items-center mr-3">
+                        <input
+                          type="radio"
+                          name="payment_choice"
+                          checked={paymentChoice === 'pay_in_chair'}
+                          onChange={() => setPaymentChoice('pay_in_chair')}
+                          className="h-4 w-4 text-amber-500 focus:ring-amber-500 border-zinc-700 bg-zinc-800"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <div className="flex items-center justify-between">
+                          <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                            <Scissors className="h-3.5 w-3.5 text-amber-400" /> Pay in the Chair
+                          </span>
+                          <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
+                            Pay on Arrival
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-zinc-400 mt-0.5">
+                          Settle via PayFast card machine or cash at studio counter
+                        </p>
+                      </div>
+                    </button>
+                  </div>
+                </div>
+              );
+            })()}
+
             {/* Special Requests / Notes */}
             <div className="space-y-1.5">
               <Label className="text-xs text-zinc-400">Grooming Notes (Optional)</Label>
@@ -946,16 +1153,20 @@ function BookContent() {
             <Button
               disabled={!selectedSlot || submitting}
               onClick={handleConfirmBooking}
-              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm py-5"
+              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm py-5 shadow-lg shadow-amber-500/10"
             >
               {submitting
-                ? 'Confirming Appointment...'
+                ? 'Processing...'
                 : (() => {
                     const cov = isServiceCovered(selectedService);
                     if (hasActiveSubscription && cov.covered) {
                       return 'Confirm Appointment (Included in Membership)';
                     }
-                    return `Confirm Appointment (R ${selectedService ? Number(selectedService.price).toFixed(2) : '0.00'})`;
+                    const priceStr = `R ${selectedService ? Number(selectedService.price).toFixed(2) : '0.00'}`;
+                    if (paymentChoice === 'payfast') {
+                      return `Pay Online with PayFast (${priceStr})`;
+                    }
+                    return `Confirm & Pay in Chair (${priceStr})`;
                   })()}
             </Button>
           </Card>
