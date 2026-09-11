@@ -82,6 +82,19 @@ export default function RootLayout({
 
             <div className="pt-6 flex flex-col sm:flex-row items-center justify-between text-xs text-zinc-600 gap-3">
               <p>&copy; {new Date().getFullYear()} Dissafyt Platform. All rights reserved.</p>
+              <div className="flex items-center space-x-4 text-xs text-zinc-500">
+                <Link href="/privacy" className="hover:text-amber-400 transition-colors">
+                  Privacy Policy
+                </Link>
+                <span>•</span>
+                <Link href="/terms" className="hover:text-amber-400 transition-colors">
+                  Terms & Conditions
+                </Link>
+                <span>•</span>
+                <Link href="/data-deletion" className="hover:text-amber-400 transition-colors">
+                  Data Deletion
+                </Link>
+              </div>
               <p className="font-mono text-[11px] text-zinc-500">
                 POWERED BY PAYFAST ZAR // EXPRESS NATIONWIDE COURIER
               </p>
