@@ -542,7 +542,7 @@ function BookContent() {
                 <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
                   Included in Membership (R0.00)
                 </span>
-              ) : confirmedBooking.payment_status === 'paid_online' ? (
+              ) : confirmedBooking.payment_status === 'paid_online' || searchParams.get('paid') === '1' ? (
                 <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
                   Paid Online via PayFast
                 </span>
@@ -562,7 +562,7 @@ function BookContent() {
             </div>
           </div>
 
-          {confirmedBooking.payment_status === 'unpaid' && Number(confirmedBooking.total_amount || confirmedBooking.servicePrice) > 0 && (
+          {confirmedBooking.payment_status === 'unpaid' && searchParams.get('paid') !== '1' && Number(confirmedBooking.total_amount || confirmedBooking.servicePrice) > 0 && (
             <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-left space-y-1.5">
               <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
                 <AlertCircle className="h-4 w-4 text-amber-400 shrink-0" />

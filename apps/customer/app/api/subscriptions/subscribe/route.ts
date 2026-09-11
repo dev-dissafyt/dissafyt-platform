@@ -135,38 +135,33 @@ export async function POST(request: NextRequest) {
     const merchantKey = process.env.PAYFAST_MERCHANT_KEY || 'c08hjtdezifi4';
 
     const payfastData: Record<string, string> = {
-      cmd: '_paynow',
-      receiver: merchantId,
+      merchant_id: merchantId,
+      merchant_key: merchantKey,
       return_url: `${siteUrl}/book?subscribed=true&plan=${planCode}`,
       cancel_url: `${siteUrl}/book?cancelled=true`,
       notify_url: `${siteUrl}/api/payments/payfast-notify`,
-      amount: plan.price.toFixed(2),
-      item_name: `Ace of Fyt - ${plan.name}`,
-      item_description: plan.description,
-      subscription_type: '1',
-      recurring_amount: plan.price.toFixed(2),
-      cycles: '12',
-      frequency: '3', // Monthly
       name_first: firstName,
       name_last: lastName,
       email_address: email,
       ...(cellNumber ? { cell_number: cellNumber } : {}),
+      m_payment_id: `sub_${authCtx.userId.slice(0, 8)}_${Date.now()}`,
+      amount: plan.price.toFixed(2),
+      item_name: `Ace of Fyt - ${plan.name}`,
+      item_description: plan.description,
       custom_str1: planCode,
       custom_str2: authCtx.userId,
+      subscription_type: '1',
+      recurring_amount: plan.price.toFixed(2),
+      frequency: '3', // Monthly
+      cycles: '0',    // Indefinite
     };
 
-    const signature = PayfastService.generateSignature(payfastData);
+    const payfast = PayfastService.createTransactionPayload(payfastData);
 
     return NextResponse.json({
       success: true,
       activatedImmediately: false,
-      payfast: {
-        action: process.env.PAYFAST_ENVIRONMENT || 'https://payment.payfast.io/eng/process',
-        fields: {
-          ...payfastData,
-          signature,
-        },
-      },
+      payfast,
     });
   } catch (err: any) {
     console.error('Subscription setup error:', err);

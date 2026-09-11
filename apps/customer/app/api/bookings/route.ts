@@ -105,27 +105,19 @@ export async function POST(request: NextRequest) {
         return_url: `${siteUrl}/book?confirmed_booking=${result.booking.id}&paid=1`,
         cancel_url: `${siteUrl}/book?cancelled_booking=${result.booking.id}`,
         notify_url: `${siteUrl}/api/payments/payfast-notify`,
-        m_payment_id: result.booking.id,
-        amount: Number(result.booking.total_amount).toFixed(2),
-        item_name: `Dissafyt Cut: ${serviceData?.name || 'Haircut'}`,
         name_first: firstName,
         ...(lastName ? { name_last: lastName } : {}),
         email_address: profile?.email || authCtx.email || '',
         ...(profile?.phone ? { cell_number: profile.phone } : {}),
+        m_payment_id: result.booking.id,
+        amount: Number(result.booking.total_amount).toFixed(2),
+        item_name: `Dissafyt Cut - ${serviceData?.name || 'Haircut'}`,
         custom_str1: result.booking.id,
         custom_str2: authCtx.userId,
         custom_str3: 'booking',
       };
 
-      const signature = PayfastService.generateSignature(payfastData);
-
-      payfast = {
-        action: process.env.PAYFAST_ENVIRONMENT || 'https://payment.payfast.io/eng/process',
-        fields: {
-          ...payfastData,
-          signature,
-        },
-      };
+      payfast = PayfastService.createTransactionPayload(payfastData);
     }
 
     return NextResponse.json({

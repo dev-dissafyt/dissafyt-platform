@@ -82,28 +82,22 @@ export async function POST(request: NextRequest) {
       return_url: `${siteUrl}/checkout/success?order=${order.order_number}`,
       cancel_url: `${siteUrl}/checkout?cancelled=1`,
       notify_url: `${siteUrl}/api/payments/payfast-notify`,
-      m_payment_id: order.id,
-      amount: Number(order.total).toFixed(2),
-      item_name: `Dissafyt Order ${order.order_number}`,
       name_first: firstName,
       ...(lastName ? { name_last: lastName } : {}),
       ...(recipientEmail ? { email_address: recipientEmail } : {}),
       ...(recipientPhone ? { cell_number: recipientPhone } : {}),
+      m_payment_id: order.id,
+      amount: Number(order.total).toFixed(2),
+      item_name: `Dissafyt Order ${order.order_number}`,
       custom_str1: order.id,
       custom_str2: userId,
     };
 
-    const signature = PayfastService.generateSignature(payfastData);
+    const payfast = PayfastService.createTransactionPayload(payfastData);
 
     return NextResponse.json({
       order,
-      payfast: {
-        action: process.env.PAYFAST_ENVIRONMENT || 'https://payment.payfast.io/eng/process',
-        fields: {
-          ...payfastData,
-          signature,
-        },
-      },
+      payfast,
     }, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });

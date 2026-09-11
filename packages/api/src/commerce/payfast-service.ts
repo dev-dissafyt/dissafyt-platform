@@ -20,6 +20,73 @@ export interface PayfastNotifyPayload {
   [key: string]: string | undefined;
 }
 
+export const PAYFAST_CANONICAL_ORDER = [
+  // Merchant details
+  'merchant_id',
+  'merchant_key',
+  'return_url',
+  'cancel_url',
+  'notify_url',
+  'fica_idnumber',
+
+  // Customer details
+  'name_first',
+  'name_last',
+  'email_address',
+  'cell_number',
+
+  // Transaction details
+  'm_payment_id',
+  'amount',
+  'item_name',
+  'item_description',
+  'custom_int1',
+  'custom_int2',
+  'custom_int3',
+  'custom_int4',
+  'custom_int5',
+  'custom_str1',
+  'custom_str2',
+  'custom_str3',
+  'custom_str4',
+  'custom_str5',
+
+  // Transaction options
+  'email_confirmation',
+  'confirmation_address',
+
+  // Payment methods
+  'payment_method',
+
+  // Recurring billing / Subscriptions
+  'subscription_type',
+  'billing_date',
+  'recurring_amount',
+  'frequency',
+  'cycles',
+  'subscription_notify_email',
+
+  // Tokenization
+  'token',
+  'return',
+] as const;
+
+/**
+ * PHP urlencode implementation (RFC 1738 compliant).
+ * Matches PHP urlencode() used by PayFast servers:
+ * spaces encoded as '+', and characters ! ' ( ) * ~ encoded.
+ */
+export function phpUrlEncode(str: string): string {
+  return encodeURIComponent(str)
+    .replace(/%20/g, '+')
+    .replace(/!/g, '%21')
+    .replace(/'/g, '%27')
+    .replace(/\(/g, '%28')
+    .replace(/\)/g, '%29')
+    .replace(/\*/g, '%2A')
+    .replace(/~/g, '%7E');
+}
+
 export class PayfastService {
   private static get merchantId(): string {
     return process.env.PAYFAST_MERCHANT_ID || process.env.NEXT_PUBLIC_PAYFAST_MERCHANT_ID || '17675995';
@@ -34,32 +101,107 @@ export class PayfastService {
   }
 
   /**
-   * Generates MD5 signature for PayFast transactions.
+   * Sorts and sanitizes PayFast transaction attributes into the strict canonical
+   * sequence required by the PayFast payment processor.
    */
-  static generateSignature(data: Record<string, string | number | undefined>, passphrase = this.passphrase): string {
-    let pfOutput = '';
-    for (const key of Object.keys(data)) {
-      const val = data[key];
+  static formatPaymentPayload(data: Record<string, string | number | undefined>): Record<string, string> {
+    const clean: Record<string, string> = {};
+    for (const [key, val] of Object.entries(data)) {
       if (val !== undefined && val !== null && String(val).trim() !== '' && key !== 'signature') {
-        pfOutput += `${key.trim()}=${encodeURIComponent(String(val).trim()).replace(/%20/g, '+')}&`;
+        clean[key.trim()] = String(val).trim();
+      }
+    }
+
+    const sortedKeys = Object.keys(clean).sort((a, b) => {
+      const idxA = (PAYFAST_CANONICAL_ORDER as readonly string[]).indexOf(a);
+      const idxB = (PAYFAST_CANONICAL_ORDER as readonly string[]).indexOf(b);
+      if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+      if (idxA !== -1) return -1;
+      if (idxB !== -1) return 1;
+      return a.localeCompare(b);
+    });
+
+    const ordered: Record<string, string> = {};
+    for (const k of sortedKeys) {
+      ordered[k] = clean[k];
+    }
+    return ordered;
+  }
+
+  /**
+   * Generates MD5 signature for PayFast transactions.
+   * If sortCanonical is true (default), keys are ordered strictly according to PayFast's official sequence.
+   */
+  static generateSignature(
+    data: Record<string, string | number | undefined>,
+    passphrase = this.passphrase,
+    sortCanonical = true
+  ): string {
+    const fields = sortCanonical ? this.formatPaymentPayload(data) : data;
+    let pfOutput = '';
+    for (const key of Object.keys(fields)) {
+      const val = fields[key];
+      if (val !== undefined && val !== null && String(val).trim() !== '' && key !== 'signature') {
+        pfOutput += `${key.trim()}=${phpUrlEncode(String(val).trim())}&`;
       }
     }
 
     let getString = pfOutput.slice(0, -1);
-    if (passphrase) {
-      getString += `&passphrase=${encodeURIComponent(passphrase.trim()).replace(/%20/g, '+')}`;
+    if (passphrase && passphrase.trim() !== '') {
+      getString += `&passphrase=${phpUrlEncode(passphrase.trim())}`;
     }
 
     return crypto.createHash('md5').update(getString).digest('hex');
   }
 
   /**
+   * Generates a fully formatted, canonically ordered PayFast transaction payload
+   * ready for form submission with matching MD5 signature.
+   */
+  static createTransactionPayload(
+    data: Record<string, string | number | undefined>,
+    passphrase = this.passphrase
+  ): { action: string; fields: Record<string, string> } {
+    const orderedFields = this.formatPaymentPayload(data);
+    const signature = this.generateSignature(orderedFields, passphrase, false);
+    return {
+      action: this.host,
+      fields: {
+        ...orderedFields,
+        signature,
+      },
+    };
+  }
+
+  /**
    * Validates incoming PayFast ITN callback.
+   * Checks received parameter order (per PayFast ITN specification) with fallback to canonical.
    */
   static validateSignature(payload: PayfastNotifyPayload, passphrase = this.passphrase): boolean {
     if (!payload.signature) return false;
-    const calculatedSignature = this.generateSignature(payload, passphrase);
-    return calculatedSignature.toLowerCase() === payload.signature.toLowerCase();
+    const targetSig = payload.signature.toLowerCase();
+
+    // 1. Check in received order with configured passphrase
+    const sigReceivedWithPass = this.generateSignature(payload, passphrase, false);
+    if (sigReceivedWithPass.toLowerCase() === targetSig) return true;
+
+    // 2. Check in received order without passphrase (in case merchant dashboard has no passphrase set)
+    if (passphrase) {
+      const sigReceivedNoPass = this.generateSignature(payload, '', false);
+      if (sigReceivedNoPass.toLowerCase() === targetSig) return true;
+    }
+
+    // 3. Check in canonical order with configured passphrase
+    const sigCanonicalWithPass = this.generateSignature(payload, passphrase, true);
+    if (sigCanonicalWithPass.toLowerCase() === targetSig) return true;
+
+    // 4. Check in canonical order without passphrase
+    if (passphrase) {
+      const sigCanonicalNoPass = this.generateSignature(payload, '', true);
+      if (sigCanonicalNoPass.toLowerCase() === targetSig) return true;
+    }
+
+    return false;
   }
 
   /**
