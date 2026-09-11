@@ -17,8 +17,27 @@ export const DEFAULT_OPERATOR: AdminOperator = {
 export function getActiveOperator(): AdminOperator {
   if (typeof window === 'undefined') return DEFAULT_OPERATOR;
   try {
+    const cookieEmail = getCookie('dissafyt_admin_email');
+    const cookieRole = (getCookie('dissafyt_admin_role') as AppRole) || 'admin';
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (raw) return JSON.parse(raw);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (cookieEmail && parsed.email !== cookieEmail) {
+        return {
+          email: cookieEmail,
+          role: cookieRole,
+          fullName: cookieEmail.split('@')[0],
+        };
+      }
+      return parsed;
+    }
+    if (cookieEmail) {
+      return {
+        email: cookieEmail,
+        role: cookieRole,
+        fullName: cookieEmail.split('@')[0],
+      };
+    }
   } catch {
     // ignore
   }

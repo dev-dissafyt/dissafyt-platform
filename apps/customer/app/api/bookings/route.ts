@@ -52,7 +52,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { service_id, staff_id, start_time, notes, payment_choice } = body;
+    const { service_id, staff_id, start_time, notes, payment_choice, location_id } = body;
 
     if (!service_id || !start_time) {
       return NextResponse.json(
@@ -67,6 +67,7 @@ export async function POST(request: NextRequest) {
       staff_id: staff_id || null,
       start_time,
       notes,
+      location_id: location_id || 'loc-cpt-flagship',
       payment_choice: payment_choice || 'payfast',
     });
 

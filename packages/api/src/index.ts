@@ -9,6 +9,7 @@ export * from './admin/admin-user-service';
 export * from './commerce/payfast-service';
 export * from './commerce/order-service';
 export * from './barbershop/barbershop-service';
+export * from './barbershop/domain';
 export * from './reporting/reporting-service';
 export * from './studio/studio-service';
 export * from './studio/brand-service';

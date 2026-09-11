@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient, BarberService } from '@dissafyt/database';
 import { AuditService } from '../audit/audit-service';
+import { BarbershopService } from '../barbershop/barbershop-service';
 
 export interface CreateServiceInput {
   name: string;
@@ -203,20 +204,55 @@ export class AdminBarbershopService {
   }
 
   /**
-   * Lists all barbershop staff.
+   * Lists all barbershop staff, optionally filtered by location, with location metadata attached.
    */
-  static async listStaff(): Promise<any[]> {
+  static async listStaff(locationId?: string): Promise<any[]> {
     const admin = getSupabaseAdminClient();
-    const { data, error } = await admin
+    let query = admin
       .from('staff')
       .select('*')
       .order('display_name', { ascending: true });
 
+    if (locationId && locationId !== 'all') {
+      query = query.eq('location_id', locationId);
+    }
+
+    const { data, error } = await query;
+
     if (error || !data) {
+      // Fallback query without location_id filter if column missing in Postgres schema cache
+      if (locationId && error?.code === 'PGRST204') {
+        const { data: fbData } = await admin
+          .from('staff')
+          .select('*')
+          .order('display_name', { ascending: true });
+        if (fbData) {
+          const locations = await BarbershopService.listLocations();
+          return fbData.map((member: any) => {
+            const locId = member.location_id || 'loc-cpt-flagship';
+            const loc = locations.find((l) => l.id === locId) || locations[0] || null;
+            return {
+              ...member,
+              location_id: locId,
+              location: loc,
+            };
+          });
+        }
+      }
       console.error('Failed to list staff:', error);
       return [];
     }
-    return data;
+
+    const locations = await BarbershopService.listLocations();
+    return data.map((member: any) => {
+      const locId = member.location_id || 'loc-cpt-flagship';
+      const loc = locations.find((l) => l.id === locId) || locations[0] || null;
+      return {
+        ...member,
+        location_id: locId,
+        location: loc,
+      };
+    });
   }
 
   /**
@@ -231,15 +267,18 @@ export class AdminBarbershopService {
       working_hours?: any;
       user_id?: string | null;
       is_active?: boolean;
+      location_id?: string | null;
     },
     actor?: { email?: string; role?: string }
   ): Promise<{ success: boolean; staff?: any; error?: string }> {
     const admin = getSupabaseAdminClient();
+    const resolvedLocationId = input.location_id || 'loc-cpt-flagship';
     const payload: any = {
       display_name: input.display_name,
       bio: input.bio || '',
       user_id: input.user_id || null,
       is_active: input.is_active !== undefined ? input.is_active : true,
+      location_id: resolvedLocationId,
     };
     if (input.phone) payload.phone = input.phone;
     if (input.avatar_url) payload.avatar_url = input.avatar_url;
@@ -258,6 +297,7 @@ export class AdminBarbershopService {
         delete payload.phone;
         delete payload.avatar_url;
         delete payload.working_hours;
+        delete payload.location_id;
 
         const { data: fbData, error: fbError } = await admin
           .from('staff')
@@ -273,12 +313,17 @@ export class AdminBarbershopService {
           phone: input.phone || null,
           avatar_url: input.avatar_url || null,
           working_hours: input.working_hours || null,
+          location_id: resolvedLocationId,
         };
       } else {
         return { success: false, error: error.message };
       }
     } else {
       createdStaff = data;
+    }
+
+    if (!createdStaff.location_id) {
+      createdStaff.location_id = resolvedLocationId;
     }
 
     // Invisible Audit Trail
@@ -300,7 +345,7 @@ export class AdminBarbershopService {
    */
   static async updateStaff(
     id: string,
-    input: { display_name?: string; bio?: string; phone?: string; avatar_url?: string; working_hours?: any; is_active?: boolean; user_id?: string | null },
+    input: { display_name?: string; bio?: string; phone?: string; avatar_url?: string; working_hours?: any; is_active?: boolean; user_id?: string | null; location_id?: string | null },
     actor?: { email?: string; role?: string }
   ): Promise<{ success: boolean; staff?: any; error?: string }> {
     const admin = getSupabaseAdminClient();
@@ -317,12 +362,13 @@ export class AdminBarbershopService {
         .single();
 
       if (error) {
-        // Gracefully handle missing columns in schema cache (e.g. phone, avatar_url, working_hours)
+        // Gracefully handle missing columns in schema cache (e.g. phone, avatar_url, working_hours, location_id)
         if (error.code === 'PGRST204' || error.message?.includes('column') || error.message?.includes('schema cache')) {
           console.warn('Staff update fallback: schema column missing, stripping pending columns:', error.message);
           delete payload.phone;
           delete payload.avatar_url;
           delete payload.working_hours;
+          delete payload.location_id;
 
           const { data: fbData, error: fbError } = await admin
             .from('staff')
@@ -341,12 +387,17 @@ export class AdminBarbershopService {
             phone: input.phone !== undefined ? input.phone : beforeData?.phone,
             avatar_url: input.avatar_url !== undefined ? input.avatar_url : beforeData?.avatar_url,
             working_hours: input.working_hours !== undefined ? input.working_hours : beforeData?.working_hours,
+            location_id: input.location_id !== undefined ? input.location_id : (beforeData?.location_id || 'loc-cpt-flagship'),
           };
         } else {
           return { success: false, error: error.message };
         }
       } else {
         updatedStaff = data;
+      }
+
+      if (!updatedStaff.location_id) {
+        updatedStaff.location_id = input.location_id || beforeData?.location_id || 'loc-cpt-flagship';
       }
 
       // Invisible Audit Trail
@@ -409,6 +460,7 @@ export class AdminBarbershopService {
     date?: string;
     staffId?: string;
     status?: string;
+    locationId?: string;
   }): Promise<any[]> {
     const admin = getSupabaseAdminClient();
 
@@ -444,12 +496,65 @@ export class AdminBarbershopService {
       query = query.eq('status', filters.status);
     }
 
-    const { data, error } = await query;
+    if (filters?.locationId && filters.locationId !== 'all') {
+      query = query.eq('location_id', filters.locationId);
+    }
+
+    let { data, error } = await query;
+
+    // Fallback if location_id query fails due to missing column in cache
+    if ((error || !data) && filters?.locationId) {
+      let fbQuery = admin
+        .from('bookings')
+        .select(`
+          *,
+          service:services(*),
+          staff:staff(*),
+          customer:profiles(*)
+        `)
+        .order('start_time', { ascending: true });
+
+      if (filters?.date && filters.date !== 'all') {
+        if (filters.date === 'upcoming') {
+          const now = new Date();
+          fbQuery = fbQuery.gte('end_time', now.toISOString());
+        } else if (filters.date === 'past') {
+          const now = new Date();
+          fbQuery = fbQuery.lt('end_time', now.toISOString());
+        } else {
+          const dayStart = new Date(`${filters.date}T00:00:00+02:00`).toISOString();
+          const dayEnd = new Date(`${filters.date}T23:59:59.999+02:00`).toISOString();
+          fbQuery = fbQuery.gte('start_time', dayStart).lte('start_time', dayEnd);
+        }
+      }
+      if (filters?.staffId && filters.staffId !== 'all') {
+        fbQuery = fbQuery.eq('staff_id', filters.staffId);
+      }
+      if (filters?.status && filters.status !== 'all') {
+        fbQuery = fbQuery.eq('status', filters.status);
+      }
+      const { data: fbData, error: fbError } = await fbQuery;
+      if (!fbError && fbData) {
+        data = fbData;
+        error = null;
+      }
+    }
+
     if (error || !data) {
       console.error('Failed to list bookings:', error);
       return [];
     }
-    return data;
+
+    const locations = await BarbershopService.listLocations();
+    return data.map((b: any) => {
+      const locId = b.location_id || b.staff?.location_id || 'loc-cpt-flagship';
+      const loc = locations.find((l) => l.id === locId) || locations[0] || null;
+      return {
+        ...b,
+        location_id: locId,
+        location: loc,
+      };
+    });
   }
 
   /**

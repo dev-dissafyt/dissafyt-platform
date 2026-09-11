@@ -449,6 +449,7 @@ function BookContent() {
           start_time: selectedSlot.startTime,
           notes,
           payment_choice: chosenPayment,
+          location_id: 'loc-cpt-flagship',
         }),
       });
 
@@ -571,6 +572,20 @@ function BookContent() {
               <p className="text-xs text-zinc-300 leading-relaxed">
                 Please settle your appointment fee of <strong className="text-white">R {Number(confirmedBooking.total_amount || confirmedBooking.servicePrice).toFixed(2)}</strong> at the studio counter via our PayFast card machine or cash before your haircut.
               </p>
+            </div>
+          )}
+
+          {confirmedBooking.start_time && (
+            <div className="pt-2">
+              <a
+                href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`Ace of Fyt: ${confirmedBooking.serviceName}`)}&dates=${new Date(confirmedBooking.start_time).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}/${new Date(confirmedBooking.end_time || new Date(new Date(confirmedBooking.start_time).getTime() + 30 * 60000)).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}&details=${encodeURIComponent(`Appointment with Ace of Fyt Barbershop.\nService: ${confirmedBooking.serviceName}\nStudio: Dissafyt Studio, Cape Town`)}&location=${encodeURIComponent('Dissafyt Studio, Cape Town, Western Cape, South Africa')}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full inline-flex items-center justify-center rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs font-bold text-amber-300 hover:bg-amber-500/20 transition-all shadow-sm"
+              >
+                <CalendarCheck className="mr-2 h-4 w-4 text-amber-400" />
+                Add to Google Calendar
+              </a>
             </div>
           )}
 

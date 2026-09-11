@@ -17,11 +17,13 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date') || undefined;
     const staffId = searchParams.get('staffId') || undefined;
     const status = searchParams.get('status') || undefined;
+    const locationId = searchParams.get('locationId') || undefined;
 
     const bookings = await AdminBarbershopService.listBookings({
       date,
       staffId,
       status,
+      locationId,
     });
 
     return NextResponse.json(bookings);

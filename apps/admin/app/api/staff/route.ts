@@ -13,7 +13,9 @@ export async function GET(request: NextRequest) {
   if (isAuthFailure(auth)) return auth;
 
   try {
-    const staff = await AdminBarbershopService.listStaff();
+    const { searchParams } = new URL(request.url);
+    const locationId = searchParams.get('locationId') || undefined;
+    const staff = await AdminBarbershopService.listStaff(locationId);
     return NextResponse.json(staff);
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to list staff' }, { status: 500 });
@@ -30,7 +32,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { display_name, bio, phone, is_active, user_id } = body;
+    const { display_name, bio, phone, is_active, user_id, location_id } = body;
 
     if (!display_name) {
       return NextResponse.json({ error: 'Display name is required' }, { status: 400 });
@@ -43,6 +45,7 @@ export async function POST(request: NextRequest) {
         phone: phone || undefined,
         is_active: is_active !== undefined ? is_active : true,
         user_id: user_id || null,
+        location_id: location_id || undefined,
       },
       { email: auth.email, role: auth.role }
     );

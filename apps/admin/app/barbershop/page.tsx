@@ -51,6 +51,8 @@ interface StaffMember {
   display_name: string;
   bio?: string | null;
   phone?: string | null;
+  location_id?: string | null;
+  location?: BarbershopLocation | null;
   is_active: boolean;
   created_at: string;
 }
@@ -60,13 +62,17 @@ interface BookingRecord {
   customer_id: string;
   service_id: string;
   staff_id?: string | null;
+  location_id?: string | null;
+  location?: BarbershopLocation | null;
   start_time: string;
   end_time: string;
   status: string;
+  payment_status?: string;
+  is_subscription_covered?: boolean;
   total_amount: number;
   notes?: string | null;
   service?: { name: string; duration_minutes: number; price: number };
-  staff?: { display_name: string } | null;
+  staff?: { display_name: string; location_id?: string } | null;
   customer?: { full_name?: string; email?: string; phone?: string } | null;
 }
 
@@ -104,6 +110,7 @@ export default function AdminBarbershopPage() {
   const [staffDisplayName, setStaffDisplayName] = useState('');
   const [staffBio, setStaffBio] = useState('');
   const [staffPhone, setStaffPhone] = useState('');
+  const [staffLocationId, setStaffLocationId] = useState('loc-cpt-flagship');
   const [staffSubmitting, setStaffSubmitting] = useState(false);
 
   // --- TAB 3: SERVICES STATE ---
@@ -134,6 +141,7 @@ export default function AdminBarbershopPage() {
   const [editStaffName, setEditStaffName] = useState('');
   const [editStaffBio, setEditStaffBio] = useState('');
   const [editStaffPhone, setEditStaffPhone] = useState('');
+  const [editStaffLocationId, setEditStaffLocationId] = useState('loc-cpt-flagship');
   const [editStaffActive, setEditStaffActive] = useState(true);
   const [editStaffSubmitting, setEditStaffSubmitting] = useState(false);
 
@@ -169,6 +177,7 @@ export default function AdminBarbershopPage() {
       if (filterDate) params.set('date', filterDate);
       if (filterStaffId !== 'all') params.set('staffId', filterStaffId);
       if (filterStatus !== 'all') params.set('status', filterStatus);
+      if (filterLocationId !== 'all') params.set('locationId', filterLocationId);
 
       const res = await adminFetch(`/api/bookings?${params.toString()}`);
       if (res.ok) setBookings(await res.json());
@@ -263,7 +272,7 @@ export default function AdminBarbershopPage() {
 
   useEffect(() => {
     loadBookings();
-  }, [filterDate, filterStaffId, filterStatus]);
+  }, [filterDate, filterStaffId, filterStatus, filterLocationId]);
 
   // --- APPOINTMENT ACTIONS ---
   async function handleUpdateBookingStatus(id: string, status: string) {
@@ -312,6 +321,7 @@ export default function AdminBarbershopPage() {
     setEditStaffName(staff.display_name);
     setEditStaffBio(staff.bio || '');
     setEditStaffPhone(staff.phone || '');
+    setEditStaffLocationId(staff.location_id || 'loc-cpt-flagship');
     setEditStaffActive(staff.is_active);
   }
 
@@ -328,6 +338,7 @@ export default function AdminBarbershopPage() {
           display_name: editStaffName,
           bio: editStaffBio,
           phone: editStaffPhone,
+          location_id: editStaffLocationId,
           is_active: editStaffActive,
         }),
       });
@@ -359,6 +370,7 @@ export default function AdminBarbershopPage() {
           display_name: staffDisplayName,
           bio: staffBio,
           phone: staffPhone,
+          location_id: staffLocationId,
           is_active: true,
         }),
       });
@@ -368,6 +380,7 @@ export default function AdminBarbershopPage() {
         setStaffDisplayName('');
         setStaffBio('');
         setStaffPhone('');
+        setStaffLocationId('loc-cpt-flagship');
         setShowAddStaffModal(false);
         loadStaff();
       } else {
@@ -594,7 +607,8 @@ export default function AdminBarbershopPage() {
   // Filter bookings by location
   const filteredBookings = bookings.filter((b) => {
     if (filterLocationId === 'all') return true;
-    return filterLocationId === 'loc-jhb-flagship';
+    const bookingLocId = (b as any).location_id || (b.staff as any)?.location_id || 'loc-cpt-flagship';
+    return bookingLocId === filterLocationId;
   });
 
   // Metrics for appointments (Audit-Compliant: Memberships are separated from cash walk-ins)
@@ -960,7 +974,9 @@ export default function AdminBarbershopPage() {
                             </div>
                             <div className="flex items-center space-x-1 text-stone-400">
                               <MapPin className="h-3.5 w-3.5 text-amber-500" />
-                              <span className="text-stone-300">Dissafyt Studio, Cape Town</span>
+                              <span className="text-stone-300">
+                                {b.location?.name || locations.find((l) => l.id === b.location_id)?.name || 'Dissafyt Studio, Cape Town'}
+                              </span>
                             </div>
                           </div>
 
@@ -1126,6 +1142,21 @@ export default function AdminBarbershopPage() {
                   />
                 </div>
 
+                <div className="space-y-1">
+                  <Label>Studio / Station Location</Label>
+                  <select
+                    value={staffLocationId}
+                    onChange={(e) => setStaffLocationId(e.target.value)}
+                    className="w-full h-10 rounded-md border border-stone-800 bg-stone-950 px-3 text-sm text-white focus:border-amber-500 focus:outline-none"
+                  >
+                    {locations.map((loc) => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.name} {loc.is_flagship ? '(Flagship)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="flex justify-end space-x-3 pt-3">
                   <Button
                     type="button"
@@ -1187,6 +1218,21 @@ export default function AdminBarbershopPage() {
                     onChange={(e) => setEditStaffPhone(e.target.value)}
                     placeholder="+27 82 123 4567"
                   />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Studio / Station Location</Label>
+                  <select
+                    value={editStaffLocationId}
+                    onChange={(e) => setEditStaffLocationId(e.target.value)}
+                    className="w-full h-10 rounded-md border border-stone-800 bg-stone-950 px-3 text-sm text-white focus:border-amber-500 focus:outline-none"
+                  >
+                    {locations.map((loc) => (
+                      <option key={loc.id} value={loc.id}>
+                        {loc.name} {loc.is_flagship ? '(Flagship)' : ''}
+                      </option>
+                    ))}
+                  </select>
                 </div>
 
                 <div className="space-y-1">
@@ -1275,7 +1321,12 @@ export default function AdminBarbershopPage() {
                     )}
                     <div className="flex items-center text-stone-300">
                       <MapPin className="h-3 w-3 mr-1 text-amber-500" />
-                      <span>Stationed: Dissafyt Studio, Cape Town (Flagship)</span>
+                      <span>
+                        Stationed:{' '}
+                        {staff.location?.name ||
+                          locations.find((l) => l.id === staff.location_id)?.name ||
+                          'Dissafyt Studio, Cape Town (Flagship)'}
+                      </span>
                     </div>
                     <div>Standard Hours: Mon-Fri 09:00 - 18:00, Sat 09:00 - 17:00</div>
                   </div>

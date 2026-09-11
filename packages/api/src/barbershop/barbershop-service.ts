@@ -252,21 +252,49 @@ export class BarbershopService {
   }
 
   /**
-   * Retrieves all active barbershop staff.
+   * Retrieves all active barbershop staff, optionally filtered by location, with location metadata attached.
    */
-  static async listActiveStaff(): Promise<Staff[]> {
+  static async listActiveStaff(locationId?: string): Promise<Staff[]> {
     const admin = getSupabaseAdminClient();
-    const { data, error } = await admin
+    let query = admin
       .from('staff')
       .select('*')
       .eq('is_active', true)
       .order('display_name', { ascending: true });
 
+    if (locationId && locationId !== 'all') {
+      query = query.eq('location_id', locationId);
+    }
+
+    const { data, error } = await query;
+
     if (error || !data) {
+      // Fallback query without location_id filter if column missing
+      if (locationId && error?.code === 'PGRST204') {
+        const { data: fbData } = await admin
+          .from('staff')
+          .select('*')
+          .eq('is_active', true)
+          .order('display_name', { ascending: true });
+        if (fbData) {
+          const locations = await BarbershopService.listLocations();
+          return fbData.map((member: any) => ({
+            ...member,
+            location_id: member.location_id || 'loc-cpt-flagship',
+            location: locations.find((l) => l.id === (member.location_id || 'loc-cpt-flagship')) || locations[0],
+          })) as Staff[];
+        }
+      }
       console.error('Error fetching active staff:', error);
       return [];
     }
-    return data as Staff[];
+
+    const locations = await BarbershopService.listLocations();
+    return data.map((member: any) => ({
+      ...member,
+      location_id: member.location_id || 'loc-cpt-flagship',
+      location: locations.find((l) => l.id === (member.location_id || 'loc-cpt-flagship')) || locations[0],
+    })) as Staff[];
   }
 
   /**
@@ -278,6 +306,7 @@ export class BarbershopService {
     date: string; // "YYYY-MM-DD"
     serviceId: string;
     staffId?: string | null;
+    locationId?: string | null;
   }): Promise<{ slots: AvailableSlot[]; service?: BarberService; error?: string }> {
     const admin = getSupabaseAdminClient();
 
@@ -298,7 +327,23 @@ export class BarbershopService {
     if (params.staffId && params.staffId !== 'any') {
       staffQuery = staffQuery.eq('id', params.staffId);
     }
-    const { data: activeStaff, error: stErr } = await staffQuery;
+    if (params.locationId && params.locationId !== 'all') {
+      staffQuery = staffQuery.eq('location_id', params.locationId);
+    }
+    let { data: activeStaff, error: stErr } = await staffQuery;
+
+    // Fallback if location_id column does not exist yet in Postgres schema cache
+    if ((stErr || !activeStaff || activeStaff.length === 0) && params.locationId) {
+      let fbQuery = admin.from('staff').select('*').eq('is_active', true);
+      if (params.staffId && params.staffId !== 'any') {
+        fbQuery = fbQuery.eq('id', params.staffId);
+      }
+      const { data: fbStaff } = await fbQuery;
+      if (fbStaff && fbStaff.length > 0) {
+        activeStaff = fbStaff;
+        stErr = null;
+      }
+    }
 
     if (stErr || !activeStaff || activeStaff.length === 0) {
       return { slots: [], service, error: 'No active barbers available for this request.' };
@@ -761,7 +806,9 @@ export class BarbershopService {
       ? (statusNote ? `${input.notes} (${statusNote})` : input.notes)
       : (statusNote || (isCoveredBySubscription ? 'Included in Member Subscription' : null));
 
-    // 4. Create booking record with audit attributes
+    const resolvedLocationId = input.location_id || 'loc-cpt-flagship';
+
+    // 4. Create booking record with audit attributes and location
     let bookingResult: any = null;
     try {
       const { data: bk, error: bErr } = await admin
@@ -770,6 +817,7 @@ export class BarbershopService {
           customer_id: input.customer_id,
           service_id: input.service_id,
           staff_id: assignedStaffId,
+          location_id: resolvedLocationId,
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
           status: bookingStatus,
@@ -785,8 +833,8 @@ export class BarbershopService {
       if (bErr) throw bErr;
       bookingResult = bk;
     } catch (insertErr: any) {
-      // Fallback if migration 0007 columns are not yet applied on Supabase PostgREST schema cache
-      console.warn('Booking insert with audit columns fallback:', insertErr?.message);
+      // Fallback if migration 0007 / 0011 columns are not yet applied on Supabase PostgREST schema cache
+      console.warn('Booking insert with audit/location columns fallback:', insertErr?.message);
       const { data: fallbackBk, error: fallbackErr } = await admin
         .from('bookings')
         .insert({
@@ -805,7 +853,14 @@ export class BarbershopService {
       if (fallbackErr || !fallbackBk) {
         return { success: false, error: fallbackErr?.message || 'Failed to create booking' };
       }
-      bookingResult = fallbackBk;
+      bookingResult = {
+        ...fallbackBk,
+        location_id: resolvedLocationId,
+      };
+    }
+
+    if (!bookingResult.location_id) {
+      bookingResult.location_id = resolvedLocationId;
     }
 
     return { success: true, booking: bookingResult };
@@ -868,7 +923,16 @@ export class BarbershopService {
       return [];
     }
 
-    return data as BookingWithDetails[];
+    const locations = await BarbershopService.listLocations();
+    return data.map((b: any) => {
+      const locId = b.location_id || b.staff?.location_id || 'loc-cpt-flagship';
+      const loc = locations.find((l) => l.id === locId) || locations[0] || null;
+      return {
+        ...b,
+        location_id: locId,
+        location: loc,
+      };
+    }) as BookingWithDetails[];
   }
 
   /**

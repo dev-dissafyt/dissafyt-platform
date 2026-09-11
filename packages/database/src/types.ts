@@ -192,6 +192,8 @@ export interface Staff {
   phone?: string | null;
   avatar_url?: string | null;
   working_hours?: any;
+  location_id?: string | null;
+  location?: BarbershopLocation | null;
   is_active: boolean;
   created_at: string;
 }
@@ -208,6 +210,7 @@ export interface Booking {
   customer_id: string;
   service_id: string;
   staff_id?: string | null;
+  location_id?: string | null;
   start_time: string;
   end_time: string;
   status: BookingStatus;
@@ -224,6 +227,7 @@ export interface Booking {
 export interface BookingWithDetails extends Booking {
   service?: BarberService;
   staff?: Staff | null;
+  location?: BarbershopLocation | null;
   customer?: Profile | null;
 }
 

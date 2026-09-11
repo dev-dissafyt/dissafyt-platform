@@ -16,8 +16,37 @@ import {
   Layers,
 } from 'lucide-react';
 import { SubscriptionCarousel } from './components/subscription-carousel';
+import { AdminBarbershopService } from '@dissafyt/api';
 
-export default function HomePage() {
+export const dynamic = 'force-dynamic';
+
+export default async function HomePage() {
+  const allServices = await AdminBarbershopService.listServices().catch(() => []);
+  const activeServices = (allServices || []).filter((s) => s.is_active && !s.is_subscription);
+  const displayServices = activeServices.length > 0 ? activeServices.slice(0, 3) : [
+    {
+      id: 'default-1',
+      name: 'The Executive Combo',
+      description: 'Full service transformation: razor skin fade, beard architectural lineup, hot towel sculpt, and scalp treatment.',
+      price: 220,
+      duration_minutes: 45,
+    },
+    {
+      id: 'default-2',
+      name: 'The Ace Skin Fade',
+      description: 'Zero-guard skin fade, taper fade, or burst fade with razor edge crisping and matte styling clay.',
+      price: 120,
+      duration_minutes: 30,
+    },
+    {
+      id: 'default-3',
+      name: 'Beard Sculpt & Towel',
+      description: 'Beard shaping, razor perimeter definition, steamed essential oil towel, and organic beard butter massage.',
+      price: 100,
+      duration_minutes: 30,
+    },
+  ];
+
   const marqueeItems = [
     'ACE OF FYT BARBERSHOP',
     'CAPE TOWN FLAGSHIP',
@@ -341,50 +370,47 @@ export default function HomePage() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8">
-            {/* Service 1 */}
-            <div className="rounded-2xl border border-amber-500/30 bg-amber-500/5 p-6 space-y-4 relative">
-              <div className="absolute top-4 right-4 rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30 font-mono">
-                FLAGSHIP SIGNATURE
-              </div>
-              <div>
-                <h4 className="font-display text-xl font-extrabold text-white">The Executive Combo</h4>
-                <p className="text-xs text-zinc-400 mt-1">
-                  Full service transformation: razor skin fade, beard architectural lineup, hot towel sculpt, and scalp treatment.
-                </p>
-              </div>
-              <div className="flex items-baseline space-x-2 pt-2 border-t border-amber-500/20">
-                <span className="text-2xl font-black text-amber-400 font-display">R 220</span>
-                <span className="text-xs text-zinc-400">/ or 2x per mo on Executive Pass</span>
-              </div>
-            </div>
-
-            {/* Service 2 */}
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 space-y-4">
-              <div>
-                <h4 className="font-display text-xl font-extrabold text-white">The Ace Skin Fade</h4>
-                <p className="text-xs text-zinc-400 mt-1">
-                  Zero-guard skin fade, taper fade, or burst fade with razor edge crisping and matte styling clay.
-                </p>
-              </div>
-              <div className="flex items-baseline space-x-2 pt-2 border-t border-zinc-800">
-                <span className="text-2xl font-black text-white font-display">R 120</span>
-                <span className="text-xs text-zinc-400">/ or included with Regular Pass</span>
-              </div>
-            </div>
-
-            {/* Service 3 */}
-            <div className="rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 space-y-4">
-              <div>
-                <h4 className="font-display text-xl font-extrabold text-white">Beard Sculpt & Towel</h4>
-                <p className="text-xs text-zinc-400 mt-1">
-                  Beard shaping, razor perimeter definition, steamed essential oil towel, and organic beard butter massage.
-                </p>
-              </div>
-              <div className="flex items-baseline space-x-2 pt-2 border-t border-zinc-800">
-                <span className="text-2xl font-black text-white font-display">R 100</span>
-                <span className="text-xs text-zinc-400">/ 30 min chair session</span>
-              </div>
-            </div>
+            {displayServices.map((service, index) => {
+              const isHighlight = index === 0;
+              return (
+                <div
+                  key={service.id}
+                  className={`rounded-2xl p-6 space-y-4 relative ${
+                    isHighlight
+                      ? 'border border-amber-500/30 bg-amber-500/5'
+                      : 'border border-zinc-800 bg-zinc-900/50'
+                  }`}
+                >
+                  {isHighlight && (
+                    <div className="absolute top-4 right-4 rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30 font-mono">
+                      FLAGSHIP SIGNATURE
+                    </div>
+                  )}
+                  <div>
+                    <h4 className="font-display text-xl font-extrabold text-white">{service.name}</h4>
+                    <p className="text-xs text-zinc-400 mt-1 line-clamp-2">
+                      {service.description || `${service.duration_minutes || 30} min session with precision razor finishing.`}
+                    </p>
+                  </div>
+                  <div
+                    className={`flex items-baseline space-x-2 pt-2 border-t ${
+                      isHighlight ? 'border-amber-500/20' : 'border-zinc-800'
+                    }`}
+                  >
+                    <span
+                      className={`text-2xl font-black font-display ${
+                        isHighlight ? 'text-amber-400' : 'text-white'
+                      }`}
+                    >
+                      R {Number(service.price).toFixed(0)}
+                    </span>
+                    <span className="text-xs text-zinc-400">
+                      / {service.duration_minutes || 30} min chair session
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       </section>
