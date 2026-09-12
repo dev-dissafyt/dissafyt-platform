@@ -27,30 +27,42 @@ function RegisterForm() {
     setSuccessMsg(null);
 
     try {
-      const supabase = getSupabaseBrowserClient();
-      const { data, error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            full_name: fullName,
-            phone,
-          },
-        },
+      // 1. Create authenticated account via high-speed API (bypasses Supabase SMTP 504 timeout)
+      const res = await fetch('/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          password,
+          fullName,
+          phone,
+        }),
       });
 
-      if (error) {
-        setErrorMsg(error.message);
+      const result = await res.json();
+
+      if (!res.ok || !result.success) {
+        setErrorMsg(result.error || 'Failed to create account.');
         setLoading(false);
         return;
       }
 
-      if (data.session) {
-        router.push(redirectUrl);
-      } else {
-        setSuccessMsg('Registration successful! Please check your email inbox to verify your account.');
+      // 2. Automatically log the client in with session persistence
+      const supabase = getSupabaseBrowserClient();
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+
+      if (signInError) {
+        setSuccessMsg('Account created successfully! Please sign in with your credentials.');
         setLoading(false);
+        return;
       }
+
+      // 3. Instant redirect to destination
+      router.push(redirectUrl);
+      router.refresh();
     } catch (err: unknown) {
       setErrorMsg(err instanceof Error ? err.message : 'An unexpected error occurred.');
       setLoading(false);
