@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import Image from 'next/image';
+import { headers } from 'next/headers';
 import './globals.css';
 
 import { Navbar } from './components/Navbar';
@@ -15,17 +16,22 @@ export default function RootLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const headersList = headers();
+  const platformApp = headersList.get('x-platform-app') || 'customer';
+  const isCustomer = platformApp === 'customer';
+
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
       <body className="min-h-screen flex flex-col bg-black text-zinc-50 antialiased selection:bg-amber-500 selection:text-black">
-        {/* Responsive Navigation Bar */}
-        <Navbar />
+        {/* Responsive Navigation Bar for Storefront */}
+        {isCustomer && <Navbar />}
 
         {/* Main Content Area */}
         <main className="flex-1">{children}</main>
 
         {/* High-End Editorial Footer */}
-        <footer className="border-t border-zinc-900 bg-black py-12 text-zinc-500">
+        {isCustomer && (
+          <footer className="border-t border-zinc-900 bg-black py-12 text-zinc-500">
           <div className="container mx-auto max-w-7xl px-4 sm:px-6">
             <div className="grid grid-cols-1 md:grid-cols-4 gap-8 pb-10 border-b border-zinc-900">
               <div className="md:col-span-2 space-y-4">
@@ -101,6 +107,7 @@ export default function RootLayout({
             </div>
           </div>
         </footer>
+        )}
       </body>
     </html>
   );
