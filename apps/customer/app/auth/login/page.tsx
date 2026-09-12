@@ -6,7 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { getSupabaseBrowserClient } from '@dissafyt/database';
 import Image from 'next/image';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from '@dissafyt/ui';
-import { Lock, Mail } from 'lucide-react';
+import { Lock, Mail, ShieldCheck } from 'lucide-react';
 
 function LoginForm() {
   const router = useRouter();
@@ -85,7 +85,15 @@ function LoginForm() {
           </div>
 
           <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="password">Password</Label>
+              <Link
+                href="/auth/forgot-password"
+                className="text-xs text-amber-500 hover:text-amber-400 font-medium transition-colors"
+              >
+                Forgot password?
+              </Link>
+            </div>
             <Input
               id="password"
               type="password"
@@ -113,6 +121,15 @@ function LoginForm() {
           >
             Sign up
           </Link>
+        </div>
+
+        {/* Security Trust Badge */}
+        <div className="mt-6 pt-4 border-t border-zinc-800/80 text-[11px] text-zinc-500 flex items-center justify-between font-mono">
+          <div className="flex items-center space-x-1.5">
+            <ShieldCheck className="h-3.5 w-3.5 text-amber-500" />
+            <span>256-Bit SSL Encrypted</span>
+          </div>
+          <span>Dissafyt Cape Town</span>
         </div>
       </CardContent>
     </Card>

@@ -174,7 +174,7 @@ function AdminLoginContent() {
           <div className="pt-4 border-t border-stone-800/80 text-[11px] text-stone-500 flex items-center justify-between font-mono">
             <div className="flex items-center space-x-1.5">
               <ShieldCheck className="h-3.5 w-3.5 text-emerald-500" />
-              <span>Supabase RBAC Auth</span>
+              <span>Dissafyt Sovereign Vault // RBAC</span>
             </div>
             <span>v2.4.0 CPT</span>
           </div>

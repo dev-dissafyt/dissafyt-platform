@@ -118,7 +118,7 @@ export default function AdminCustomersPage() {
         <CardHeader>
           <CardTitle className="text-lg text-white">Registered Users ({filteredUsers.length})</CardTitle>
           <CardDescription>
-            All profiles synchronized via Supabase Auth and PostgreSQL triggers.
+            All profiles synchronized via Dissafyt Auth Ledger.
           </CardDescription>
         </CardHeader>
         <CardContent>

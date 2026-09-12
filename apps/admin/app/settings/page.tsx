@@ -115,7 +115,7 @@ export default function AdminSettingsPage() {
               </div>
             </div>
             <p className="text-xs text-stone-500">
-              Note: The user must first register via the customer portal or Supabase Auth.
+              Note: The user must first register via the customer portal.
             </p>
           </form>
         </CardContent>
@@ -132,7 +132,7 @@ export default function AdminSettingsPage() {
         <CardContent className="space-y-3">
           <div className="flex items-center justify-between py-2 border-b border-stone-800">
             <div>
-              <div className="font-medium text-stone-200">Supabase PostgreSQL & Auth</div>
+              <div className="font-medium text-stone-200">Dissafyt Cloud Database & Auth Engine</div>
               <div className="text-xs text-stone-500 font-mono">https://ddetxmhghairsapcqmto.supabase.co</div>
             </div>
             <span className="flex items-center text-xs text-emerald-400 font-mono">

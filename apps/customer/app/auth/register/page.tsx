@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { getSupabaseBrowserClient } from '@dissafyt/database';
 import Image from 'next/image';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from '@dissafyt/ui';
+import { ShieldCheck } from 'lucide-react';
 
 function RegisterForm() {
   const router = useRouter();
@@ -163,6 +164,15 @@ function RegisterForm() {
           >
             Sign in
           </Link>
+        </div>
+
+        {/* Security Trust Badge */}
+        <div className="mt-6 pt-4 border-t border-zinc-800/80 text-[11px] text-zinc-500 flex items-center justify-between font-mono">
+          <div className="flex items-center space-x-1.5">
+            <ShieldCheck className="h-3.5 w-3.5 text-amber-500" />
+            <span>256-Bit SSL Encrypted</span>
+          </div>
+          <span>Dissafyt Cape Town</span>
         </div>
       </CardContent>
     </Card>

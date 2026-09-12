@@ -151,7 +151,7 @@ export default function AdminDashboardPage() {
             <div className="text-2xl font-bold text-white">
               {loading ? '...' : metrics?.overview.totalCustomers ?? 0}
             </div>
-            <p className="text-xs text-stone-500 mt-1">Unified Supabase Auth Profiles</p>
+            <p className="text-xs text-stone-500 mt-1">Unified Dissafyt Profiles</p>
           </CardContent>
         </Card>
 
@@ -365,7 +365,7 @@ export default function AdminDashboardPage() {
           </CardHeader>
           <CardContent className="space-y-3 text-xs">
             <div className="flex items-center justify-between py-2 border-b border-stone-800">
-              <span className="text-stone-300">Supabase PostgreSQL</span>
+              <span className="text-stone-300">Dissafyt Sovereign Database</span>
               <span className="text-emerald-400 font-mono">ONLINE (RLS Active)</span>
             </div>
             <div className="flex items-center justify-between py-2 border-b border-stone-800">

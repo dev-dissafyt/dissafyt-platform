@@ -169,7 +169,7 @@ function StudioLoginContent() {
             }`}
           >
             <Lock className="w-3.5 h-3.5" />
-            <span>Supabase Email & Password</span>
+            <span>Studio Passkey Access</span>
           </button>
         </div>
 
@@ -388,7 +388,7 @@ function StudioLoginContent() {
               className="w-full py-3 bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider rounded-xl transition shadow-lg shadow-amber-500/20 disabled:opacity-50 flex items-center justify-center space-x-2"
             >
               {loading ? (
-                <span>Authenticating with Supabase...</span>
+                <span>Authenticating Credentials...</span>
               ) : (
                 <>
                   <span>

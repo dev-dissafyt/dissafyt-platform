@@ -530,7 +530,7 @@ export default function AdminCommercePage() {
         <CardHeader>
           <CardTitle className="text-lg text-white">Live Catalog ({products.length})</CardTitle>
           <CardDescription>
-            All clothing and commerce items stored in Supabase PostgreSQL.
+            All clothing and commerce items stored in Dissafyt Cloud Ledger.
           </CardDescription>
         </CardHeader>
         <CardContent>
