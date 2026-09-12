@@ -20,6 +20,71 @@ export async function GET() {
   });
 }
 
+// ---------------------------------------------------------------------------
+// IN-MEMORY CACHED APPOINTMENT CATALOG (Zero latency on INIT requests)
+// ---------------------------------------------------------------------------
+interface CachedAppointmentData {
+  services: { id: string; title: string }[];
+  barbers: { id: string; title: string }[];
+  timestamp: number;
+}
+let CACHED_APPOINTMENT_DATA: CachedAppointmentData | null = null;
+const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+async function getCachedOrFetchAppointmentData() {
+  if (CACHED_APPOINTMENT_DATA && Date.now() - CACHED_APPOINTMENT_DATA.timestamp < CACHE_TTL_MS) {
+    return CACHED_APPOINTMENT_DATA;
+  }
+
+  try {
+    const [services, staffList] = await Promise.all([
+      BarbershopService.listServices(),
+      BarbershopService.listActiveStaff(),
+    ]);
+
+    const activeServices = services
+      .filter((s) => s.is_active && !s.is_subscription)
+      .map((s) => ({
+        id: s.name,
+        title: `${s.name} (R${s.price})`,
+      }));
+
+    const activeBarbers = staffList.map((st) => ({
+      id: st.display_name,
+      title: st.bio ? `${st.display_name} (${st.bio})` : `${st.display_name} (Barber)`,
+    }));
+
+    CACHED_APPOINTMENT_DATA = {
+      services: activeServices.length > 0 ? activeServices : [
+        { id: 'Classic Haircut', title: 'Classic Haircut (R120)' },
+        { id: 'Signature Haircut & Beard', title: 'Haircut & Beard (R160)' },
+      ],
+      barbers: activeBarbers.length > 0 ? activeBarbers : [
+        { id: 'Curtis Lee', title: 'Curtis Lee (Master Barber)' },
+        { id: 'First Available Barber', title: 'First Available Barber' },
+      ],
+      timestamp: Date.now(),
+    };
+  } catch (err) {
+    console.warn('[Flow Endpoint] Could not refresh appointment cache:', err);
+    if (!CACHED_APPOINTMENT_DATA) {
+      CACHED_APPOINTMENT_DATA = {
+        services: [
+          { id: 'Classic Haircut', title: 'Classic Haircut (R120)' },
+          { id: 'Signature Haircut & Beard', title: 'Haircut & Beard (R160)' },
+        ],
+        barbers: [
+          { id: 'Curtis Lee', title: 'Curtis Lee (Master Barber)' },
+          { id: 'First Available Barber', title: 'First Available Barber' },
+        ],
+        timestamp: Date.now(),
+      };
+    }
+  }
+
+  return CACHED_APPOINTMENT_DATA;
+}
+
 /**
  * POST /api/whatsapp/flow-endpoint
  * Handles Meta Flow encrypted data exchange: health check (ping), INIT, and screen data exchange.
@@ -51,7 +116,8 @@ export async function POST(request: NextRequest) {
     iv = decrypted.initialVector;
 
     const { action, screen, data, flow_token, version } = decrypted.decryptedBody;
-    console.log(`[Flow Endpoint Action] action=${action}, screen=${screen}, token=${flow_token}, version=${version}`);
+    const targetFlow = request.nextUrl.searchParams.get('flow')?.toLowerCase() || '';
+    console.log(`[Flow Endpoint Action] action=${action}, screen=${screen}, token=${flow_token}, flow=${targetFlow}, version=${version}`);
 
     let responsePayload: Record<string, any> = {};
 
@@ -69,47 +135,51 @@ export async function POST(request: NextRequest) {
     // ACTION 2: INIT (Flow Opened)
     // -------------------------------------------------------------------------
     else if (action === 'INIT') {
-      if (screen === 'SIGN_IN' || flow_token?.startsWith('auth_')) {
+      const isAuthFlow =
+        targetFlow === 'signup' ||
+        targetFlow === 'auth' ||
+        targetFlow === 'login' ||
+        screen === 'SIGN_IN' ||
+        screen === 'SIGN_UP' ||
+        flow_token?.toLowerCase().includes('auth') ||
+        flow_token?.toLowerCase().includes('sign');
+
+      const isFeedbackFlow =
+        targetFlow === 'feedback' ||
+        targetFlow === 'review' ||
+        screen === 'FEEDBACK' ||
+        flow_token?.toLowerCase().includes('rev') ||
+        flow_token?.toLowerCase().includes('feed');
+
+      const isSupportFlow =
+        targetFlow === 'support' ||
+        targetFlow === 'help' ||
+        screen === 'SUPPORT_TICKET' ||
+        flow_token?.toLowerCase().includes('sup') ||
+        flow_token?.toLowerCase().includes('ticket');
+
+      if (isAuthFlow) {
         responsePayload = {
           screen: 'SIGN_IN',
           data: {},
         };
-      } else if (screen === 'FEEDBACK' || flow_token?.startsWith('rev_')) {
+      } else if (isFeedbackFlow) {
         responsePayload = {
           screen: 'FEEDBACK',
           data: {},
         };
-      } else if (screen === 'SUPPORT_TICKET' || flow_token?.startsWith('sup_')) {
+      } else if (isSupportFlow) {
         responsePayload = {
           screen: 'SUPPORT_TICKET',
           data: {},
         };
       } else {
-        const services = await BarbershopService.listServices();
-        const activeServices = services
-          .filter((s) => s.is_active && !s.is_subscription)
-          .map((s) => ({
-            id: s.name,
-            title: `${s.name} (R${s.price})`,
-          }));
-
-        const staffList = await BarbershopService.listActiveStaff();
-        const activeBarbers = staffList.map((st) => ({
-          id: st.display_name,
-          title: st.bio ? `${st.display_name} (${st.bio})` : `${st.display_name} (Barber)`,
-        }));
-
+        const apptData = await getCachedOrFetchAppointmentData();
         responsePayload = {
           screen: 'APPOINTMENT_SELECTION',
           data: {
-            services: activeServices.length > 0 ? activeServices : [
-              { id: 'Classic Haircut', title: 'Classic Haircut (R120)' },
-              { id: 'Signature Haircut & Beard', title: 'Haircut & Beard (R160)' },
-            ],
-            barbers: activeBarbers.length > 0 ? activeBarbers : [
-              { id: 'Curtis Lee', title: 'Curtis Lee (Master Barber)' },
-              { id: 'First Available Barber', title: 'First Available Barber' },
-            ],
+            services: apptData.services,
+            barbers: apptData.barbers,
           },
         };
       }
@@ -129,45 +199,47 @@ export async function POST(request: NextRequest) {
         const lastName = (flowData.last_name || '').trim();
         const email = (flowData.email || '').trim().toLowerCase();
         const fullName = `${firstName} ${lastName}`.trim() || 'New Member';
-        const password = flowData.password || '';
+        const password = flowData.password || 'DissafytCapeTown2026!';
 
-        const admin = getSupabaseAdminClient();
         let userId = '';
 
         if (email) {
-          const { data: existingUser } = await admin
-            .from('profiles')
-            .select('id, email')
-            .eq('email', email)
-            .maybeSingle();
+          try {
+            const admin = getSupabaseAdminClient();
+            // Fast direct creation with 2.5s timeout safeguard
+            const createPromise = admin.auth.admin.createUser({
+              email,
+              password,
+              email_confirm: true,
+              user_metadata: { full_name: fullName },
+            });
+            const timeoutPromise = new Promise<{ data: any; error: any }>((_, reject) =>
+              setTimeout(() => reject(new Error('Auth timeout')), 2500)
+            );
+            const { data: created, error: createErr } = (await Promise.race([
+              createPromise,
+              timeoutPromise,
+            ])) as any;
 
-          if (!existingUser) {
-            try {
-              const { data: created } = await admin.auth.admin.createUser({
-                email,
-                password: password || 'DissafytCapeTown2026!',
-                email_confirm: true,
-                user_metadata: { full_name: fullName },
-              });
-              if (created?.user) {
-                userId = created.user.id;
-              }
-            } catch (authErr) {
-              console.warn('[Flow Endpoint] Auth user creation note:', authErr);
+            if (created?.user) {
+              userId = created.user.id;
+            } else if (createErr?.message?.includes('already registered') || createErr?.status === 422) {
+              userId = 'existing_user';
             }
-          } else {
-            userId = existingUser.id;
+          } catch (authErr) {
+            console.warn('[Flow Endpoint] Auth user creation note:', authErr);
           }
         }
 
-        await AuditService.recordLog({
+        // Fire-and-forget audit log so response to Meta is not delayed
+        void AuditService.recordLog({
           actor_email: email || 'whatsapp:guest',
           actor_role: 'customer',
           action: 'whatsapp.client_registered',
           entity_type: 'profile',
           entity_id: userId || 'registered',
           changes: { firstName, lastName, email, offers: flowData.offers_acceptance },
-        });
+        }).catch((err) => console.warn('Audit record note:', err));
 
         responsePayload = {
           screen: 'SUCCESS',
@@ -188,21 +260,16 @@ export async function POST(request: NextRequest) {
       // -----------------------------------------------------------------------
       else if (actionType === 'sign_in' || (flowData.email && flowData.password && !flowData.service)) {
         const email = (flowData.email || '').trim().toLowerCase();
-        const admin = getSupabaseAdminClient();
-        const { data: profile } = await admin
-          .from('profiles')
-          .select('id, full_name, email')
-          .eq('email', email)
-          .maybeSingle();
 
-        await AuditService.recordLog({
+        // Fire-and-forget audit log
+        void AuditService.recordLog({
           actor_email: email || 'whatsapp:client',
           actor_role: 'customer',
           action: 'whatsapp.client_sign_in_attempt',
           entity_type: 'profile',
-          entity_id: profile?.id || 'unknown',
-          changes: { email, found: Boolean(profile) },
-        });
+          entity_id: 'signin_attempt',
+          changes: { email },
+        }).catch((err) => console.warn('Audit record note:', err));
 
         responsePayload = {
           screen: 'SUCCESS',
@@ -211,7 +278,6 @@ export async function POST(request: NextRequest) {
               params: {
                 flow_token: flow_token || `auth_${Date.now()}`,
                 status: 'signed_in',
-                name: profile?.full_name || 'Member',
                 email,
               },
             },
@@ -254,29 +320,32 @@ export async function POST(request: NextRequest) {
         const comments = flowData.comments || '';
         const highlights = flowData.highlights || [];
 
-        await AuditService.recordLog({
-          actor_email: 'whatsapp:client',
-          actor_role: 'customer',
-          action: 'whatsapp.review_submitted',
-          entity_type: 'customer_review',
-          entity_id: `rev_${Date.now()}`,
-          changes: { rating, barber, highlights, comments },
-        });
-
-        if (rating <= 3) {
+        // Asynchronously record audit log & alert Curtis without blocking HTTP response
+        void (async () => {
           try {
-            await WhatsAppService.sendTextMessage(
-              CURTIS_PHONE,
-              `🚨 *CRITICAL CLIENT FEEDBACK ALERT*\n\n` +
-              `• *Rating:* ${rating}/5 Stars ⚠️\n` +
-              `• *Barber:* ${barber}\n` +
-              `• *Comments:* "${comments || 'No comment provided'}"\n\n` +
-              `_Customer requires personal follow-up from Curtis._`
-            );
+            await AuditService.recordLog({
+              actor_email: 'whatsapp:client',
+              actor_role: 'customer',
+              action: 'whatsapp.review_submitted',
+              entity_type: 'customer_review',
+              entity_id: `rev_${Date.now()}`,
+              changes: { rating, barber, highlights, comments },
+            });
+
+            if (rating <= 3) {
+              await WhatsAppService.sendTextMessage(
+                CURTIS_PHONE,
+                `🚨 *CRITICAL CLIENT FEEDBACK ALERT*\n\n` +
+                `• *Rating:* ${rating}/5 Stars ⚠️\n` +
+                `• *Barber:* ${barber}\n` +
+                `• *Comments:* "${comments || 'No comment provided'}"\n\n` +
+                `_Customer requires personal follow-up from Curtis._`
+              );
+            }
           } catch (err) {
-            console.warn('[Flow Endpoint] Failed to alert Curtis of low rating:', err);
+            console.warn('[Flow Endpoint] Review alert note:', err);
           }
-        }
+        })();
 
         responsePayload = {
           screen: 'SUCCESS',
@@ -300,27 +369,30 @@ export async function POST(request: NextRequest) {
         const bookingRef = flowData.booking_ref || 'N/A';
         const details = flowData.details || '';
 
-        await AuditService.recordLog({
-          actor_email: 'whatsapp:client',
-          actor_role: 'customer',
-          action: 'whatsapp.support_inquiry',
-          entity_type: 'support_ticket',
-          entity_id: `sup_${Date.now()}`,
-          changes: { topic, bookingRef, details },
-        });
+        // Asynchronously record support ticket & notify Curtis
+        void (async () => {
+          try {
+            await AuditService.recordLog({
+              actor_email: 'whatsapp:client',
+              actor_role: 'customer',
+              action: 'whatsapp.support_inquiry',
+              entity_type: 'support_ticket',
+              entity_id: `sup_${Date.now()}`,
+              changes: { topic, bookingRef, details },
+            });
 
-        try {
-          await WhatsAppService.sendTextMessage(
-            CURTIS_PHONE,
-            `🆘 *WHATSAPP SUPPORT INQUIRY*\n\n` +
-            `• *Topic:* ${topic}\n` +
-            `• *Ref:* ${bookingRef}\n` +
-            `• *Details:* "${details}"\n\n` +
-            `_Client submitted inquiry via WhatsApp Support Flow._`
-          );
-        } catch (err) {
-          console.warn('[Flow Endpoint] Failed to alert Curtis of support inquiry:', err);
-        }
+            await WhatsAppService.sendTextMessage(
+              CURTIS_PHONE,
+              `🆘 *NEW STUDIO SUPPORT INQUIRY*\n\n` +
+              `• *Topic:* ${topic}\n` +
+              `• *Booking Ref:* ${bookingRef}\n` +
+              `• *Message:* "${details || 'No details provided'}"\n\n` +
+              `_Customer submitted support request via WhatsApp Flow._`
+            );
+          } catch (err) {
+            console.warn('[Flow Endpoint] Support notify note:', err);
+          }
+        })();
 
         responsePayload = {
           screen: 'SUCCESS',

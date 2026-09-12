@@ -154,7 +154,11 @@
                 "type": "OptIn",
                 "name": "terms_agreement",
                 "label": "I agree to the Terms and Conditions.",
-                "required": true,
+                "required": true
+              },
+              {
+                "type": "EmbeddedLink",
+                "text": "Read Terms and Conditions",
                 "on-click-action": {
                   "name": "navigate",
                   "next": {
