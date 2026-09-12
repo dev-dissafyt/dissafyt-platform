@@ -1,6 +1,6 @@
 import React from 'react';
 import Link from 'next/link';
-import { Sparkles, Layers, ArrowUpRight, Palette, Store } from 'lucide-react';
+import { Sparkles, Layers, ArrowUpRight, Palette, Store, TrendingUp, DollarSign } from 'lucide-react';
 import { PersonaSwitcher } from '@/app/components/persona-switcher';
 
 export default function StudioLayout({ children }: { children: React.ReactNode }) {
@@ -27,18 +27,25 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
 
             <nav className="hidden md:flex items-center space-x-1 font-mono text-xs">
               <Link
-                href="/creator?app=studio"
+                href="/?app=studio"
                 className="px-3 py-1.5 rounded hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors flex items-center space-x-1.5"
               >
-                <Sparkles className="w-3.5 h-3.5 text-purple-400" />
-                <span>Creator Portal</span>
+                <Palette className="w-3.5 h-3.5 text-purple-400" />
+                <span>Creator Lab & Drops</span>
               </Link>
               <Link
-                href="/creator?app=studio&tab=mockup"
+                href="/sales?app=studio"
                 className="px-3 py-1.5 rounded hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors flex items-center space-x-1.5"
               >
-                <Layers className="w-3.5 h-3.5 text-amber-400" />
-                <span>Garment Lab</span>
+                <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
+                <span>Sales & Royalties</span>
+              </Link>
+              <Link
+                href="/payouts?app=studio"
+                className="px-3 py-1.5 rounded hover:bg-zinc-800 text-zinc-300 hover:text-white transition-colors flex items-center space-x-1.5"
+              >
+                <DollarSign className="w-3.5 h-3.5 text-amber-400" />
+                <span>Payouts & Banking</span>
               </Link>
             </nav>
           </div>
@@ -58,6 +65,19 @@ export default function StudioLayout({ children }: { children: React.ReactNode }
           </div>
         </div>
       </header>
+
+      {/* Sub-navigation for mobile */}
+      <div className="md:hidden flex border-b border-zinc-800/80 bg-zinc-900/60 px-4 py-2 font-mono text-xs space-x-2 overflow-x-auto">
+        <Link href="/?app=studio" className="px-2.5 py-1 rounded bg-zinc-800 text-purple-400 whitespace-nowrap">
+          Creator Lab
+        </Link>
+        <Link href="/sales?app=studio" className="px-2.5 py-1 rounded hover:bg-zinc-800 text-zinc-400 whitespace-nowrap">
+          Sales & Royalties
+        </Link>
+        <Link href="/payouts?app=studio" className="px-2.5 py-1 rounded hover:bg-zinc-800 text-zinc-400 whitespace-nowrap">
+          Payouts
+        </Link>
+      </div>
 
       {/* Main Studio View */}
       <main className="flex-1 max-w-7xl w-full mx-auto p-4 sm:p-6 lg:p-8">

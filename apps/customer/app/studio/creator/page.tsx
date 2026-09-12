@@ -20,7 +20,7 @@ import {
   Tag
 } from 'lucide-react';
 import type { Brand, DealType } from '@dissafyt/database';
-import { getActivePersona, StudioPersona } from '../../../lib/persona';
+import { getActivePersona, StudioPersona } from '@/lib/persona';
 
 const GARMENT_PRESETS = [
   { id: 'tee_boxy_240', name: '240gsm Heavyweight Boxy Tee', type: 'tee', baseCost: 180, defaultRetail: 450 },
