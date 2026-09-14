@@ -84,6 +84,8 @@ export async function GET(request: NextRequest) {
             category: categoryName,
             google_product_category: '1604', // Apparel & Accessories > Clothing
             inventory: variant.stock_quantity ?? 25,
+            size: variant.name && variant.name !== 'Standard' ? variant.name : 'M',
+            color: 'Black',
           });
         }
       } else {
@@ -102,26 +104,47 @@ export async function GET(request: NextRequest) {
           category: categoryName,
           google_product_category: '1604',
           inventory: 25,
+          size: 'M',
+          color: 'Black',
         });
       }
     }
 
     // 2. Return CSV format if requested (?format=csv)
+    // Matches Meta Commerce Manager's Official 31-Column Data Feed Template
     if (format === 'csv') {
       const headers = [
         'id',
-        'item_group_id',
         'title',
         'description',
         'availability',
         'condition',
-        'price',
         'link',
         'image_link',
         'brand',
+        'price',
         'google_product_category',
         'fb_product_category',
-        'inventory',
+        'quantity_to_sell_on_facebook',
+        'sale_price',
+        'sale_price_effective_date',
+        'item_group_id',
+        'gender',
+        'color',
+        'size',
+        'age_group',
+        'material',
+        'pattern',
+        'shipping',
+        'shipping_weight',
+        'offer_disclaimer',
+        'offer_disclaimer_url',
+        'video[0].url',
+        'video[0].tag[0]',
+        'gtin',
+        'product_tags[0]',
+        'product_tags[1]',
+        'style[0]',
       ];
 
       const csvRows = [
@@ -129,18 +152,36 @@ export async function GET(request: NextRequest) {
         ...items.map((item) =>
           [
             escapeCsvField(item.id),
-            escapeCsvField(item.item_group_id),
             escapeCsvField(item.title),
             escapeCsvField(item.description),
             escapeCsvField(item.availability),
             escapeCsvField(item.condition),
-            escapeCsvField(item.price),
             escapeCsvField(item.link),
             escapeCsvField(item.image_link),
             escapeCsvField(item.brand),
-            escapeCsvField(item.google_product_category),
-            escapeCsvField('clothing'),
-            item.inventory,
+            escapeCsvField(item.price),
+            escapeCsvField('Apparel & Accessories > Clothing'),
+            escapeCsvField('Clothing & Accessories > Clothing'),
+            escapeCsvField(item.inventory),
+            escapeCsvField(item.price), // sale_price
+            escapeCsvField(''), // sale_price_effective_date
+            escapeCsvField(item.item_group_id),
+            escapeCsvField('unisex'),
+            escapeCsvField(item.color || 'Black'),
+            escapeCsvField(item.size || 'M'),
+            escapeCsvField('adult'),
+            escapeCsvField('cotton'),
+            escapeCsvField('graphic print'),
+            escapeCsvField('ZA:::0.00 ZAR'),
+            escapeCsvField('0.5 kg'),
+            escapeCsvField('Valid while stocks last. Terms and conditions apply.'),
+            escapeCsvField('https://www.dissafyt.com/terms'),
+            escapeCsvField(''),
+            escapeCsvField(''),
+            escapeCsvField(''),
+            escapeCsvField('Streetwear'),
+            escapeCsvField(item.category || 'Apparel'),
+            escapeCsvField('Streetwear'),
           ].join(',')
         ),
       ];
