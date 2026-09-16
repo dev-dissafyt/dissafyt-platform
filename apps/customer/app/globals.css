@@ -9,11 +9,26 @@
   --foreground: #fafafa;
 }
 
+:root.light,
+html.light,
+.light {
+  --background: #f8fafc;
+  --foreground: #09090b;
+}
+
+:root.dark,
+html.dark,
+.dark {
+  --background: #000000;
+  --foreground: #fafafa;
+}
+
 body {
   color: var(--foreground);
   background: var(--background);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   overflow-x: hidden;
+  transition: background-color 0.25s ease, color 0.25s ease;
 }
 
 .font-display {
@@ -34,4 +49,91 @@ body {
 
 .animate-marquee:hover {
   animation-play-state: paused;
+}
+
+/* Skeleton Loading Shimmer */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.animate-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0.03) 0%,
+    rgba(255, 255, 255, 0.08) 50%,
+    rgba(255, 255, 255, 0.03) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.8s infinite;
+}
+
+/* Smooth Interactive Button Hover Feedback */
+button,
+a.btn-interactive {
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+              box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+              background-color 0.15s cubic-bezier(0.4, 0, 0.2, 1),
+              border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+button:active,
+a.btn-interactive:active {
+  transform: scale(0.97);
+}
+
+/* Print Stylesheet */
+@media print {
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 12pt !important;
+  }
+
+  /* Hide interactive web chrome on print */
+  header,
+  nav,
+  footer,
+  aside,
+  .no-print,
+  #scroll-progress,
+  #scroll-to-top,
+  #floating-contact,
+  #cookie-banner,
+  .cart-drawer,
+  button,
+  .btn-print-hide {
+    display: none !important;
+  }
+
+  /* Ensure clean card and table printing */
+  main {
+    margin: 0 !important;
+    padding: 0 !important;
+    width: 100% !important;
+  }
+
+  .card,
+  article,
+  section {
+    break-inside: avoid;
+    border: 1px solid #e2e8f0 !important;
+    box-shadow: none !important;
+    background: #ffffff !important;
+    color: #000000 !important;
+  }
+
+  h1, h2, h3, h4, h5, h6 {
+    color: #000000 !important;
+    break-after: avoid;
+  }
+
+  a {
+    color: #000000 !important;
+    text-decoration: underline !important;
+  }
 }

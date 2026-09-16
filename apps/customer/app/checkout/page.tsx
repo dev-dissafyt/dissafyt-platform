@@ -3,18 +3,9 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input, Label } from '@dissafyt/ui';
-import { ShoppingBag, ArrowLeft, Trash2, ShieldCheck, Truck, Lock } from 'lucide-react';
+import { ShoppingBag, ArrowLeft, Trash2, ShieldCheck, Truck, Lock, Plus, Minus } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@dissafyt/database';
-
-interface CartItem {
-  productId: string;
-  variantId?: string | null;
-  productName: string;
-  variantName?: string;
-  price: number;
-  quantity: number;
-  image?: string;
-}
+import { useCart } from '../context/cart-context';
 
 const SA_PROVINCES = [
   'Gauteng',
@@ -29,8 +20,8 @@ const SA_PROVINCES = [
 ];
 
 export default function CheckoutPage() {
-  const [cart, setCart] = useState<CartItem[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { items: cart, subtotal, updateQuantity, removeItem, clearCart, isHydrated } = useCart();
+  const [profileLoading, setProfileLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
 
@@ -45,57 +36,36 @@ export default function CheckoutPage() {
   const [postalCode, setPostalCode] = useState('');
 
   useEffect(() => {
-    const stored = localStorage.getItem('dissafyt_cart');
-    if (stored) {
-      try {
-        setCart(JSON.parse(stored));
-      } catch (e) {
-        console.error(e);
-      }
-    }
-
     // Prefill profile if user logged in
     async function prefillUser() {
-      const supabase = getSupabaseBrowserClient();
-      const { data } = await supabase.auth.getSession();
-      if (data?.session) {
-        if (data.session.user?.email) {
-          setRecipientEmail(data.session.user.email);
+      try {
+        const supabase = getSupabaseBrowserClient();
+        const { data } = await supabase.auth.getSession();
+        if (data?.session) {
+          if (data.session.user?.email) {
+            setRecipientEmail(data.session.user.email);
+          }
+          const token = data.session.access_token;
+          const res = await fetch('/api/users/me', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (res.ok) {
+            const profile = await res.json();
+            if (profile.full_name) setRecipientName(profile.full_name);
+            if (profile.phone) setRecipientPhone(profile.phone);
+            if (profile.email) setRecipientEmail(profile.email);
+          }
         }
-        const token = data.session.access_token;
-        const res = await fetch('/api/users/me', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (res.ok) {
-          const profile = await res.json();
-          if (profile.full_name) setRecipientName(profile.full_name);
-          if (profile.phone) setRecipientPhone(profile.phone);
-          if (profile.email) setRecipientEmail(profile.email);
-        }
+      } catch (e) {
+        console.error('Error fetching user profile for checkout:', e);
+      } finally {
+        setProfileLoading(false);
       }
-      setLoading(false);
     }
     prefillUser();
   }, []);
 
-  function updateQuantity(index: number, newQty: number) {
-    if (newQty <= 0) {
-      removeFromCart(index);
-      return;
-    }
-    const updated = [...cart];
-    updated[index].quantity = newQty;
-    setCart(updated);
-    localStorage.setItem('dissafyt_cart', JSON.stringify(updated));
-  }
-
-  function removeFromCart(index: number) {
-    const updated = cart.filter((_, i) => i !== index);
-    setCart(updated);
-    localStorage.setItem('dissafyt_cart', JSON.stringify(updated));
-  }
-
-  const subtotal = cart.reduce((acc, item) => acc + item.price * item.quantity, 0);
+  const loading = !isHydrated || profileLoading;
 
   async function handleProceedToPayment(e: React.FormEvent) {
     e.preventDefault();
@@ -144,8 +114,8 @@ export default function CheckoutPage() {
         return;
       }
 
-      // Clear local cart
-      localStorage.removeItem('dissafyt_cart');
+      // Clear reactive cart
+      clearCart();
 
       // Dynamically submit the PayFast HTML form
       const form = document.createElement('form');
@@ -333,22 +303,64 @@ export default function CheckoutPage() {
             </CardHeader>
             <CardContent className="p-0 space-y-4">
               <div className="divide-y divide-zinc-800">
-                {cart.map((item, index) => (
-                  <div key={`${item.productId}-${index}`} className="py-3 flex items-center justify-between text-sm">
-                    <div>
-                      <div className="font-medium text-white">{item.productName}</div>
-                      <div className="text-xs text-zinc-400">
-                        {item.variantName} &bull; Qty: {item.quantity}
+                {cart.map((item) => (
+                  <div key={item.id} className="py-3 flex items-center justify-between text-sm gap-3">
+                    <div className="flex items-center space-x-3 min-w-0">
+                      {item.image ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.image}
+                          alt={item.productName}
+                          className="h-12 w-12 rounded-lg object-cover border border-zinc-800 flex-shrink-0 bg-zinc-950"
+                        />
+                      ) : (
+                        <div className="h-12 w-12 rounded-lg bg-zinc-950 border border-zinc-800 flex items-center justify-center flex-shrink-0 text-zinc-600">
+                          <ShoppingBag className="h-5 w-5" />
+                        </div>
+                      )}
+                      <div className="min-w-0">
+                        <div className="font-medium text-white truncate">{item.productName}</div>
+                        <div className="text-xs text-zinc-400 flex items-center space-x-2 mt-0.5">
+                          <span className="rounded bg-zinc-800/80 px-1.5 py-0.5 text-[10px] font-mono text-zinc-300">
+                            {item.variantName || 'Standard'}
+                          </span>
+                          <span>R {item.price.toFixed(2)} ea</span>
+                        </div>
                       </div>
                     </div>
-                    <div className="flex items-center space-x-3">
-                      <span className="font-bold text-amber-400">
+
+                    <div className="flex items-center space-x-3 flex-shrink-0">
+                      <div className="inline-flex items-center rounded border border-zinc-800 bg-zinc-950">
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(item.id, item.quantity - 1)}
+                          className="p-1 text-zinc-400 hover:text-white transition-colors"
+                          aria-label="Decrease quantity"
+                        >
+                          <Minus className="h-3 w-3" />
+                        </button>
+                        <span className="min-w-[20px] text-center font-mono text-xs font-bold text-white">
+                          {item.quantity}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => updateQuantity(item.id, item.quantity + 1)}
+                          className="p-1 text-zinc-400 hover:text-white transition-colors"
+                          aria-label="Increase quantity"
+                        >
+                          <Plus className="h-3 w-3" />
+                        </button>
+                      </div>
+
+                      <span className="font-bold text-amber-400 min-w-[70px] text-right font-mono text-xs sm:text-sm">
                         R {(item.price * item.quantity).toFixed(2)}
                       </span>
+
                       <button
                         type="button"
-                        onClick={() => removeFromCart(index)}
-                        className="text-zinc-500 hover:text-red-400"
+                        onClick={() => removeItem(item.id)}
+                        className="text-zinc-500 hover:text-red-400 transition-colors p-1"
+                        aria-label={`Remove ${item.productName}`}
                       >
                         <Trash2 className="h-4 w-4" />
                       </button>

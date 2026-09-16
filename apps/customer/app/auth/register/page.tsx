@@ -7,6 +7,7 @@ import { getSupabaseBrowserClient } from '@dissafyt/database';
 import Image from 'next/image';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from '@dissafyt/ui';
 import { ShieldCheck } from 'lucide-react';
+import { PasswordInput } from '../../components/password-input';
 
 function RegisterForm() {
   const router = useRouter();
@@ -137,9 +138,8 @@ function RegisterForm() {
 
           <div className="space-y-2">
             <Label htmlFor="password">Password</Label>
-            <Input
+            <PasswordInput
               id="password"
-              type="password"
               placeholder="••••••••"
               value={password}
               onChange={(e) => setPassword(e.target.value)}

@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { CheckCircle2, Package, Truck, MessageSquare, ArrowRight, ShoppingBag, ShieldCheck } from 'lucide-react';
+import { useCart } from '../../context/cart-context';
 
 interface OrderItem {
   id: string;
@@ -38,17 +39,14 @@ interface OrderDetails {
 function SuccessContent() {
   const searchParams = useSearchParams();
   const orderNumber = searchParams.get('order') || searchParams.get('order_number') || searchParams.get('m_payment_id');
+  const { clearCart } = useCart();
 
   const [order, setOrder] = useState<OrderDetails | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     // Clear cart immediately upon successful checkout redirect
-    try {
-      localStorage.removeItem('dissafyt_cart');
-    } catch {
-      // Ignore
-    }
+    clearCart();
 
     if (!orderNumber) {
       setLoading(false);

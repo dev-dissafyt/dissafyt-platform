@@ -16,6 +16,7 @@ import {
   Layers,
 } from 'lucide-react';
 import { SubscriptionCarousel } from './components/subscription-carousel';
+import { FaqAccordion } from './components/faq-accordion';
 import { AdminBarbershopService } from '@dissafyt/api';
 
 export const dynamic = 'force-dynamic';
@@ -460,19 +461,24 @@ export default async function HomePage() {
             <div className="lg:col-span-5 flex flex-col sm:flex-row lg:flex-col gap-4">
               <Link
                 href="/book"
-                className="w-full text-center rounded-xl bg-amber-500 hover:bg-amber-400 px-6 py-4 text-xs font-black uppercase tracking-wider text-black shadow-lg shadow-amber-500/10 transition-all"
+                className="w-full text-center rounded-xl bg-amber-500 hover:bg-amber-400 px-6 py-4 text-xs font-black uppercase tracking-wider text-black shadow-lg shadow-amber-500/10 transition-all hover:scale-[1.02] active:scale-95"
               >
                 Book Chair in Cape Town
               </Link>
               <Link
                 href="/shop"
-                className="w-full text-center rounded-xl border border-zinc-700 hover:border-zinc-500 bg-zinc-900 px-6 py-4 text-xs font-black uppercase tracking-wider text-zinc-200 transition-all"
+                className="w-full text-center rounded-xl border border-zinc-700 hover:border-zinc-500 bg-zinc-900 px-6 py-4 text-xs font-black uppercase tracking-wider text-zinc-200 transition-all hover:scale-[1.02] active:scale-95"
               >
                 Explore Streetwear Catalog
               </Link>
             </div>
           </div>
         </div>
+      </section>
+
+      {/* 7. EXPANDABLE FAQ SECTION */}
+      <section className="container mx-auto max-w-7xl px-4 sm:px-6">
+        <FaqAccordion />
       </section>
     </div>
   );

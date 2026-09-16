@@ -5,6 +5,9 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Card, Button, PayfastProductButton } from '@dissafyt/ui';
 import { ShoppingBag, ArrowLeft, Check, ShieldCheck, Truck, RefreshCw } from 'lucide-react';
+import { useCart } from '../../context/cart-context';
+import { LastUpdatedBadge } from '../../components/last-updated';
+import { CopyButton } from '../../components/copy-button';
 
 interface Variant {
   id: string;
@@ -29,6 +32,7 @@ export default function ProductDetailPage() {
   const params = useParams();
   const router = useRouter();
   const slug = params?.slug as string;
+  const { addItem, openCart } = useCart();
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
@@ -57,9 +61,9 @@ export default function ProductDetailPage() {
     loadProduct();
   }, [slug]);
 
-  function handleAddToCart() {
+  function handleAddToCart(openDrawer: boolean = true) {
     if (!product) return;
-    const cartItem = {
+    addItem({
       productId: product.id,
       variantId: selectedVariant?.id || null,
       productName: product.name,
@@ -67,26 +71,19 @@ export default function ProductDetailPage() {
       price: selectedVariant?.price_override || product.base_price,
       quantity,
       image: product.images?.[0] || '',
-    };
+      slug: product.slug || slug,
+    });
 
-    const existingCart = JSON.parse(localStorage.getItem('dissafyt_cart') || '[]');
-    const existingIndex = existingCart.findIndex(
-      (item: any) => item.productId === cartItem.productId && item.variantId === cartItem.variantId
-    );
-
-    if (existingIndex > -1) {
-      existingCart[existingIndex].quantity += quantity;
-    } else {
-      existingCart.push(cartItem);
-    }
-
-    localStorage.setItem('dissafyt_cart', JSON.stringify(existingCart));
     setAddedNotice(true);
-    setTimeout(() => setAddedNotice(false), 3000);
+    setTimeout(() => setAddedNotice(false), 2500);
+
+    if (openDrawer) {
+      openCart();
+    }
   }
 
   function handleBuyNow() {
-    handleAddToCart();
+    handleAddToCart(false);
     router.push('/checkout');
   }
 
@@ -144,11 +141,15 @@ export default function ProductDetailPage() {
         {/* Product Details & Purchase Form */}
         <div className="space-y-6">
           <div>
-            {product.category_name && (
-              <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-400 uppercase tracking-wider border border-amber-500/20">
-                {product.category_name}
-              </span>
-            )}
+            <div className="flex flex-wrap items-center gap-2">
+              {product.category_name && (
+                <span className="rounded-full bg-amber-500/10 px-3 py-1 text-xs font-semibold text-amber-400 uppercase tracking-wider border border-amber-500/20">
+                  {product.category_name}
+                </span>
+              )}
+              <LastUpdatedBadge date="September 2026" prefix="Batch 01" />
+              <CopyButton text={selectedVariant?.sku || product.slug || product.id} label="SKU" />
+            </div>
             <h1 className="text-3xl font-extrabold text-white mt-3">{product.name}</h1>
             <div className="mt-3 flex items-baseline space-x-3">
               <span className="text-3xl font-extrabold text-amber-400">
@@ -224,7 +225,7 @@ export default function ProductDetailPage() {
 
               <Button
                 type="button"
-                onClick={handleAddToCart}
+                onClick={() => handleAddToCart(true)}
                 variant="outline"
                 className="flex-1 border-zinc-700 text-zinc-200 hover:bg-zinc-800 font-semibold"
               >

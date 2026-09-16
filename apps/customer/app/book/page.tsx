@@ -22,6 +22,7 @@ import {
   Lock,
 } from 'lucide-react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { getSupabaseBrowserClient } from '@dissafyt/database';
 import { SubscriptionCarousel } from '../components/subscription-carousel';
 
@@ -632,10 +633,17 @@ function BookContent() {
           <Link href="/" className="inline-flex items-center text-xs text-zinc-400 hover:text-white mb-2">
             <ArrowLeft className="mr-1 h-3.5 w-3.5" /> Back to Home
           </Link>
-          <h1 className="font-display text-4xl sm:text-5xl font-extrabold text-white tracking-tight flex items-center">
-            <Scissors className="mr-3 h-9 w-9 text-amber-500" />
-            Ace of Fyt Barbershop
-          </h1>
+          <div className="py-1">
+            <h1 className="sr-only">Ace of Fyt Barbershop</h1>
+            <Image
+              src="/ace-of-fyt-logo.svg"
+              alt="Ace of Fyt Barbershop"
+              width={280}
+              height={127}
+              className="h-16 sm:h-20 w-auto object-contain dark:invert dark:brightness-110 transition-all"
+              priority
+            />
+          </div>
           <p className="text-sm text-zinc-400 mt-1 max-w-xl">
             Cape Town’s premier grooming destination. Precision fades, scissor craft, and hot towel sculpting.
           </p>

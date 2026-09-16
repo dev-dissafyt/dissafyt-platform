@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { getSupabaseBrowserClient } from '@dissafyt/database';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from '@dissafyt/ui';
 import { X, Lock, Mail, User, ShieldCheck } from 'lucide-react';
+import { PasswordInput } from './password-input';
 
 interface AuthModalProps {
   isOpen: boolean;
@@ -182,9 +183,8 @@ export function AuthModal({
 
               <div className="space-y-1">
                 <Label className="text-xs text-zinc-300">Password</Label>
-                <Input
+                <PasswordInput
                   required
-                  type="password"
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}

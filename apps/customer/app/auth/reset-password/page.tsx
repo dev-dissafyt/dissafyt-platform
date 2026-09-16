@@ -7,6 +7,7 @@ import Image from 'next/image';
 import { getSupabaseBrowserClient } from '@dissafyt/database';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from '@dissafyt/ui';
 import { ShieldCheck, CheckCircle2, Lock, ArrowRight } from 'lucide-react';
+import { PasswordInput } from '../../components/password-input';
 
 function ResetPasswordForm() {
   const router = useRouter();
@@ -123,9 +124,8 @@ function ResetPasswordForm() {
           <form onSubmit={handlePasswordUpdate} className="space-y-4">
             <div className="space-y-2">
               <Label htmlFor="new-password">New Password</Label>
-              <Input
+              <PasswordInput
                 id="new-password"
-                type="password"
                 placeholder="••••••••••••"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -136,9 +136,8 @@ function ResetPasswordForm() {
 
             <div className="space-y-2">
               <Label htmlFor="confirm-password">Confirm New Password</Label>
-              <Input
+              <PasswordInput
                 id="confirm-password"
-                type="password"
                 placeholder="••••••••••••"
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
