@@ -314,32 +314,49 @@ export class BrandService {
     const brandName = brand?.name || 'Skhanda Heritage Co.';
     const dealType = brand?.deal_type || 'drip_income';
 
-    // Mock/runtime aggregation based on print queue activity and demo catalog
+    const admin = getSupabaseAdminClient();
+    const { data: payouts } = await admin
+      .from('creator_payouts')
+      .select('*')
+      .eq('brand_id', brandId);
+
+    const { data: jobs } = await admin
+      .from('print_jobs')
+      .select('*')
+      .eq('brand_id', brandId);
+
+    const printJobs = jobs || [];
+    const payoutList = payouts || [];
+
+    const totalUnitsSold = printJobs.filter((j) => j.status !== 'cancelled').length;
+    let totalGrossRevenue = 0;
+    for (const p of payoutList) {
+      totalGrossRevenue += Number(p.amount || 0);
+    }
+    const commissionRate = Number(brand?.commission_rate || 20);
+    const totalRoyaltiesEarned = Number(((totalGrossRevenue * commissionRate) / 100).toFixed(2));
+
+    const paidOut = payoutList
+      .filter((p) => p.status === 'paid')
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
+    const pending = payoutList
+      .filter((p) => p.status === 'pending' || p.status === 'processing')
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+
     return {
       brand_id: brandId,
       brand_name: brandName,
       deal_type: dealType,
-      total_gross_revenue: dealType === 'stacked_returns' ? 15300 : 9900,
-      total_units_sold: dealType === 'stacked_returns' ? 34 : 22,
-      total_royalties_earned: dealType === 'stacked_returns' ? 6300 : 3465,
-      royalties_pending_clearance: 770, // 7-day holding period for recent orders
-      royalties_paid_out: dealType === 'stacked_returns' ? 3500 : 1500,
-      available_for_payout: dealType === 'stacked_returns' ? 2030 : 1195,
-      by_category: [
-        { name: '240gsm Boxy Tees', units: 18, revenue: 8100 },
-        { name: 'Heavyweight Fleece Hoodies', units: 8, revenue: 6000 },
-        { name: 'Drop-Shoulder Street Tees', units: 8, revenue: 3040 },
-      ],
-      by_color: [
-        { color: 'Onyx Black', count: 20, percentage: 59 },
-        { color: 'Bone / Off-White', count: 9, percentage: 26 },
-        { color: 'Washed Olive', count: 5, percentage: 15 },
-      ],
-      by_size: [
-        { size: 'M', count: 8 },
-        { size: 'L', count: 16 },
-        { size: 'XL', count: 10 },
-      ],
+      total_gross_revenue: totalGrossRevenue,
+      total_units_sold: totalUnitsSold,
+      total_royalties_earned: totalRoyaltiesEarned,
+      royalties_pending_clearance: pending,
+      royalties_paid_out: paidOut,
+      available_for_payout: Math.max(0, totalRoyaltiesEarned - paidOut - pending),
+      by_category: [],
+      by_color: [],
+      by_size: [],
     };
   }
 
@@ -348,15 +365,22 @@ export class BrandService {
    * Tracks batch investment, physical barbershop studio rack sales, and break-even milestones.
    */
   static async getStackedReturnsMetrics(brandId: string): Promise<StackedReturnsMetrics> {
+    const admin = getSupabaseAdminClient();
+    const { data: jobs } = await admin
+      .from('print_jobs')
+      .select('*')
+      .eq('brand_id', brandId);
+
+    const printJobs = jobs || [];
+    const unitsSoldOnline = printJobs.filter((j) => j.status === 'dispatched' || j.status === 'packed').length;
+    const unitsSoldStudio = 0;
+    const unitsSoldTotal = unitsSoldOnline + unitsSoldStudio;
     const initialBatch = 50;
     const unitCost = 180;
     const retailPrice = 450;
-    const unitsSoldStudio = 20; // sold off physical hangers in Ace of Fyt barbershop
-    const unitsSoldOnline = 14;
-    const unitsSoldTotal = unitsSoldStudio + unitsSoldOnline;
-    const totalStack = initialBatch * unitCost; // R9,000
+    const totalStack = initialBatch * unitCost;
     const grossRecovered = unitsSoldTotal * retailPrice;
-    const breakEvenUnits = Math.ceil(totalStack / retailPrice); // 20 units
+    const breakEvenUnits = Math.ceil(totalStack / retailPrice);
 
     return {
       brand_id: brandId,
@@ -372,7 +396,7 @@ export class BrandService {
       break_even_reached: unitsSoldTotal >= breakEvenUnits,
       gross_recovered: grossRecovered,
       net_stacked_profit: Math.max(0, grossRecovered - totalStack),
-      roi_percentage: Math.round(((grossRecovered - totalStack) / totalStack) * 100),
+      roi_percentage: totalStack > 0 ? Math.round(((grossRecovered - totalStack) / totalStack) * 100) : 0,
     };
   }
 
@@ -383,32 +407,22 @@ export class BrandService {
     payouts: any[];
     banking: CreatorBankingDetails;
   }> {
+    const admin = getSupabaseAdminClient();
+    const { data: payouts } = await admin
+      .from('creator_payouts')
+      .select('*')
+      .eq('brand_id', brandId)
+      .order('created_at', { ascending: false });
+
     return {
       banking: {
         bank_name: 'First National Bank (FNB)',
-        account_holder: 'Skhanda Heritage Enterprise',
+        account_holder: 'Dissafyt Verified Creator',
         account_number: '••••••••4892',
         branch_code: '250655',
         account_type: 'cheque',
       },
-      payouts: [
-        {
-          id: 'pay-001',
-          amount: 2000,
-          status: 'paid',
-          reference: 'EFT-DISS-2026-0901',
-          created_at: new Date(Date.now() - 86400000 * 7).toISOString(),
-          processed_at: new Date(Date.now() - 86400000 * 6).toISOString(),
-        },
-        {
-          id: 'pay-002',
-          amount: 1500,
-          status: 'paid',
-          reference: 'EFT-DISS-2026-0905',
-          created_at: new Date(Date.now() - 86400000 * 3).toISOString(),
-          processed_at: new Date(Date.now() - 86400000 * 2).toISOString(),
-        },
-      ],
+      payouts: payouts || [],
     };
   }
 

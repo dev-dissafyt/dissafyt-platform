@@ -27,21 +27,25 @@ export function NewsletterSignup({ className = '', variant = 'footer' }: Newslet
     setLoading(true);
 
     try {
-      // Simulate API registration or store locally
-      await new Promise((resolve) => setTimeout(resolve, 800));
+      const res = await fetch('/api/newsletter', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          source: variant === 'footer' ? 'website_footer' : 'website_inline',
+        }),
+      });
 
-      if (typeof window !== 'undefined') {
-        const list = JSON.parse(localStorage.getItem('dissafyt_newsletter_subscribers') || '[]');
-        if (!list.includes(email.trim().toLowerCase())) {
-          list.push(email.trim().toLowerCase());
-          localStorage.setItem('dissafyt_newsletter_subscribers', JSON.stringify(list));
-        }
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || 'Unable to join at this moment.');
       }
 
       setSuccess(true);
       setEmail('');
-    } catch {
-      setError('Unable to join at this moment. Please try again.');
+    } catch (err: any) {
+      setError(err.message || 'Unable to join at this moment. Please try again.');
     } finally {
       setLoading(false);
     }

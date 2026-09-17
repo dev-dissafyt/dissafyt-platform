@@ -32,7 +32,7 @@ export async function GET(request: NextRequest) {
 
 /**
  * POST /api/bookings
- * Creates a new barbershop appointment with dual payment support (PayFast online vs Pay in Chair).
+ * Creates a new barbershop appointment with PayFast online payment or VIP membership coverage.
  */
 export async function POST(request: NextRequest) {
   try {

@@ -6,7 +6,7 @@ import { MessageSquare, X, Phone, Clock, MapPin, ArrowUpRight } from 'lucide-rea
 export function FloatingContact() {
   const [isOpen, setIsOpen] = useState(false);
 
-  const whatsappUrl = 'https://wa.me/27725916055?text=' + encodeURIComponent('Hi Dissafyt Concierge, I have an inquiry regarding garments / barbershop chair booking.');
+  const whatsappUrl = 'https://wa.me/27818082570?text=' + encodeURIComponent('Hi Dissafyt Concierge, I have an inquiry regarding garments / barbershop chair booking.');
 
   return (
     <div id="floating-contact" className="fixed bottom-6 right-6 z-40 no-print">
@@ -54,14 +54,14 @@ export function FloatingContact() {
 
             {/* Phone Call Link */}
             <a
-              href="tel:+27210000000"
+              href="tel:+27818082570"
               className="flex items-center justify-between rounded-xl bg-zinc-900 border border-zinc-800 p-3 text-zinc-300 hover:bg-zinc-800 hover:border-zinc-700 transition-all hover:scale-[1.02] active:scale-98"
             >
               <div className="flex items-center space-x-2.5">
                 <Phone className="h-4 w-4 text-amber-500" />
                 <div className="text-left">
                   <div className="text-xs font-bold text-white">Direct Line</div>
-                  <div className="text-[10px] text-zinc-400 font-mono">+27 (0) 21 000 0000</div>
+                  <div className="text-[10px] text-zinc-400 font-mono">+27 81 808 2570</div>
                 </div>
               </div>
               <ArrowUpRight className="h-4 w-4 text-zinc-400" />

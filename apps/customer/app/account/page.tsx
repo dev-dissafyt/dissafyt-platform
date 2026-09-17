@@ -20,6 +20,9 @@ import {
   RefreshCw,
   AlertCircle,
   MapPin,
+  Sparkles,
+  X,
+  Flame,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -106,6 +109,13 @@ export default function AccountPage() {
   const [phone, setPhone] = useState('');
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
+  // Subscription Management State
+  const [availableSubPlans, setAvailableSubPlans] = useState<any[]>([]);
+  const [isChangePlanOpen, setIsChangePlanOpen] = useState(false);
+  const [isCancelSubOpen, setIsCancelSubOpen] = useState(false);
+  const [subActionLoading, setSubActionLoading] = useState(false);
+  const [selectedChangePlanCode, setSelectedChangePlanCode] = useState<string | null>(null);
+
   // Notification Preferences
   const [notifOrderEmail, setNotifOrderEmail] = useState(true);
   const [notifBookingSMS, setNotifBookingSMS] = useState(true);
@@ -149,12 +159,18 @@ export default function AccountPage() {
       setToken(accessToken);
 
       try {
-        const [userRes, ordersRes, bookingsRes, subRes] = await Promise.all([
+        const [userRes, ordersRes, bookingsRes, subRes, servicesRes] = await Promise.all([
           fetch('/api/users/me', { headers: { Authorization: `Bearer ${accessToken}` } }),
           fetch('/api/orders', { headers: { Authorization: `Bearer ${accessToken}` } }),
           fetch('/api/bookings', { headers: { Authorization: `Bearer ${accessToken}` } }),
           fetch('/api/subscriptions/status', { headers: { Authorization: `Bearer ${accessToken}` } }),
+          fetch('/api/services'),
         ]);
+
+        if (servicesRes.ok) {
+          const sList = await servicesRes.json();
+          setAvailableSubPlans(sList.filter((s: any) => s.is_subscription && s.is_active));
+        }
 
         if (userRes.ok) {
           const profileData: UserData = await userRes.json();
@@ -295,6 +311,93 @@ export default function AccountPage() {
       alert('Error connecting to reschedule service');
     } finally {
       setIsSubmittingReschedule(false);
+    }
+  }
+
+  async function handleCancelSubscription() {
+    if (!token) return;
+    setSubActionLoading(true);
+    try {
+      const res = await fetch('/api/subscriptions/cancel', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (res.ok) {
+        setStatusMsg(data.message || 'Membership cancelled successfully.');
+        setIsCancelSubOpen(false);
+        const subRes = await fetch('/api/subscriptions/status', {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        if (subRes.ok) {
+          const sData = await subRes.json();
+          setSubscription(sData.subscription || null);
+          setSubscriptionQuota(sData.quota || null);
+        }
+      } else {
+        alert(data.error || 'Failed to cancel membership.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Network error while cancelling membership.');
+    } finally {
+      setSubActionLoading(false);
+    }
+  }
+
+  async function handleConfirmChangePlan() {
+    if (!token || !selectedChangePlanCode) return;
+    setSubActionLoading(true);
+    try {
+      const res = await fetch('/api/subscriptions/change-plan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ targetPlanCode: selectedChangePlanCode, isSandboxDemo: true }),
+      });
+      const data = await res.json();
+      if (res.ok) {
+        if (data.switchedImmediately) {
+          setStatusMsg(data.message || 'Membership plan updated successfully!');
+          setIsChangePlanOpen(false);
+          setSelectedChangePlanCode(null);
+          const subRes = await fetch('/api/subscriptions/status', {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (subRes.ok) {
+            const sData = await subRes.json();
+            setSubscription(sData.subscription || null);
+            setSubscriptionQuota(sData.quota || null);
+          }
+        } else if (data.payfast) {
+          const form = document.createElement('form');
+          form.method = 'POST';
+          form.action = data.payfast.action;
+          for (const [key, value] of Object.entries(data.payfast.fields)) {
+            if (value !== undefined && value !== null) {
+              const input = document.createElement('input');
+              input.type = 'hidden';
+              input.name = key;
+              input.value = String(value);
+              form.appendChild(input);
+            }
+          }
+          document.body.appendChild(form);
+          form.submit();
+        }
+      } else {
+        alert(data.error || 'Failed to change membership plan.');
+      }
+    } catch (e) {
+      console.error(e);
+      alert('Network error while changing membership plan.');
+    } finally {
+      setSubActionLoading(false);
     }
   }
 
@@ -486,6 +589,166 @@ export default function AccountPage() {
                 className="border-zinc-800 text-zinc-300"
               >
                 Keep Original Time
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CHANGE PLAN MODAL */}
+      {isChangePlanOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="relative w-full max-w-lg rounded-2xl border border-zinc-800 bg-zinc-950 p-6 text-white shadow-2xl space-y-5 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <div>
+                <h3 className="text-base font-bold text-white flex items-center">
+                  <Sparkles className="mr-2 h-4 w-4 text-amber-500" />
+                  Switch Barbershop Membership Plan
+                </h3>
+                <p className="text-xs text-zinc-400 mt-0.5">
+                  Upgrade or downgrade your monthly tier with immediate quota adjustment.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsChangePlanOpen(false)}
+                className="text-zinc-500 hover:text-white p-1"
+                aria-label="Close modal"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            {/* Available Plans List */}
+            <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+              {(availableSubPlans.length > 0 ? availableSubPlans : [
+                { plan_code: 'solo', name: 'The Solo Membership', price: 100, description: '1 haircut per month with priority booking.' },
+                { plan_code: 'twice', name: 'The Regular Membership', price: 190, description: '2 haircuts per month with queue skip and priority booking.' },
+                { plan_code: 'executive', name: 'The Executive', price: 350, description: 'Full combo, twice a month with hot towel & beard sculpt.' },
+                { plan_code: 'father-son', name: 'Father n Son Membership', price: 190, description: 'A combo cut for you and your boy — bonding time, sorted.' },
+              ]).map((plan) => {
+                const isCurrent = subscription?.plan_code === plan.plan_code;
+                const isSelected = selectedChangePlanCode === plan.plan_code;
+
+                return (
+                  <div
+                    key={plan.plan_code}
+                    onClick={() => {
+                      if (!isCurrent) setSelectedChangePlanCode(plan.plan_code);
+                    }}
+                    className={`p-3.5 rounded-xl border transition-all cursor-pointer flex items-center justify-between ${
+                      isCurrent
+                        ? 'border-zinc-800 bg-zinc-900/40 opacity-70 cursor-not-allowed'
+                        : isSelected
+                        ? 'border-amber-500 bg-amber-500/10 ring-1 ring-amber-500/30'
+                        : 'border-zinc-800 bg-zinc-900/70 hover:border-zinc-700'
+                    }`}
+                  >
+                    <div className="space-y-0.5">
+                      <div className="flex items-center space-x-2">
+                        <span className="font-bold text-white text-sm">{plan.name}</span>
+                        {isCurrent && (
+                          <span className="rounded-full bg-zinc-800 px-2 py-0.5 text-[10px] font-mono text-zinc-400">
+                            Current Plan
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-xs text-zinc-400 max-w-sm leading-snug">
+                        {plan.description}
+                      </p>
+                    </div>
+
+                    <div className="text-right flex-shrink-0 pl-3">
+                      <span className="font-mono font-bold text-amber-400 text-sm">
+                        R {Number(plan.price).toFixed(0)}/mo
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-2 border-t border-zinc-900">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsChangePlanOpen(false)}
+                className="border-zinc-800 text-zinc-300 text-xs"
+              >
+                Cancel
+              </Button>
+              <Button
+                size="sm"
+                disabled={!selectedChangePlanCode || selectedChangePlanCode === subscription?.plan_code || subActionLoading}
+                onClick={handleConfirmChangePlan}
+                className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs"
+              >
+                {subActionLoading ? 'Updating Plan...' : 'Confirm Plan Change'}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* CANCEL SUBSCRIPTION CONFIRMATION MODAL */}
+      {isCancelSubOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in duration-150">
+          <div className="relative w-full max-w-md rounded-2xl border border-zinc-800 bg-zinc-950 p-6 text-white shadow-2xl space-y-4 animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
+              <h3 className="text-base font-bold text-white flex items-center text-rose-400">
+                <AlertCircle className="mr-2 h-5 w-5 text-rose-500" />
+                Cancel VIP Membership?
+              </h3>
+              <button
+                type="button"
+                onClick={() => setIsCancelSubOpen(false)}
+                className="text-zinc-500 hover:text-white p-1"
+                aria-label="Close modal"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+
+            <div className="space-y-3 text-xs text-zinc-300 leading-relaxed">
+              <p>
+                Are you sure you want to cancel your{' '}
+                <span className="font-bold text-white">{subscription?.plan_name || 'VIP Membership'}</span>?
+              </p>
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 space-y-1 text-amber-200">
+                <div className="font-semibold text-amber-300">Period-End Access Retained:</div>
+                <p className="text-[11px]">
+                  You will retain full access to your remaining{' '}
+                  <span className="font-bold">{subscriptionQuota?.available_cuts ?? 0} haircut(s)</span> until{' '}
+                  <span className="font-bold">
+                    {subscriptionQuota?.period_end
+                      ? new Date(subscriptionQuota.period_end).toLocaleDateString('en-ZA', {
+                          day: 'numeric',
+                          month: 'short',
+                          year: 'numeric',
+                        })
+                      : 'the end of your current cycle'}
+                  </span>
+                  . After this date, your subscription will not renew.
+                </p>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-end space-x-3 pt-2 border-t border-zinc-900">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setIsCancelSubOpen(false)}
+                className="border-zinc-800 text-zinc-300 text-xs"
+              >
+                Keep My Membership
+              </Button>
+              <Button
+                size="sm"
+                disabled={subActionLoading}
+                onClick={handleCancelSubscription}
+                className="bg-rose-600 hover:bg-rose-500 text-white font-bold text-xs"
+              >
+                {subActionLoading ? 'Cancelling...' : 'Confirm Cancellation'}
               </Button>
             </div>
           </div>
@@ -818,8 +1081,8 @@ export default function AccountPage() {
 
         {/* Sidebar Column: Roles, Notifications, Quick Actions */}
         <div className="space-y-6">
-          {/* Active Membership Card */}
-          {subscription && (
+          {/* Active Membership or Join Guild Card */}
+          {subscription ? (
             <Card className="border-amber-500/40 bg-gradient-to-b from-zinc-900 via-zinc-950 to-zinc-950 shadow-lg shadow-amber-500/5">
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between">
@@ -827,8 +1090,14 @@ export default function AccountPage() {
                     <Scissors className="mr-2 h-4 w-4 text-amber-500" />
                     VIP Membership
                   </CardTitle>
-                  <span className="rounded-full bg-emerald-500/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-emerald-400 border border-emerald-500/20">
-                    Active
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${
+                      subscription.status === 'cancelled'
+                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                    }`}
+                  >
+                    {subscription.status === 'cancelled' ? 'Cancelled (Active Period)' : 'Active'}
                   </span>
                 </div>
                 <CardDescription className="text-xs">
@@ -838,7 +1107,7 @@ export default function AccountPage() {
               <CardContent className="space-y-3.5 text-xs">
                 <div className="flex items-baseline justify-between border-b border-zinc-800 pb-2">
                   <span className="font-bold text-white text-sm">
-                    {subscriptionQuota?.plan_name || subscription.plan_name || 'The Solo Membership'}
+                    {subscriptionQuota?.plan_name || subscription.plan_name || 'VIP Membership'}
                   </span>
                   <span className="font-mono font-bold text-amber-400">
                     R {Number(subscription.price || 100).toFixed(2)}/mo
@@ -882,7 +1151,7 @@ export default function AccountPage() {
                     <div className="flex items-center justify-between text-[10px] text-zinc-500 pt-0.5">
                       <span>{subscriptionQuota.used_cuts} used this cycle</span>
                       <span>
-                        Renews{' '}
+                        {subscription.status === 'cancelled' ? 'Expires ' : 'Renews '}
                         {subscriptionQuota.period_end
                           ? new Date(subscriptionQuota.period_end).toLocaleDateString('en-ZA', {
                               day: 'numeric',
@@ -899,7 +1168,7 @@ export default function AccountPage() {
                   </p>
                 )}
 
-                {/* Dynamic Action Button */}
+                {/* Primary Booking Action */}
                 <div className="pt-1">
                   {subscriptionQuota && subscriptionQuota.available_cuts <= 0 ? (
                     <div className="space-y-1.5">
@@ -931,7 +1200,58 @@ export default function AccountPage() {
                     </Link>
                   )}
                 </div>
+
+                {/* Self-Service Plan Controls */}
+                <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between gap-2">
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedChangePlanCode(subscription.plan_code || 'twice');
+                      setIsChangePlanOpen(true);
+                    }}
+                    className="flex-1 border-zinc-700 hover:border-zinc-500 bg-zinc-900 text-zinc-200 text-[11px] h-7"
+                  >
+                    Change Plan
+                  </Button>
+                  {subscription.status === 'active' ? (
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => setIsCancelSubOpen(true)}
+                      className="text-zinc-500 hover:text-red-400 hover:bg-red-500/10 text-[11px] h-7 px-2"
+                    >
+                      Cancel
+                    </Button>
+                  ) : (
+                    <span className="text-[10px] font-mono text-zinc-500">
+                      Cancels on cycle end
+                    </span>
+                  )}
+                </div>
               </CardContent>
+            </Card>
+          ) : (
+            <Card className="border-zinc-800 bg-gradient-to-b from-zinc-900/70 to-zinc-950 p-5 space-y-3.5">
+              <div className="space-y-1.5">
+                <div className="inline-flex items-center space-x-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 text-[10px] font-mono uppercase text-amber-400">
+                  <Sparkles className="h-3 w-3" />
+                  <span>VIP GROOMING GUILD</span>
+                </div>
+                <h3 className="text-sm font-bold text-white uppercase tracking-tight">
+                  Ace of Fyt Recurring Chair Pass
+                </h3>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Save on regular haircut sessions, skip the queue with priority booking, and unlock exclusive streetwear drop pricing.
+                </p>
+              </div>
+              <Link href="/book#memberships" className="block">
+                <Button size="sm" className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-8 shadow-md shadow-amber-500/10">
+                  Explore Memberships (From R100/mo)
+                </Button>
+              </Link>
             </Card>
           )}
 

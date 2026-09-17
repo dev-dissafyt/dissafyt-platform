@@ -332,3 +332,15 @@ export interface Subscription {
   updated_at: string;
 }
 
+// Newsletter types
+export type NewsletterStatus = 'subscribed' | 'unsubscribed';
+
+export interface NewsletterSubscriber {
+  id: string;
+  email: string;
+  source: string;
+  status: NewsletterStatus;
+  created_at: string;
+  updated_at: string;
+}
+

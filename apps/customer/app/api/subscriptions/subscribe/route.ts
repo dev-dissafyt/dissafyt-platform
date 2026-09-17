@@ -5,18 +5,18 @@ import { getSupabaseAdminClient } from '@dissafyt/database';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const PLAN_CONFIGS: Record<
+const FALLBACK_PLANS: Record<
   string,
   { name: string; price: number; description: string }
 > = {
   solo: {
-    name: 'The Solo',
+    name: 'The Solo Membership',
     price: 100.0,
     description: '1 haircut per month with priority booking.',
   },
   twice: {
-    name: 'The Regular',
-    price: 180.0,
+    name: 'The Regular Membership',
+    price: 190.0,
     description: '2 haircuts per month with queue skip and priority booking.',
   },
   executive: {
@@ -25,9 +25,9 @@ const PLAN_CONFIGS: Record<
     description: 'Full combo, twice a month with hot towel & beard sculpt.',
   },
   'father-son': {
-    name: 'The Executive',
-    price: 350.0,
-    description: 'Full combo, twice a month with hot towel & beard sculpt.',
+    name: 'Father n Son Membership',
+    price: 190.0,
+    description: 'A combo cut for you and your boy — bonding time, sorted.',
   },
 };
 
@@ -52,12 +52,28 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { planCode = 'twice', isSandboxDemo = false } = body;
 
-    const plan = PLAN_CONFIGS[planCode];
+    const admin = getSupabaseAdminClient();
+
+    // Query active service dynamically from CMS database
+    const { data: dbService } = await admin
+      .from('services')
+      .select('*')
+      .eq('is_subscription', true)
+      .eq('is_active', true)
+      .eq('plan_code', planCode)
+      .maybeSingle();
+
+    const plan = dbService
+      ? {
+          name: dbService.name,
+          price: Number(dbService.price),
+          description: dbService.description || FALLBACK_PLANS[planCode]?.description || '',
+        }
+      : FALLBACK_PLANS[planCode];
+
     if (!plan) {
       return NextResponse.json({ error: `Unknown plan code: ${planCode}` }, { status: 400 });
     }
-
-    const admin = getSupabaseAdminClient();
 
     // Fetch user's profile for autofilling first/last name and phone
     const { data: profile } = await admin

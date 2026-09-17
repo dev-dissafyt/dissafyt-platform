@@ -16,45 +16,64 @@ export interface SubscriptionPlan {
   perks: string[];
 }
 
+export const PERKS_BY_CODE: Record<string, string[]> = {
+  solo: [
+    '1 fresh haircut per month',
+    'Book anytime in the month',
+    'Priority booking access',
+    'Cancel or pause anytime',
+  ],
+  twice: [
+    '2 fresh haircuts per month',
+    'Best value per cut (R95/cut)',
+    'Skip the queue & walk-in priority',
+    'Complimentary hot towel finish',
+    'Cancel or pause anytime',
+  ],
+  executive: [
+    '2 Full Combos per month (Cut + Beard)',
+    'Hot towel sculpting & razor line-up',
+    'Queue skip & VIP priority booking access',
+    'Complimentary scalp conditioning & styling',
+    'Cancel or pause anytime',
+  ],
+  'father-son': [
+    '1 Adult cut + 1 Junior cut per month',
+    'Priority Saturday chair reservations',
+    'Side-by-side or back-to-back chairs',
+    'Cancel or pause anytime',
+  ],
+};
+
 export const DEFAULT_PLANS: SubscriptionPlan[] = [
   {
     id: 'solo',
-    name: 'The Solo',
+    name: 'The Solo Membership',
     tagline: 'Keep sharp every month',
     price: 100,
-    perks: [
-      '1 fresh haircut per month',
-      'Book anytime in the month',
-      'Priority booking access',
-      'Cancel or pause anytime',
-    ],
+    perks: PERKS_BY_CODE.solo,
   },
   {
     id: 'twice',
-    name: 'The Regular',
+    name: 'The Regular Membership',
     tagline: 'Never let it grow out',
-    price: 180,
+    price: 190,
     featured: true,
-    perks: [
-      '2 fresh haircuts per month',
-      'Best value per cut (R90/cut)',
-      'Skip the queue & walk-in priority',
-      'Complimentary hot towel finish',
-      'Cancel or pause anytime',
-    ],
+    perks: PERKS_BY_CODE.twice,
   },
   {
     id: 'executive',
     name: 'The Executive',
     tagline: 'Full combo, twice a month',
     price: 350,
-    perks: [
-      '2 Full Combos per month (Cut + Beard)',
-      'Hot towel sculpting & razor line-up',
-      'Queue skip & VIP priority booking access',
-      'Complimentary scalp conditioning & styling',
-      'Cancel or pause anytime',
-    ],
+    perks: PERKS_BY_CODE.executive,
+  },
+  {
+    id: 'father-son',
+    name: 'Father n Son Membership',
+    tagline: 'Bonding time in the chair',
+    price: 190,
+    perks: PERKS_BY_CODE['father-son'],
   },
 ];
 
@@ -73,12 +92,39 @@ export function SubscriptionCarousel({
 }: SubscriptionCarouselProps) {
   const router = useRouter();
   const carouselRef = useRef<HTMLDivElement>(null);
+  const [plans, setPlans] = useState<SubscriptionPlan[]>(DEFAULT_PLANS);
   const [activeIndex, setActiveIndex] = useState(1); // Default center on "The Regular"
   const [userSession, setUserSession] = useState<any>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [pendingPlanId, setPendingPlanId] = useState<string | null>(null);
   const [subscribingPlanId, setSubscribingPlanId] = useState<string | null>(null);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+
+  // Fetch live CMS subscription services
+  useEffect(() => {
+    fetch('/api/services')
+      .then((res) => (res.ok ? res.json() : []))
+      .then((services: any[]) => {
+        const subServices = (services || []).filter((s) => s.is_subscription);
+        if (subServices.length > 0) {
+          const mapped: SubscriptionPlan[] = subServices.map((s) => ({
+            id: s.plan_code || s.id,
+            name: s.name,
+            tagline: s.description ? s.description.slice(0, 50) : 'Ace of Fyt Recurring Chair Pass',
+            price: Number(s.price),
+            featured: s.plan_code === 'twice',
+            perks: PERKS_BY_CODE[s.plan_code] || [
+              'Regular haircut chair pass',
+              'Priority booking access',
+              'Complimentary grooming styling',
+              'Cancel or pause anytime',
+            ],
+          }));
+          setPlans(mapped);
+        }
+      })
+      .catch((err) => console.error('Failed to load subscription services:', err));
+  }, []);
 
   // Check auth session
   useEffect(() => {
@@ -104,7 +150,7 @@ export function SubscriptionCarousel({
     const { scrollLeft, clientWidth } = carouselRef.current;
     const cardWidth = 320; // approximate card width + gap
     const newIndex = Math.round(scrollLeft / cardWidth);
-    setActiveIndex(Math.min(Math.max(newIndex, 0), DEFAULT_PLANS.length - 1));
+    setActiveIndex(Math.min(Math.max(newIndex, 0), plans.length - 1));
   }
 
   function scrollToIndex(index: number) {
@@ -122,7 +168,7 @@ export function SubscriptionCarousel({
   }
 
   function scrollRight() {
-    scrollToIndex(Math.min(activeIndex + 1, DEFAULT_PLANS.length - 1));
+    scrollToIndex(Math.min(activeIndex + 1, plans.length - 1));
   }
 
   // Handle subscribe click
@@ -230,7 +276,7 @@ export function SubscriptionCarousel({
           </button>
           <button
             onClick={scrollRight}
-            disabled={activeIndex === DEFAULT_PLANS.length - 1}
+            disabled={activeIndex === plans.length - 1}
             className="p-2 rounded-lg border border-zinc-800 bg-zinc-900 text-zinc-300 hover:text-white hover:border-zinc-700 disabled:opacity-30 disabled:cursor-not-allowed transition"
             aria-label="Next plan"
           >
@@ -252,7 +298,7 @@ export function SubscriptionCarousel({
         className="flex space-x-6 overflow-x-auto pb-6 pt-2 snap-x snap-mandatory scrollbar-none"
         style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
       >
-        {DEFAULT_PLANS.map((plan, idx) => {
+        {plans.map((plan, idx) => {
           const isFeatured = plan.featured;
           const isProcessing = subscribingPlanId === plan.id;
 
@@ -338,7 +384,7 @@ export function SubscriptionCarousel({
 
       {/* Pagination Dots */}
       <div className="flex justify-center items-center space-x-2 pt-1">
-        {DEFAULT_PLANS.map((_, idx) => (
+        {plans.map((_, idx) => (
           <button
             key={idx}
             onClick={() => scrollToIndex(idx)}

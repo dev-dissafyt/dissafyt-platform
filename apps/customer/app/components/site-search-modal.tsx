@@ -3,135 +3,23 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, X, Scissors, ShoppingBag, ArrowRight, ExternalLink, Sparkles } from 'lucide-react';
+import { Search, X, Scissors, ShoppingBag, Loader2, Sparkles } from 'lucide-react';
 
-interface SearchResult {
+export interface SearchResult {
   id: string;
   title: string;
   subtitle: string;
-  category: 'STREETWEAR' | 'BARBERSHOP' | 'PAGE';
+  category: 'STREETWEAR' | 'BARBERSHOP';
   href: string;
   price?: string;
 }
-
-const STATIC_SEARCH_ITEMS: SearchResult[] = [
-  // Streetwear
-  {
-    id: 'sw-1',
-    title: '280GSM Heavyweight Oversized Hoodie',
-    subtitle: 'Cape Town Garment Lab Batch 01 French Terry',
-    category: 'STREETWEAR',
-    href: '/shop',
-    price: 'R 850.00',
-  },
-  {
-    id: 'sw-2',
-    title: 'Dissafyt Flagship Minimal Tee',
-    subtitle: '100% Ring-Spun Cotton, DTG Print',
-    category: 'STREETWEAR',
-    href: '/shop',
-    price: 'R 450.00',
-  },
-  {
-    id: 'sw-3',
-    title: 'Ace of Fyt Heavyweight Fleece',
-    subtitle: 'Streetwear drop engineered in Cape Town',
-    category: 'STREETWEAR',
-    href: '/shop',
-    price: 'R 920.00',
-  },
-  {
-    id: 'sw-4',
-    title: 'Signature Snapback & Beanie Capsule',
-    subtitle: 'Custom 3D embroidery headwear',
-    category: 'STREETWEAR',
-    href: '/shop',
-    price: 'R 380.00',
-  },
-
-  // Barbershop
-  {
-    id: 'bb-1',
-    title: 'The Executive Combo',
-    subtitle: 'Razor skin fade, beard lineup, hot towel sculpt, scalp treatment',
-    category: 'BARBERSHOP',
-    href: '/book',
-    price: 'R 220.00',
-  },
-  {
-    id: 'bb-2',
-    title: 'The Ace Skin Fade',
-    subtitle: 'Zero-guard taper, skin fade, razor edge crisping',
-    category: 'BARBERSHOP',
-    href: '/book',
-    price: 'R 120.00',
-  },
-  {
-    id: 'bb-3',
-    title: 'Beard Sculpt & Hot Towel',
-    subtitle: 'Beard shaping, steamed towel, organic butter massage',
-    category: 'BARBERSHOP',
-    href: '/book',
-    price: 'R 100.00',
-  },
-  {
-    id: 'bb-4',
-    title: 'VIP Monthly Guild Membership',
-    subtitle: 'Unlimited cuts, zero-queue waitlist, drop room discount',
-    category: 'BARBERSHOP',
-    href: '/book',
-    price: 'From R 450/mo',
-  },
-
-  // Pages
-  {
-    id: 'pg-1',
-    title: 'Dissafyt Streetwear Drop Room',
-    subtitle: 'Explore active clothing collections and capsules',
-    category: 'PAGE',
-    href: '/shop',
-  },
-  {
-    id: 'pg-2',
-    title: 'Ace of Fyt Chair Reservations',
-    subtitle: 'Book appointment with master barbers in Cape Town',
-    category: 'PAGE',
-    href: '/book',
-  },
-  {
-    id: 'pg-3',
-    title: 'My Dissafyt Account',
-    subtitle: 'View garment orders, tracking numbers, and appointments',
-    category: 'PAGE',
-    href: '/account',
-  },
-  {
-    id: 'pg-4',
-    title: 'Shopping Bag Checkout',
-    subtitle: 'PayFast ZAR door-to-door courier checkout',
-    category: 'PAGE',
-    href: '/checkout',
-  },
-  {
-    id: 'pg-5',
-    title: 'Terms & Conditions',
-    subtitle: 'Store policies, appointment rules, and courier guidelines',
-    category: 'PAGE',
-    href: '/terms',
-  },
-  {
-    id: 'pg-6',
-    title: 'Privacy Policy',
-    subtitle: 'Client data encryption, POPIA compliance, and privacy rights',
-    category: 'PAGE',
-    href: '/privacy',
-  },
-];
 
 export function SiteSearchModal() {
   const [isOpen, setIsOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [cmsItems, setCmsItems] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const router = useRouter();
 
@@ -159,29 +47,50 @@ export function SiteSearchModal() {
     };
   }, [isOpen]);
 
-  // Focus input when opened
+  // Fetch live CMS products & services whenever modal opens
   useEffect(() => {
     if (isOpen) {
       document.body.style.overflow = 'hidden';
       setTimeout(() => inputRef.current?.focus(), 50);
+
+      // Fetch live CMS items
+      let isSubscribed = true;
+      setLoading(true);
+      fetch('/api/search')
+        .then((res) => (res.ok ? res.json() : []))
+        .then((data: SearchResult[]) => {
+          if (isSubscribed) {
+            setCmsItems(data);
+          }
+        })
+        .catch((err) => {
+          console.error('Failed to load CMS search items:', err);
+        })
+        .finally(() => {
+          if (isSubscribed) setLoading(false);
+        });
+
+      return () => {
+        isSubscribed = false;
+        document.body.style.overflow = '';
+      };
     } else {
       document.body.style.overflow = '';
       setQuery('');
       setSelectedIndex(0);
     }
-    return () => {
-      document.body.style.overflow = '';
-    };
   }, [isOpen]);
 
+  // Filter items exclusively against active CMS products and services
   const filteredItems = query.trim() === ''
-    ? STATIC_SEARCH_ITEMS.slice(0, 6)
-    : STATIC_SEARCH_ITEMS.filter((item) => {
+    ? cmsItems
+    : cmsItems.filter((item) => {
         const q = query.toLowerCase();
         return (
           item.title.toLowerCase().includes(q) ||
           item.subtitle.toLowerCase().includes(q) ||
-          item.category.toLowerCase().includes(q)
+          item.category.toLowerCase().includes(q) ||
+          (item.price && item.price.toLowerCase().includes(q))
         );
       });
 
@@ -217,11 +126,15 @@ export function SiteSearchModal() {
         className="relative z-50 w-full max-w-xl overflow-hidden rounded-2xl border border-zinc-800 bg-zinc-950 shadow-2xl animate-in zoom-in-95 duration-150 text-white"
         role="dialog"
         aria-modal="true"
-        aria-label="Site Search"
+        aria-label="CMS Product and Service Search"
       >
         {/* Search Input Bar */}
         <div className="flex items-center border-b border-zinc-800 px-4 py-3.5 space-x-3">
-          <Search className="h-5 w-5 text-amber-500 flex-shrink-0" />
+          {loading ? (
+            <Loader2 className="h-5 w-5 text-amber-500 animate-spin flex-shrink-0" />
+          ) : (
+            <Search className="h-5 w-5 text-amber-500 flex-shrink-0" />
+          )}
           <input
             ref={inputRef}
             type="text"
@@ -231,7 +144,7 @@ export function SiteSearchModal() {
               setSelectedIndex(0);
             }}
             onKeyDown={handleInputKeyDown}
-            placeholder="Search garments, barbershop services, pages... (Cmd + K)"
+            placeholder="Search CMS products & services... (Cmd + K)"
             className="flex-1 bg-transparent text-sm text-white placeholder-zinc-500 outline-none"
           />
           {query && (
@@ -249,10 +162,19 @@ export function SiteSearchModal() {
 
         {/* Results List */}
         <div className="max-h-80 overflow-y-auto p-2 divide-y divide-zinc-900">
-          {filteredItems.length === 0 ? (
+          {loading && cmsItems.length === 0 ? (
             <div className="py-12 text-center text-zinc-500 space-y-2">
-              <p className="text-sm">No results found for &ldquo;{query}&rdquo;</p>
-              <p className="text-xs text-zinc-600">Try searching &ldquo;hoodie&rdquo;, &ldquo;fade&rdquo;, or &ldquo;booking&rdquo;</p>
+              <Loader2 className="mx-auto h-6 w-6 text-amber-500 animate-spin" />
+              <p className="text-xs text-zinc-400">Querying live CMS catalog...</p>
+            </div>
+          ) : filteredItems.length === 0 ? (
+            <div className="py-12 text-center text-zinc-500 space-y-2">
+              <p className="text-sm font-medium text-zinc-300">
+                No products or services found in CMS matching &ldquo;{query}&rdquo;
+              </p>
+              <p className="text-xs text-zinc-500 max-w-xs mx-auto">
+                Search queries strictly against active garments in our streetwear lab and scheduled barbershop cuts.
+              </p>
             </div>
           ) : (
             filteredItems.map((item, idx) => {
@@ -270,10 +192,8 @@ export function SiteSearchModal() {
                     <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-zinc-900 border border-zinc-800 text-zinc-400 flex-shrink-0">
                       {item.category === 'STREETWEAR' ? (
                         <ShoppingBag className="h-4 w-4 text-amber-500" />
-                      ) : item.category === 'BARBERSHOP' ? (
-                        <Scissors className="h-4 w-4 text-amber-500" />
                       ) : (
-                        <ExternalLink className="h-4 w-4 text-zinc-400" />
+                        <Scissors className="h-4 w-4 text-amber-500" />
                       )}
                     </div>
                     <div className="min-w-0">
@@ -310,7 +230,7 @@ export function SiteSearchModal() {
             <span>ESC Close</span>
           </div>
           <span className="text-amber-500/80 flex items-center gap-1">
-            <Sparkles className="h-3 w-3" /> DISSAFYT SEARCH
+            <Sparkles className="h-3 w-3" /> CMS CATALOG SEARCH
           </span>
         </div>
       </div>

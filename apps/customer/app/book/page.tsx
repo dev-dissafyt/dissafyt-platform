@@ -110,7 +110,6 @@ function BookContent() {
   const [submitting, setSubmitting] = useState(false);
   const [bookingError, setBookingError] = useState<string | null>(null);
   const [confirmedBooking, setConfirmedBooking] = useState<any>(null);
-  const [paymentChoice, setPaymentChoice] = useState<'payfast' | 'pay_in_chair'>('payfast');
 
   // Quick Auth Form (if guest wants to log in or register right here)
   const [showAuthForm, setShowAuthForm] = useState(false);
@@ -436,7 +435,7 @@ function BookContent() {
     try {
       const cov = isServiceCovered(selectedService);
       const isCovered = hasActiveSubscription && cov.covered;
-      const chosenPayment = isCovered ? 'membership_covered' : paymentChoice;
+      const chosenPayment = isCovered ? 'membership_covered' : 'payfast';
 
       const res = await fetch('/api/bookings', {
         method: 'POST',
@@ -549,8 +548,8 @@ function BookContent() {
                   Paid Online via PayFast
                 </span>
               ) : (
-                <span className="inline-flex items-center rounded-full bg-amber-500/10 px-2 py-0.5 text-xs font-medium text-amber-400">
-                  Due in Chair (R {Number(confirmedBooking.total_amount || confirmedBooking.servicePrice).toFixed(2)})
+                <span className="inline-flex items-center rounded-full bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-400">
+                  Paid Online via PayFast
                 </span>
               )}
             </div>
@@ -563,18 +562,6 @@ function BookContent() {
               </span>
             </div>
           </div>
-
-          {confirmedBooking.payment_status === 'unpaid' && searchParams.get('paid') !== '1' && Number(confirmedBooking.total_amount || confirmedBooking.servicePrice) > 0 && (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-left space-y-1.5">
-              <div className="text-xs font-bold text-amber-300 flex items-center gap-1.5">
-                <AlertCircle className="h-4 w-4 text-amber-400 shrink-0" />
-                Payment Due Upon Arrival
-              </div>
-              <p className="text-xs text-zinc-300 leading-relaxed">
-                Please settle your appointment fee of <strong className="text-white">R {Number(confirmedBooking.total_amount || confirmedBooking.servicePrice).toFixed(2)}</strong> at the studio counter via our PayFast card machine or cash before your haircut.
-              </p>
-            </div>
-          )}
 
           {confirmedBooking.start_time && (
             <div className="pt-2">
@@ -1081,76 +1068,25 @@ function BookContent() {
               return (
                 <div className="space-y-2 pt-2 border-t border-zinc-800">
                   <Label className="text-xs font-semibold text-zinc-300 uppercase tracking-wider">
-                    Select Payment Method
+                    Payment Method
                   </Label>
-                  <div className="grid grid-cols-1 gap-2">
-                    {/* Option A: Pay Online (PayFast) */}
-                    <button
-                      type="button"
-                      onClick={() => setPaymentChoice('payfast')}
-                      className={`flex items-start text-left p-3 rounded-xl border transition-all ${
-                        paymentChoice === 'payfast'
-                          ? 'border-amber-500 bg-amber-500/10 text-white'
-                          : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700'
-                      }`}
-                    >
-                      <div className="flex h-5 items-center mr-3">
-                        <input
-                          type="radio"
-                          name="payment_choice"
-                          checked={paymentChoice === 'payfast'}
-                          onChange={() => setPaymentChoice('payfast')}
-                          className="h-4 w-4 text-amber-500 focus:ring-amber-500 border-zinc-700 bg-zinc-800"
-                        />
+                  <div className="flex items-start text-left p-3.5 rounded-xl border border-amber-500/40 bg-amber-500/5 text-white">
+                    <div className="flex h-5 items-center mr-3 text-amber-400">
+                      <CreditCard className="h-4 w-4" />
+                    </div>
+                    <div className="flex-1">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-white">
+                          Pay Online via PayFast
+                        </span>
+                        <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                          Instant Confirm
+                        </span>
                       </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                            <CreditCard className="h-3.5 w-3.5 text-amber-400" /> Pay Online (PayFast)
-                          </span>
-                          <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
-                            Instant Confirm
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-zinc-400 mt-0.5">
-                          Cards, Instant EFT, Capitec Pay, SnapScan
-                        </p>
-                      </div>
-                    </button>
-
-                    {/* Option B: Pay in the Chair */}
-                    <button
-                      type="button"
-                      onClick={() => setPaymentChoice('pay_in_chair')}
-                      className={`flex items-start text-left p-3 rounded-xl border transition-all ${
-                        paymentChoice === 'pay_in_chair'
-                          ? 'border-amber-500 bg-amber-500/10 text-white'
-                          : 'border-zinc-800 bg-zinc-900/50 text-zinc-400 hover:border-zinc-700'
-                      }`}
-                    >
-                      <div className="flex h-5 items-center mr-3">
-                        <input
-                          type="radio"
-                          name="payment_choice"
-                          checked={paymentChoice === 'pay_in_chair'}
-                          onChange={() => setPaymentChoice('pay_in_chair')}
-                          className="h-4 w-4 text-amber-500 focus:ring-amber-500 border-zinc-700 bg-zinc-800"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-white flex items-center gap-1.5">
-                            <Scissors className="h-3.5 w-3.5 text-amber-400" /> Pay in the Chair
-                          </span>
-                          <span className="text-[10px] font-semibold uppercase px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700">
-                            Pay on Arrival
-                          </span>
-                        </div>
-                        <p className="text-[11px] text-zinc-400 mt-0.5">
-                          Settle via PayFast card machine or cash at studio counter
-                        </p>
-                      </div>
-                    </button>
+                      <p className="text-[11px] text-zinc-400 mt-1 leading-relaxed">
+                        Cards, Instant EFT, Capitec Pay, SnapScan. Booking confirmed immediately upon checkout.
+                      </p>
+                    </div>
                   </div>
                 </div>
               );
@@ -1179,17 +1115,14 @@ function BookContent() {
               className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-sm py-5 shadow-lg shadow-amber-500/10"
             >
               {submitting
-                ? 'Processing...'
+                ? 'Redirecting to PayFast...'
                 : (() => {
                     const cov = isServiceCovered(selectedService);
                     if (hasActiveSubscription && cov.covered) {
                       return 'Confirm Appointment (Included in Membership)';
                     }
                     const priceStr = `R ${selectedService ? Number(selectedService.price).toFixed(2) : '0.00'}`;
-                    if (paymentChoice === 'payfast') {
-                      return `Pay Online with PayFast (${priceStr})`;
-                    }
-                    return `Confirm & Pay in Chair (${priceStr})`;
+                    return `Pay with PayFast (${priceStr})`;
                   })()}
             </Button>
           </Card>

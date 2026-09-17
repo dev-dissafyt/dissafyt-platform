@@ -5,11 +5,11 @@ import { getSupabaseAdminClient } from '@dissafyt/database';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const PLAN_CONFIGS: Record<string, { name: string; price: number }> = {
+const FALLBACK_PLANS: Record<string, { name: string; price: number }> = {
   solo: { name: 'The Solo Membership', price: 100.0 },
-  twice: { name: 'The Regular Membership', price: 180.0 },
-  executive: { name: 'The Executive Membership', price: 350.0 },
-  'father-son': { name: 'The Executive Membership', price: 350.0 },
+  twice: { name: 'The Regular Membership', price: 190.0 },
+  executive: { name: 'The Executive', price: 350.0 },
+  'father-son': { name: 'Father n Son Membership', price: 190.0 },
 };
 
 /**
@@ -33,9 +33,21 @@ export async function POST(request: NextRequest) {
 
     const body = await request.json().catch(() => ({}));
     const planCode = body.planCode || 'twice';
-    const plan = PLAN_CONFIGS[planCode] || PLAN_CONFIGS.twice;
 
     const admin = getSupabaseAdminClient();
+
+    // Query active service dynamically from CMS database
+    const { data: dbService } = await admin
+      .from('services')
+      .select('*')
+      .eq('is_subscription', true)
+      .eq('is_active', true)
+      .eq('plan_code', planCode)
+      .maybeSingle();
+
+    const plan = dbService
+      ? { name: dbService.name, price: Number(dbService.price) }
+      : FALLBACK_PLANS[planCode] || FALLBACK_PLANS.twice;
     const nowIso = new Date().toISOString();
 
     // 1. Check if user already has an active subscription in public.subscriptions
