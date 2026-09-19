@@ -155,6 +155,14 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             </button>
           </div>
 
+          {/* Active Operator Switcher (In Collapsible Drawer for Mobile) */}
+          <div className="lg:hidden pb-3 border-b border-stone-800">
+            <div className="text-[10px] font-mono text-stone-500 uppercase tracking-wider mb-2 px-1">
+              Active Operator
+            </div>
+            <OperatorSwitcher inDrawer={true} />
+          </div>
+
           {/* Navigation Items */}
           <nav className="space-y-1 text-sm font-medium">
             {navItems.map((item) => {
@@ -218,7 +226,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             </div>
           </div>
 
-          <div className="flex items-center space-x-2 sm:space-x-4">
+          {/* Desktop Operator Switcher (Hidden on Mobile) */}
+          <div className="hidden lg:flex items-center space-x-2 sm:space-x-4">
             <OperatorSwitcher />
           </div>
         </header>
