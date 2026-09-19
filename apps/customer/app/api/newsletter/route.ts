@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdminClient } from '@dissafyt/database';
 import { AuthService } from '@dissafyt/api';
+import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -68,19 +69,10 @@ export async function POST(request: NextRequest) {
  * Admin-authenticated list of all newsletter subscribers.
  */
 export async function GET(request: NextRequest) {
+  const auth = await requireAdminAuth(request, 'user:view');
+  if (isAuthFailure(auth)) return auth;
+
   try {
-    const authHeader = request.headers.get('Authorization');
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
-
-    if (!token) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-
-    const authCtx = await AuthService.verifyToken(token);
-    if (!authCtx || !authCtx.roles.includes('admin')) {
-      return NextResponse.json({ error: 'Forbidden. Admin privileges required.' }, { status: 403 });
-    }
-
     const admin = getSupabaseAdminClient();
     const { data: subscribers, error, count } = await admin
       .from('newsletter_subscribers')
