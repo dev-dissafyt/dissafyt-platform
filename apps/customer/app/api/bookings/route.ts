@@ -23,21 +23,23 @@ export async function GET(request: NextRequest) {
     // If admin parameters or admin headers are present, verify administrative privileges
     if (hasAdminParams) {
       const auth = await requireAdminAuth(request, 'booking:view');
-      if (!isAuthFailure(auth)) {
-        const date = searchParams.get('date') || undefined;
-        const staffId = searchParams.get('staffId') || undefined;
-        const status = searchParams.get('status') || undefined;
-        const locationId = searchParams.get('locationId') || undefined;
-
-        const bookings = await AdminBarbershopService.listBookings({
-          date,
-          staffId,
-          status,
-          locationId,
-        });
-
-        return NextResponse.json(bookings);
+      if (isAuthFailure(auth)) {
+        return auth;
       }
+
+      const date = searchParams.get('date') || undefined;
+      const staffId = searchParams.get('staffId') || undefined;
+      const status = searchParams.get('status') || undefined;
+      const locationId = searchParams.get('locationId') || undefined;
+
+      const bookings = await AdminBarbershopService.listBookings({
+        date,
+        staffId,
+        status,
+        locationId,
+      });
+
+      return NextResponse.json(bookings);
     }
 
     // Otherwise, treat as customer querying their own bookings

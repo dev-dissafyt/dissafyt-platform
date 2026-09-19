@@ -16,6 +16,7 @@ import {
   X,
 } from 'lucide-react';
 import { OperatorSwitcher } from './operator-switcher';
+import { getSupabaseBrowserClient } from '@dissafyt/database';
 
 export function AdminShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
@@ -24,6 +25,30 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   // Close mobile drawer on route transition
   useEffect(() => {
     setMobileOpen(false);
+  }, [pathname]);
+
+  // Auth gate: redirect unauthenticated visitors to login screen instead of rendering ghost operator
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (pathname === '/login' || pathname === '/admin/login') return;
+
+    const hasEmailCookie = document.cookie.includes('dissafyt_admin_email=');
+    const hasTokenCookie = document.cookie.includes('dissafyt_admin_token=');
+    const hasStorage = Boolean(localStorage.getItem('dissafyt_admin_operator'));
+
+    if (!hasEmailCookie && !hasTokenCookie && !hasStorage) {
+      try {
+        const supabase = getSupabaseBrowserClient();
+        supabase.auth.getSession().then(({ data }) => {
+          if (!data?.session) {
+            const isSubdomainAdmin = window.location.host.startsWith('admin.');
+            window.location.href = isSubdomainAdmin ? '/login' : '/admin/login';
+          }
+        });
+      } catch {
+        // ignore
+      }
+    }
   }, [pathname]);
 
   // Prevent background scrolling when mobile drawer is open

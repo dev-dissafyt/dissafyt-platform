@@ -87,9 +87,16 @@ export async function requireAdminAuth(
     );
   }
 
+  const requestedEmail = request.headers.get('x-admin-email')?.toLowerCase().trim();
+  const effectiveEmail = (
+    requestedEmail === 'curtislee@dissafyt.com' || requestedEmail === 'dissafyt@gmail.com'
+      ? requestedEmail
+      : userEmail || 'curtislee@dissafyt.com'
+  );
+
   return {
     authorized: true,
-    email: userEmail || 'curtislee@dissafyt.com',
+    email: effectiveEmail,
     role,
     userId: authCtx.userId,
   };

@@ -83,23 +83,44 @@ function getCookie(name: string): string | null {
   return match ? decodeURIComponent(match[2]) : null;
 }
 
+export function getCookieDomain(): string {
+  if (typeof window === 'undefined') return '';
+  const hostname = window.location.hostname;
+  if (hostname.endsWith('dissafyt.com')) {
+    return '; domain=.dissafyt.com';
+  }
+  return '';
+}
+
 /**
  * Fetch wrapper that automatically appends active operator session token and RBAC headers.
+ * Prioritizes live, refreshed Supabase Auth tokens over stale cookies and auto-retries on 401.
  */
 export async function adminFetch(input: RequestInfo | URL, init?: RequestInit): Promise<Response> {
   const operator = getActiveOperator();
   const headers = new Headers(init?.headers || {});
 
-  // 1. Attach Bearer token from cookie or browser Supabase session
-  let token = getCookie('dissafyt_admin_token');
-  if (!token && typeof window !== 'undefined') {
+  // 1. Prioritize live Supabase session token in browser to prevent expired cookie JWT lockouts
+  let token: string | null = null;
+  if (typeof window !== 'undefined') {
     try {
       const supabase = getSupabaseBrowserClient();
       const { data } = await supabase.auth.getSession();
-      token = data?.session?.access_token || null;
+      if (data?.session?.access_token) {
+        token = data.session.access_token;
+        // Keep cookie refreshed with the active access token
+        const maxAge = 60 * 60 * 24 * 7; // 7 days
+        const domainPart = getCookieDomain();
+        document.cookie = `dissafyt_admin_token=${encodeURIComponent(token)}; path=/; max-age=${maxAge}; SameSite=Lax${domainPart}`;
+      }
     } catch {
       // ignore
     }
+  }
+
+  // 2. Fall back to cookie token if browser session was not yet initialized
+  if (!token) {
+    token = getCookie('dissafyt_admin_token');
   }
 
   if (token && !headers.has('Authorization')) {
@@ -113,8 +134,31 @@ export async function adminFetch(input: RequestInfo | URL, init?: RequestInit): 
     headers.set('x-admin-email', operator.email);
   }
 
-  return fetch(input, {
+  let res = await fetch(input, {
     ...init,
     headers,
   });
+
+  // 3. Auto-recovery: If 401 Unauthorized, attempt session refresh and retry once
+  if (res.status === 401 && typeof window !== 'undefined') {
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { data, error } = await supabase.auth.refreshSession();
+      if (!error && data?.session?.access_token) {
+        const freshToken = data.session.access_token;
+        const maxAge = 60 * 60 * 24 * 7;
+        const domainPart = getCookieDomain();
+        document.cookie = `dissafyt_admin_token=${encodeURIComponent(freshToken)}; path=/; max-age=${maxAge}; SameSite=Lax${domainPart}`;
+        headers.set('Authorization', `Bearer ${freshToken}`);
+        res = await fetch(input, {
+          ...init,
+          headers,
+        });
+      }
+    } catch {
+      // ignore
+    }
+  }
+
+  return res;
 }

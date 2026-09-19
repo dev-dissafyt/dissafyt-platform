@@ -174,7 +174,9 @@ export class ReportingService {
     const barberPerformance = (staffList || []).map((barber) => {
       const barberBookings = bookingList.filter((b) => b.staff_id === barber.id);
       const completed = barberBookings.filter((b) => b.status === 'completed').length;
-      const upcoming = barberBookings.filter((b) => b.status === 'confirmed' && b.start_time >= todayStart).length;
+      const upcoming = barberBookings.filter(
+        (b) => (b.status === 'confirmed' || b.status === 'pending') && b.start_time >= todayStart
+      ).length;
       return {
         staffId: barber.id,
         displayName: barber.display_name,

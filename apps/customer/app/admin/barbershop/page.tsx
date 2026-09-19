@@ -180,9 +180,17 @@ export default function AdminBarbershopPage() {
       if (filterLocationId !== 'all') params.set('locationId', filterLocationId);
 
       const res = await adminFetch(`/api/bookings?${params.toString()}`);
-      if (res.ok) setBookings(await res.json());
+      if (res.ok) {
+        setBookings(await res.json());
+      } else if (res.status === 401) {
+        setStatusMsg('Administrative session expired or unauthorized. Please re-authenticate.');
+      } else {
+        const err = await res.json().catch(() => ({}));
+        setStatusMsg(err.error || 'Failed to load appointments from server.');
+      }
     } catch (e) {
-      console.error(e);
+      console.error('Network error loading bookings:', e);
+      setStatusMsg('Network connection error loading appointments.');
     } finally {
       setLoadingBookings(false);
     }
@@ -192,9 +200,14 @@ export default function AdminBarbershopPage() {
     setLoadingStaff(true);
     try {
       const res = await adminFetch('/api/staff');
-      if (res.ok) setStaffList(await res.json());
+      if (res.ok) {
+        setStaffList(await res.json());
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.warn('Could not load staff list:', err.error);
+      }
     } catch (e) {
-      console.error(e);
+      console.error('Network error loading staff:', e);
     } finally {
       setLoadingStaff(false);
     }
@@ -204,9 +217,14 @@ export default function AdminBarbershopPage() {
     setLoadingServices(true);
     try {
       const res = await adminFetch('/api/services');
-      if (res.ok) setServices(await res.json());
+      if (res.ok) {
+        setServices(await res.json());
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.warn('Could not load services list:', err.error);
+      }
     } catch (e) {
-      console.error(e);
+      console.error('Network error loading services:', e);
     } finally {
       setLoadingServices(false);
     }
@@ -216,9 +234,14 @@ export default function AdminBarbershopPage() {
     setLoadingLocations(true);
     try {
       const res = await adminFetch('/api/locations');
-      if (res.ok) setLocations(await res.json());
+      if (res.ok) {
+        setLocations(await res.json());
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.warn('Could not load locations list:', err.error);
+      }
     } catch (e) {
-      console.error(e);
+      console.error('Network error loading locations:', e);
     } finally {
       setLoadingLocations(false);
     }
