@@ -77,11 +77,12 @@ function AdminLoginContent() {
       const assignedRole = isAdmin ? "admin" : "staff";
       const fullName = userEmail === "curtislee@dissafyt.com" ? "Curtis-Lee" : "Dissafyt Flagship";
 
-      // Set cookie for Next.js edge middleware
+      // Set cookie for Next.js edge middleware with wildcard domain support
       const maxAge = 60 * 60 * 24 * 7; // 7 days
-      document.cookie = `dissafyt_admin_token=${encodeURIComponent(token)}; path=/; max-age=${maxAge}; SameSite=Lax`;
-      document.cookie = `dissafyt_admin_email=${encodeURIComponent(userEmail)}; path=/; max-age=${maxAge}; SameSite=Lax`;
-      document.cookie = `dissafyt_admin_role=${encodeURIComponent(assignedRole)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+      const domainPart = typeof window !== 'undefined' && window.location.hostname.endsWith('dissafyt.com') ? '; domain=.dissafyt.com' : '';
+      document.cookie = `dissafyt_admin_token=${encodeURIComponent(token)}; path=/; max-age=${maxAge}; SameSite=Lax${domainPart}`;
+      document.cookie = `dissafyt_admin_email=${encodeURIComponent(userEmail)}; path=/; max-age=${maxAge}; SameSite=Lax${domainPart}`;
+      document.cookie = `dissafyt_admin_role=${encodeURIComponent(assignedRole)}; path=/; max-age=${maxAge}; SameSite=Lax${domainPart}`;
 
       // Update operator state
       setActiveOperator({

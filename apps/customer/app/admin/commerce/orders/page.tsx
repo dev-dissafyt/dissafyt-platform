@@ -110,7 +110,7 @@ export default function AdminOrdersPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2 text-sm text-stone-400 mb-1">
-            <Link href="/commerce" className="hover:text-white">Commerce</Link>
+            <Link href="/admin/commerce" className="hover:text-white">Commerce</Link>
             <span>/</span>
             <span className="text-amber-500 font-medium">Orders</span>
           </div>

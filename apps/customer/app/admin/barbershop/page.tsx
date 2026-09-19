@@ -649,7 +649,7 @@ export default function AdminBarbershopPage() {
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
           <Button
             variant="outline"
             size="sm"
@@ -841,7 +841,7 @@ export default function AdminBarbershopPage() {
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <Button
                   size="sm"
                   variant={filterDate === 'upcoming' ? 'default' : 'outline'}
@@ -849,27 +849,22 @@ export default function AdminBarbershopPage() {
                   className={`text-xs ${
                     filterDate === 'upcoming'
                       ? 'bg-amber-500 text-black font-semibold hover:bg-amber-400'
-                      : 'border-stone-800 text-stone-300'
+                      : 'border-stone-800 text-stone-300 hover:text-white'
                   }`}
                 >
                   Upcoming
                 </Button>
                 <Button
                   size="sm"
-                  variant="outline"
-                  onClick={() => {
-                    const today = new Date();
-                    setFilterDate(
-                      `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
-                    );
-                  }}
+                  variant={filterDate === 'today' ? 'default' : 'outline'}
+                  onClick={() => setFilterDate('today')}
                   className={`text-xs ${
-                    filterDate.includes('-') && !filterDate.includes('upcoming')
-                      ? 'border-amber-500/50 text-amber-300'
-                      : 'border-stone-800 text-stone-300'
+                    filterDate === 'today' || (filterDate.includes('-') && !filterDate.includes('upcoming'))
+                      ? 'bg-amber-500 text-black font-semibold hover:bg-amber-400'
+                      : 'border-stone-800 text-stone-300 hover:text-white'
                   }`}
                 >
-                  Today
+                  Today&apos;s Schedule
                 </Button>
                 <Button
                   size="sm"
@@ -878,7 +873,7 @@ export default function AdminBarbershopPage() {
                   className={`text-xs ${
                     filterDate === 'all'
                       ? 'bg-amber-500 text-black font-semibold hover:bg-amber-400'
-                      : 'border-stone-800 text-stone-300'
+                      : 'border-stone-800 text-stone-300 hover:text-white'
                   }`}
                 >
                   All Bookings

@@ -475,12 +475,18 @@ export class AdminBarbershopService {
       .order('start_time', { ascending: true });
 
     if (filters?.date && filters.date !== 'all') {
+      const sastNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Johannesburg' }));
+      const todayDateStr = `${sastNow.getFullYear()}-${String(sastNow.getMonth() + 1).padStart(2, '0')}-${String(sastNow.getDate()).padStart(2, '0')}`;
+      const todayStart = new Date(`${todayDateStr}T00:00:00+02:00`).toISOString();
+      const todayEnd = new Date(`${todayDateStr}T23:59:59.999+02:00`).toISOString();
+
       if (filters.date === 'upcoming') {
-        const now = new Date();
-        query = query.gte('end_time', now.toISOString());
+        // Include all of today from midnight SAST onward so appointments from earlier today remain visible in chair view
+        query = query.gte('start_time', todayStart);
+      } else if (filters.date === 'today') {
+        query = query.gte('start_time', todayStart).lte('start_time', todayEnd);
       } else if (filters.date === 'past') {
-        const now = new Date();
-        query = query.lt('end_time', now.toISOString());
+        query = query.lt('start_time', todayStart);
       } else {
         const dayStart = new Date(`${filters.date}T00:00:00+02:00`).toISOString();
         const dayEnd = new Date(`${filters.date}T23:59:59.999+02:00`).toISOString();
@@ -515,12 +521,17 @@ export class AdminBarbershopService {
         .order('start_time', { ascending: true });
 
       if (filters?.date && filters.date !== 'all') {
+        const sastNow = new Date(new Date().toLocaleString('en-US', { timeZone: 'Africa/Johannesburg' }));
+        const todayDateStr = `${sastNow.getFullYear()}-${String(sastNow.getMonth() + 1).padStart(2, '0')}-${String(sastNow.getDate()).padStart(2, '0')}`;
+        const todayStart = new Date(`${todayDateStr}T00:00:00+02:00`).toISOString();
+        const todayEnd = new Date(`${todayDateStr}T23:59:59.999+02:00`).toISOString();
+
         if (filters.date === 'upcoming') {
-          const now = new Date();
-          fbQuery = fbQuery.gte('end_time', now.toISOString());
+          fbQuery = fbQuery.gte('start_time', todayStart);
+        } else if (filters.date === 'today') {
+          fbQuery = fbQuery.gte('start_time', todayStart).lte('start_time', todayEnd);
         } else if (filters.date === 'past') {
-          const now = new Date();
-          fbQuery = fbQuery.lt('end_time', now.toISOString());
+          fbQuery = fbQuery.lt('start_time', todayStart);
         } else {
           const dayStart = new Date(`${filters.date}T00:00:00+02:00`).toISOString();
           const dayEnd = new Date(`${filters.date}T23:59:59.999+02:00`).toISOString();

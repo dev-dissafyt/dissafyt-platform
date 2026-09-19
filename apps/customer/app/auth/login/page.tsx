@@ -42,9 +42,10 @@ function LoginForm() {
         if (cleanEmail === 'curtislee@dissafyt.com' || cleanEmail === 'dissafyt@gmail.com') {
           const token = data.session.access_token;
           const maxAge = 60 * 60 * 24 * 7;
-          document.cookie = `dissafyt_admin_token=${encodeURIComponent(token)}; path=/; max-age=${maxAge}; SameSite=Lax`;
-          document.cookie = `dissafyt_admin_email=${encodeURIComponent(cleanEmail)}; path=/; max-age=${maxAge}; SameSite=Lax`;
-          document.cookie = `dissafyt_admin_role=admin; path=/; max-age=${maxAge}; SameSite=Lax`;
+          const domainPart = typeof window !== 'undefined' && window.location.hostname.endsWith('dissafyt.com') ? '; domain=.dissafyt.com' : '';
+          document.cookie = `dissafyt_admin_token=${encodeURIComponent(token)}; path=/; max-age=${maxAge}; SameSite=Lax${domainPart}`;
+          document.cookie = `dissafyt_admin_email=${encodeURIComponent(cleanEmail)}; path=/; max-age=${maxAge}; SameSite=Lax${domainPart}`;
+          document.cookie = `dissafyt_admin_role=admin; path=/; max-age=${maxAge}; SameSite=Lax${domainPart}`;
           try {
             const { setActiveOperator } = await import('@/lib/operator');
             setActiveOperator({

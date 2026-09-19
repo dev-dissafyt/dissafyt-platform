@@ -251,8 +251,8 @@ export default function AdminCommercePage() {
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <Link href="/commerce/orders">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <Link href="/admin/commerce/orders">
             <Button
               variant="outline"
               size="sm"

@@ -54,6 +54,15 @@ export function setActiveOperator(operator: AdminOperator): void {
   }
 }
 
+export function getCookieDomain(): string {
+  if (typeof window === 'undefined') return '';
+  const hostname = window.location.hostname;
+  if (hostname.endsWith('dissafyt.com')) {
+    return '; domain=.dissafyt.com';
+  }
+  return '';
+}
+
 export async function logoutAdmin(): Promise<void> {
   if (typeof window === 'undefined') return;
   try {
@@ -65,6 +74,12 @@ export async function logoutAdmin(): Promise<void> {
 
   // Clear cookies with past expiry on root path and all subdomains
   const expired = 'Thu, 01 Jan 1970 00:00:00 GMT';
+  const domainPart = getCookieDomain();
+  document.cookie = `dissafyt_admin_token=; path=/; expires=${expired}; max-age=0; SameSite=Lax${domainPart}`;
+  document.cookie = `dissafyt_admin_email=; path=/; expires=${expired}; max-age=0; SameSite=Lax${domainPart}`;
+  document.cookie = `dissafyt_admin_role=; path=/; expires=${expired}; max-age=0; SameSite=Lax${domainPart}`;
+
+  // Also clear without domain in case host-only cookies were set
   document.cookie = `dissafyt_admin_token=; path=/; expires=${expired}; max-age=0; SameSite=Lax`;
   document.cookie = `dissafyt_admin_email=; path=/; expires=${expired}; max-age=0; SameSite=Lax`;
   document.cookie = `dissafyt_admin_role=; path=/; expires=${expired}; max-age=0; SameSite=Lax`;
@@ -93,8 +108,9 @@ export function switchAdminOperator(email: string): void {
   };
   setActiveOperator(newOp);
   const maxAge = 60 * 60 * 24 * 7; // 7 days
-  document.cookie = `dissafyt_admin_email=${encodeURIComponent(targetEmail)}; path=/; max-age=${maxAge}; SameSite=Lax`;
-  document.cookie = `dissafyt_admin_role=admin; path=/; max-age=${maxAge}; SameSite=Lax`;
+  const domainPart = getCookieDomain();
+  document.cookie = `dissafyt_admin_email=${encodeURIComponent(targetEmail)}; path=/; max-age=${maxAge}; SameSite=Lax${domainPart}`;
+  document.cookie = `dissafyt_admin_role=admin; path=/; max-age=${maxAge}; SameSite=Lax${domainPart}`;
 }
 
 function getCookie(name: string): string | null {

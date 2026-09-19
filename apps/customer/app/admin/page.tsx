@@ -205,7 +205,7 @@ export default function AdminDashboardPage() {
               <CardDescription>Order processing stages with Courier Guy delivery</CardDescription>
             </div>
             <Link
-              href="/commerce/orders"
+              href="/admin/commerce/orders"
               className="text-xs text-amber-500 hover:text-amber-400 flex items-center font-medium"
             >
               View Orders <ArrowRight className="ml-1 h-3 w-3" />
@@ -244,7 +244,7 @@ export default function AdminDashboardPage() {
               <CardDescription>Upcoming schedule and cut volume per barber</CardDescription>
             </div>
             <Link
-              href="/barbershop"
+              href="/admin/barbershop"
               className="text-xs text-amber-500 hover:text-amber-400 flex items-center font-medium"
             >
               Open Schedule <ArrowRight className="ml-1 h-3 w-3" />
@@ -302,7 +302,7 @@ export default function AdminDashboardPage() {
               </CardDescription>
             </div>
             <Link
-              href="/finance"
+              href="/admin/finance"
               className="text-xs text-amber-500 hover:text-amber-400 flex items-center font-medium"
             >
               Payment Audit <ArrowRight className="ml-1 h-3 w-3" />
