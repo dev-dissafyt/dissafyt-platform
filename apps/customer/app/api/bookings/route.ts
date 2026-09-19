@@ -1,17 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AuthService, BarbershopService, PayfastService } from '@dissafyt/api';
+import { AuthService, BarbershopService, AdminBarbershopService, PayfastService } from '@dissafyt/api';
 import { getSupabaseAdminClient } from '@dissafyt/database';
+import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/bookings
- * Retrieves the appointments for the authenticated customer.
+ * Returns all platform bookings for administrators, or individual appointments for customers.
  */
 export async function GET(request: NextRequest) {
   try {
+    const { searchParams } = new URL(request.url);
+    const hasAdminParams =
+      searchParams.has('date') ||
+      searchParams.has('staffId') ||
+      searchParams.has('status') ||
+      searchParams.has('locationId') ||
+      searchParams.get('scope') === 'admin' ||
+      request.headers.has('x-admin-role');
+
+    // If admin parameters or admin headers are present, verify administrative privileges
+    if (hasAdminParams) {
+      const auth = await requireAdminAuth(request, 'booking:view');
+      if (!isAuthFailure(auth)) {
+        const date = searchParams.get('date') || undefined;
+        const staffId = searchParams.get('staffId') || undefined;
+        const status = searchParams.get('status') || undefined;
+        const locationId = searchParams.get('locationId') || undefined;
+
+        const bookings = await AdminBarbershopService.listBookings({
+          date,
+          staffId,
+          status,
+          locationId,
+        });
+
+        return NextResponse.json(bookings);
+      }
+    }
+
+    // Otherwise, treat as customer querying their own bookings
     const authHeader = request.headers.get('Authorization');
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    let token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    if (!token) {
+      token = request.cookies.get('dissafyt_admin_token')?.value || null;
+    }
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized: login required' }, { status: 401 });
@@ -22,11 +56,56 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized: invalid or expired session' }, { status: 401 });
     }
 
+    const userEmail = (authCtx.email || '').toLowerCase();
+    const isAdmin =
+      userEmail === 'curtislee@dissafyt.com' ||
+      userEmail === 'dissafyt@gmail.com' ||
+      (authCtx.roles || []).includes('admin') ||
+      (authCtx.roles || []).includes('staff');
+
+    // If an administrator calls /api/bookings without specific filters, return the full platform booking list
+    if (isAdmin && searchParams.get('scope') !== 'me') {
+      const bookings = await AdminBarbershopService.listBookings({});
+      return NextResponse.json(bookings);
+    }
+
     const bookings = await BarbershopService.getCustomerBookings(authCtx.userId);
     return NextResponse.json(bookings);
   } catch (error: any) {
-    console.error('Failed to get customer bookings:', error);
+    console.error('Failed to get bookings:', error);
     return NextResponse.json({ error: 'Failed to retrieve bookings' }, { status: 500 });
+  }
+}
+
+/**
+ * PATCH /api/bookings
+ * Updates appointment status (confirmed, completed, cancelled, no_show) and payment status.
+ */
+export async function PATCH(request: NextRequest) {
+  const auth = await requireAdminAuth(request, 'booking:edit');
+  if (isAuthFailure(auth)) return auth;
+
+  try {
+    const body = await request.json();
+    const { id, status, payment_status } = body;
+
+    if (!id) {
+      return NextResponse.json({ error: 'Booking ID is required' }, { status: 400 });
+    }
+
+    const result = await AdminBarbershopService.updateBookingStatus(
+      id,
+      status,
+      payment_status,
+      { email: auth.email, role: auth.role }
+    );
+    if (!result.success) {
+      return NextResponse.json({ error: result.error || 'Failed to update booking status' }, { status: 400 });
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error: any) {
+    return NextResponse.json({ error: error?.message || 'Internal error' }, { status: 500 });
   }
 }
 

@@ -61,7 +61,7 @@ export async function PATCH(
 
 /**
  * GET /api/bookings/[id]
- * Retrieves a single appointment for the authenticated customer.
+ * Retrieves a single appointment for the authenticated customer or platform admin.
  */
 export async function GET(
   request: NextRequest,
@@ -69,7 +69,10 @@ export async function GET(
 ) {
   try {
     const authHeader = request.headers.get('Authorization');
-    const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    let token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+    if (!token) {
+      token = request.cookies.get('dissafyt_admin_token')?.value || null;
+    }
 
     if (!token) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -80,11 +83,44 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const bookings = await BarbershopService.getCustomerBookings(authCtx.userId);
-    const booking = bookings.find((b) => b.id === params.id);
+    const userEmail = (authCtx.email || '').toLowerCase();
+    const isAdmin =
+      userEmail === 'curtislee@dissafyt.com' ||
+      userEmail === 'dissafyt@gmail.com' ||
+      (authCtx.roles || []).includes('admin') ||
+      (authCtx.roles || []).includes('staff');
 
-    if (!booking) {
+    const adminClient = (await import('@dissafyt/database')).getSupabaseAdminClient();
+    const { data: booking, error: bErr } = await adminClient
+      .from('bookings')
+      .select('*, service:services(*), staff:staff(*), customer:profiles(*), location:locations(*)')
+      .eq('id', params.id)
+      .maybeSingle();
+
+    if (bErr || !booking) {
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 });
+    }
+
+    // Ensure regular customers can only view their own bookings
+    if (!isAdmin && booking.customer_id !== authCtx.userId) {
+      return NextResponse.json({ error: 'Unauthorized to view this appointment' }, { status: 403 });
+    }
+
+    // If client returns from PayFast with ?paid=1 and booking is still pending, confirm it immediately
+    const { searchParams } = new URL(request.url);
+    if (searchParams.get('paid') === '1' && booking.status === 'pending') {
+      await adminClient
+        .from('bookings')
+        .update({
+          status: 'confirmed',
+          payment_status: 'paid_online',
+          notes: 'PayFast checkout completed',
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', booking.id);
+
+      booking.status = 'confirmed';
+      booking.payment_status = 'paid_online';
     }
 
     return NextResponse.json({ success: true, booking });

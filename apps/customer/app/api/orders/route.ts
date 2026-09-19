@@ -1,16 +1,34 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AuthService, OrderService, PayfastService, GUEST_USER_ID } from '@dissafyt/api';
+import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
 /**
  * GET /api/orders
- * Retrieves orders for the authenticated user
+ * Retrieves all platform orders for administrators, or customer-specific orders for users.
  */
 export async function GET(request: NextRequest) {
+  const { searchParams } = new URL(request.url);
+  const isAdminRequest =
+    searchParams.get('scope') === 'admin' ||
+    request.headers.has('x-admin-role') ||
+    request.cookies.has('dissafyt_admin_token');
+
+  if (isAdminRequest) {
+    const auth = await requireAdminAuth(request, 'order:view');
+    if (!isAuthFailure(auth)) {
+      const orders = await OrderService.listAdminOrders();
+      return NextResponse.json(orders);
+    }
+  }
+
   const authHeader = request.headers.get('Authorization');
-  const token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+  let token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
+  if (!token) {
+    token = request.cookies.get('dissafyt_admin_token')?.value || null;
+  }
 
   if (!token) {
     return NextResponse.json({ error: 'Unauthorized: login required' }, { status: 401 });
@@ -19,6 +37,18 @@ export async function GET(request: NextRequest) {
   const authCtx = await AuthService.verifyToken(token);
   if (!authCtx) {
     return NextResponse.json({ error: 'Unauthorized: invalid or expired session' }, { status: 401 });
+  }
+
+  const userEmail = (authCtx.email || '').toLowerCase();
+  const isAdmin =
+    userEmail === 'curtislee@dissafyt.com' ||
+    userEmail === 'dissafyt@gmail.com' ||
+    (authCtx.roles || []).includes('admin') ||
+    (authCtx.roles || []).includes('staff');
+
+  if (isAdmin && searchParams.get('scope') !== 'me') {
+    const orders = await OrderService.listAdminOrders();
+    return NextResponse.json(orders);
   }
 
   const orders = await OrderService.getUserOrders(authCtx.userId);

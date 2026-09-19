@@ -63,10 +63,11 @@ export async function logoutAdmin(): Promise<void> {
     // ignore
   }
 
-  // Clear cookies
-  document.cookie = 'dissafyt_admin_token=; path=/; max-age=0; SameSite=Lax';
-  document.cookie = 'dissafyt_admin_email=; path=/; max-age=0; SameSite=Lax';
-  document.cookie = 'dissafyt_admin_role=; path=/; max-age=0; SameSite=Lax';
+  // Clear cookies with past expiry on root path and all subdomains
+  const expired = 'Thu, 01 Jan 1970 00:00:00 GMT';
+  document.cookie = `dissafyt_admin_token=; path=/; expires=${expired}; max-age=0; SameSite=Lax`;
+  document.cookie = `dissafyt_admin_email=; path=/; expires=${expired}; max-age=0; SameSite=Lax`;
+  document.cookie = `dissafyt_admin_role=; path=/; expires=${expired}; max-age=0; SameSite=Lax`;
 
   try {
     localStorage.removeItem(STORAGE_KEY);
@@ -74,7 +75,26 @@ export async function logoutAdmin(): Promise<void> {
     // ignore
   }
 
-  window.location.href = '/login';
+  const isSubdomainAdmin = window.location.host.startsWith('admin.');
+  if (isSubdomainAdmin) {
+    window.location.href = '/login';
+  } else {
+    window.location.href = '/admin/login';
+  }
+}
+
+export function switchAdminOperator(email: string): void {
+  const targetEmail = email.toLowerCase().trim();
+  const fullName = targetEmail.startsWith('curtis') ? 'Curtis-Lee' : 'Dissafyt Flagship';
+  const newOp: AdminOperator = {
+    email: targetEmail,
+    role: 'admin',
+    fullName,
+  };
+  setActiveOperator(newOp);
+  const maxAge = 60 * 60 * 24 * 7; // 7 days
+  document.cookie = `dissafyt_admin_email=${encodeURIComponent(targetEmail)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+  document.cookie = `dissafyt_admin_role=admin; path=/; max-age=${maxAge}; SameSite=Lax`;
 }
 
 function getCookie(name: string): string | null {
