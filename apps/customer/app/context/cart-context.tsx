@@ -12,6 +12,8 @@ export interface CartItem {
   quantity: number;
   image?: string;
   slug?: string;
+  isPreorder?: boolean;
+  preorderMessage?: string | null;
 }
 
 interface CartContextType {
@@ -48,6 +50,8 @@ function normalizeItem(raw: any): CartItem | null {
     quantity: Math.max(1, Number(raw.quantity) || 1),
     image: raw.image || '',
     slug: raw.slug || '',
+    isPreorder: Boolean(raw.isPreorder || raw.is_preorder),
+    preorderMessage: raw.preorderMessage || raw.preorder_message || null,
   };
 }
 

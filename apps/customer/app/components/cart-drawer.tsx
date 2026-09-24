@@ -136,10 +136,15 @@ export function CartDrawer() {
                         <Trash2 className="h-3.5 w-3.5" />
                       </button>
                     </div>
-                    <div className="mt-1 flex items-center space-x-2">
+                    <div className="mt-1 flex flex-wrap items-center gap-1.5">
                       <span className="inline-block rounded border border-zinc-700/80 bg-zinc-900 px-2 py-0.5 text-[10px] font-mono uppercase text-zinc-300">
                         {item.variantName || 'Standard'}
                       </span>
+                      {item.isPreorder && (
+                        <span className="inline-block rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400">
+                          Pre-order
+                        </span>
+                      )}
                       <span className="text-[11px] font-mono text-zinc-400">
                         R {item.price.toFixed(2)} ea
                       </span>

@@ -320,10 +320,15 @@ export default function CheckoutPage() {
                       )}
                       <div className="min-w-0">
                         <div className="font-medium text-white truncate">{item.productName}</div>
-                        <div className="text-xs text-zinc-400 flex items-center space-x-2 mt-0.5">
+                        <div className="text-xs text-zinc-400 flex flex-wrap items-center gap-1.5 mt-0.5">
                           <span className="rounded bg-zinc-800/80 px-1.5 py-0.5 text-[10px] font-mono text-zinc-300">
                             {item.variantName || 'Standard'}
                           </span>
+                          {item.isPreorder && (
+                            <span className="rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400">
+                              Pre-order
+                            </span>
+                          )}
                           <span>R {item.price.toFixed(2)} ea</span>
                         </div>
                       </div>

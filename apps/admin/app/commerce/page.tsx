@@ -12,6 +12,7 @@ interface Variant {
   sku: string;
   stock_quantity: number;
   price_override?: number | null;
+  is_active?: boolean;
 }
 
 interface Product {
@@ -24,6 +25,9 @@ interface Product {
   category_name?: string;
   is_active: boolean;
   images: string[];
+  is_preorder?: boolean;
+  preorder_message?: string | null;
+  preorder_target?: number | null;
   variants: Variant[];
 }
 
@@ -32,6 +36,8 @@ interface Category {
   name: string;
   slug: string;
 }
+
+const DEFAULT_STREETWEAR_SIZES = ['S', 'M', 'L', 'XL', '2XL'];
 
 export default function AdminCommercePage() {
   const [products, setProducts] = useState<Product[]>([]);
@@ -49,15 +55,30 @@ export default function AdminCommercePage() {
   const [editCategoryId, setEditCategoryId] = useState('');
   const [editStockQuantity, setEditStockQuantity] = useState('25');
   const [editIsActive, setEditIsActive] = useState(true);
+  const [editIsPreorder, setEditIsPreorder] = useState(false);
+  const [editPreorderMessage, setEditPreorderMessage] = useState('');
+  const [editPreorderTarget, setEditPreorderTarget] = useState('');
+  const [editVariants, setEditVariants] = useState<Variant[]>([]);
   const [editSubmitting, setEditSubmitting] = useState(false);
 
-  // Form State
+  // Form State (Add Product)
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [basePrice, setBasePrice] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [imageUrl, setImageUrl] = useState('');
   const [stockQuantity, setStockQuantity] = useState('25');
+  const [isPreorder, setIsPreorder] = useState(false);
+  const [preorderMessage, setPreorderMessage] = useState('Batch 01: Ships 2–3 weeks from drop close');
+  const [preorderTarget, setPreorderTarget] = useState('50');
+  const [useStreetwearSizes, setUseStreetwearSizes] = useState(true);
+  const [sizeStocks, setSizeStocks] = useState<Record<string, number>>({
+    S: 10,
+    M: 15,
+    L: 20,
+    XL: 12,
+    '2XL': 8,
+  });
   const [categoryName, setCategoryName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
@@ -102,6 +123,20 @@ export default function AdminCommercePage() {
     setStatusMsg(null);
 
     try {
+      const variantsToSubmit = useStreetwearSizes
+        ? Object.entries(sizeStocks).map(([sizeName, qty]) => ({
+            name: sizeName,
+            sku: `${(name || 'DROP').substring(0, 4).toUpperCase()}-${sizeName}`,
+            stock_quantity: Math.max(0, Number(qty) || 0),
+          }))
+        : [
+            {
+              name: 'Standard',
+              sku: `${(name || 'ITEM').substring(0, 4).toUpperCase()}-STD`,
+              stock_quantity: parseInt(stockQuantity, 10) || 10,
+            },
+          ];
+
       const res = await adminFetch('/api/products', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -112,22 +147,22 @@ export default function AdminCommercePage() {
           category_id: categoryId || null,
           images: imageUrl ? [imageUrl] : [],
           is_active: true,
-          variants: [
-            {
-              name: 'Standard',
-              sku: `${name.substring(0, 4).toUpperCase()}-STD`,
-              stock_quantity: parseInt(stockQuantity, 10) || 10,
-            },
-          ],
+          is_preorder: isPreorder,
+          preorder_message: isPreorder ? preorderMessage : null,
+          preorder_target: isPreorder && preorderTarget ? parseInt(preorderTarget, 10) : null,
+          variants: variantsToSubmit,
         }),
       });
 
       if (res.ok) {
-        setStatusMsg('Product created successfully!');
+        setStatusMsg(`Product "${name}" created successfully with ${variantsToSubmit.length} size variants!`);
         setName('');
         setDescription('');
         setBasePrice('');
         setImageUrl('');
+        setIsPreorder(false);
+        setPreorderMessage('Batch 01: Ships 2–3 weeks from drop close');
+        setPreorderTarget('50');
         setShowAddModal(false);
         loadData();
       } else {
@@ -171,6 +206,28 @@ export default function AdminCommercePage() {
     const stock = prod.variants?.reduce((acc, v) => acc + (v.stock_quantity || 0), 0) ?? 25;
     setEditStockQuantity(String(stock));
     setEditIsActive(prod.is_active);
+    setEditIsPreorder(Boolean(prod.is_preorder));
+    setEditPreorderMessage(prod.preorder_message || '');
+    setEditPreorderTarget(prod.preorder_target ? String(prod.preorder_target) : '');
+    setEditVariants(
+      prod.variants && prod.variants.length > 0
+        ? prod.variants.map((v) => ({ ...v }))
+        : [{ name: 'Standard', stock_quantity: 10, sku: '' }]
+    );
+  }
+
+  function applyStreetwearSizesToEdit() {
+    setEditVariants(
+      DEFAULT_STREETWEAR_SIZES.map((size) => {
+        const existing = editVariants.find((v) => v.name.toLowerCase() === size.toLowerCase());
+        return {
+          id: existing?.id,
+          name: size,
+          sku: existing?.sku || `${(editSlug || 'ITEM').toUpperCase().slice(0, 4)}-${size}`,
+          stock_quantity: existing ? existing.stock_quantity : 15,
+        };
+      })
+    );
   }
 
   async function handleSaveEditedProduct(e: React.FormEvent) {
@@ -188,8 +245,17 @@ export default function AdminCommercePage() {
           description: editDescription,
           base_price: parseFloat(editBasePrice) || 0,
           category_id: editCategoryId || null,
-          stock_quantity: parseInt(editStockQuantity, 10) || 0,
           is_active: editIsActive,
+          is_preorder: editIsPreorder,
+          preorder_message: editIsPreorder ? editPreorderMessage : null,
+          preorder_target: editIsPreorder && editPreorderTarget ? parseInt(editPreorderTarget, 10) : null,
+          variants: editVariants.map((v) => ({
+            id: v.id,
+            name: v.name,
+            sku: v.sku,
+            stock_quantity: Math.max(0, Number(v.stock_quantity) || 0),
+            price_override: v.price_override || null,
+          })),
         }),
       });
 
@@ -251,8 +317,8 @@ export default function AdminCommercePage() {
           </p>
         </div>
 
-        <div className="flex items-center space-x-3">
-          <Link href="/commerce/orders">
+        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+          <Link href="/admin/commerce/orders">
             <Button
               variant="outline"
               size="sm"
@@ -371,17 +437,6 @@ export default function AdminCommercePage() {
             </div>
 
             <div className="space-y-1">
-              <Label>Stock Quantity</Label>
-              <Input
-                type="number"
-                value={stockQuantity}
-                onChange={(e) => setStockQuantity(e.target.value)}
-                placeholder="Initial inventory count"
-                required
-              />
-            </div>
-
-            <div className="space-y-1 md:col-span-2">
               <Label>Image URL (Optional)</Label>
               <Input
                 value={imageUrl}
@@ -397,6 +452,107 @@ export default function AdminCommercePage() {
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Fabric weight, embroidery details, sizing fit..."
               />
+            </div>
+
+            {/* Pre-order Drop Controls */}
+            <div className="md:col-span-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+              <label className="flex items-center space-x-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={isPreorder}
+                  onChange={(e) => setIsPreorder(e.target.checked)}
+                  className="h-4 w-4 rounded accent-amber-500"
+                />
+                <span className="text-sm font-bold text-amber-400">
+                  Mark as Pre-order Batch Product
+                </span>
+                <span className="text-xs text-stone-400">
+                  (Accepts customer preorders with batch manufacturing notification)
+                </span>
+              </label>
+
+              {isPreorder && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-amber-500/20">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-stone-300">Estimated Dispatch Notice</Label>
+                    <Input
+                      value={preorderMessage}
+                      onChange={(e) => setPreorderMessage(e.target.value)}
+                      placeholder="e.g. Batch 01: Ships 2–3 weeks from drop close"
+                      className="bg-stone-950 border-stone-700 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-stone-300">Batch Target Units (Gauge Drop Interest)</Label>
+                    <Input
+                      type="number"
+                      value={preorderTarget}
+                      onChange={(e) => setPreorderTarget(e.target.value)}
+                      placeholder="e.g. 50"
+                      className="bg-stone-950 border-stone-700 text-xs"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sizing & Stock Curve Configuration */}
+            <div className="md:col-span-2 rounded-xl border border-stone-800 bg-stone-950/60 p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <div className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>Streetwear Size Curve</span>
+                    <span className="text-[10px] font-mono uppercase bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20">
+                      S to 2XL Standard
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-400">
+                    Allocate blanks or target units per individual size.
+                  </p>
+                </div>
+                <label className="flex items-center space-x-2 cursor-pointer text-xs text-stone-300">
+                  <input
+                    type="checkbox"
+                    checked={useStreetwearSizes}
+                    onChange={(e) => setUseStreetwearSizes(e.target.checked)}
+                    className="h-3.5 w-3.5 accent-amber-500 rounded"
+                  />
+                  <span>Enable Multi-Size Breakdown</span>
+                </label>
+              </div>
+
+              {useStreetwearSizes ? (
+                <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t border-stone-800">
+                  {DEFAULT_STREETWEAR_SIZES.map((size) => (
+                    <div key={size} className="space-y-1">
+                      <Label className="text-xs text-amber-400 font-mono font-bold">Size {size}</Label>
+                      <Input
+                        type="number"
+                        min="0"
+                        value={sizeStocks[size] ?? 10}
+                        onChange={(e) =>
+                          setSizeStocks({
+                            ...sizeStocks,
+                            [size]: parseInt(e.target.value, 10) || 0,
+                          })
+                        }
+                        className="bg-stone-900 border-stone-700 text-xs text-center font-mono font-semibold"
+                      />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="space-y-1 pt-2 border-t border-stone-800">
+                  <Label>Flat Inventory Quantity</Label>
+                  <Input
+                    type="number"
+                    value={stockQuantity}
+                    onChange={(e) => setStockQuantity(e.target.value)}
+                    placeholder="Initial inventory count"
+                    required
+                  />
+                </div>
+              )}
             </div>
 
             <div className="md:col-span-2 flex justify-end space-x-3 pt-4 border-t border-stone-800">
@@ -479,17 +635,6 @@ export default function AdminCommercePage() {
             </div>
 
             <div className="space-y-1">
-              <Label>Inventory Stock Quantity</Label>
-              <Input
-                type="number"
-                min="0"
-                value={editStockQuantity}
-                onChange={(e) => setEditStockQuantity(e.target.value)}
-                required
-              />
-            </div>
-
-            <div className="space-y-1">
               <Label>Status</Label>
               <div className="flex items-center space-x-4 pt-2">
                 <label className="flex items-center space-x-2 text-sm text-stone-200 cursor-pointer">
@@ -520,6 +665,97 @@ export default function AdminCommercePage() {
                 onChange={(e) => setEditDescription(e.target.value)}
                 placeholder="Fabric weight, embroidery details, sizing fit..."
               />
+            </div>
+
+            {/* Pre-order Drop Settings */}
+            <div className="md:col-span-2 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4 space-y-3">
+              <label className="flex items-center space-x-2.5 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={editIsPreorder}
+                  onChange={(e) => setEditIsPreorder(e.target.checked)}
+                  className="h-4 w-4 rounded accent-amber-500"
+                />
+                <span className="text-sm font-bold text-amber-400">
+                  Mark as Pre-order Batch Product
+                </span>
+                <span className="text-xs text-stone-400">
+                  (Accepts customer preorders with batch manufacturing notification)
+                </span>
+              </label>
+
+              {editIsPreorder && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-amber-500/20">
+                  <div className="space-y-1">
+                    <Label className="text-xs text-stone-300">Estimated Dispatch Notice</Label>
+                    <Input
+                      value={editPreorderMessage}
+                      onChange={(e) => setEditPreorderMessage(e.target.value)}
+                      placeholder="e.g. Batch 01: Ships 2–3 weeks from drop close"
+                      className="bg-stone-950 border-stone-700 text-xs"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-stone-300">Batch Target Units (Gauge Drop Interest)</Label>
+                    <Input
+                      type="number"
+                      value={editPreorderTarget}
+                      onChange={(e) => setEditPreorderTarget(e.target.value)}
+                      placeholder="e.g. 50"
+                      className="bg-stone-950 border-stone-700 text-xs"
+                    />
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sizing & Stock Curve Configuration */}
+            <div className="md:col-span-2 rounded-xl border border-stone-800 bg-stone-950/60 p-4 space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div>
+                  <div className="text-sm font-bold text-white flex items-center gap-2">
+                    <span>Size Variants & Inventory</span>
+                    <span className="text-[10px] font-mono uppercase bg-amber-500/10 text-amber-400 px-2 py-0.5 rounded border border-amber-500/20">
+                      {editVariants.length} Sizes Configured
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-400">
+                    Manage stock allocation per size variant for blanks and drop orders.
+                  </p>
+                </div>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={applyStreetwearSizesToEdit}
+                  className="border-amber-500/30 text-amber-400 hover:bg-amber-500/10 text-xs shrink-0"
+                >
+                  Apply Standard Sizes (S, M, L, XL, 2XL)
+                </Button>
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 pt-2 border-t border-stone-800">
+                {editVariants.map((v, idx) => (
+                  <div key={v.id || v.name || idx} className="space-y-1 bg-stone-900/60 p-2.5 rounded-lg border border-stone-800">
+                    <div className="flex items-center justify-between">
+                      <Label className="text-xs text-amber-400 font-mono font-bold">Size {v.name}</Label>
+                      {v.sku && <span className="text-[9px] text-stone-500 font-mono truncate max-w-[65px]">{v.sku}</span>}
+                    </div>
+                    <Input
+                      type="number"
+                      min="0"
+                      value={v.stock_quantity}
+                      onChange={(e) => {
+                        const val = parseInt(e.target.value, 10) || 0;
+                        const updated = [...editVariants];
+                        updated[idx] = { ...updated[idx], stock_quantity: val };
+                        setEditVariants(updated);
+                      }}
+                      className="bg-stone-950 border-stone-700 text-xs text-center font-mono font-semibold h-8"
+                    />
+                  </div>
+                ))}
+              </div>
             </div>
 
             <div className="md:col-span-2 flex justify-end space-x-3 pt-4 border-t border-stone-800">
@@ -713,7 +949,14 @@ export default function AdminCommercePage() {
                     return (
                       <tr key={product.id} className="hover:bg-stone-800/40">
                         <td className="py-3 px-4 font-medium text-white">
-                          <div>{product.name}</div>
+                          <div className="flex items-center gap-2">
+                            <span>{product.name}</span>
+                            {product.is_preorder && (
+                              <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-400 border border-amber-500/40">
+                                Pre-order
+                              </span>
+                            )}
+                          </div>
                           <div className="text-xs text-stone-500 font-mono">{product.slug}</div>
                         </td>
                         <td className="py-3 px-4 text-stone-400">
@@ -723,15 +966,30 @@ export default function AdminCommercePage() {
                           R {Number(product.base_price).toFixed(2)}
                         </td>
                         <td className="py-3 px-4">
-                          <span
-                            className={`rounded px-2 py-0.5 text-xs font-mono ${
-                              totalStock > 0
-                                ? 'bg-emerald-500/10 text-emerald-400'
-                                : 'bg-red-500/10 text-red-400'
-                            }`}
-                          >
-                            {totalStock} in stock
-                          </span>
+                          <div>
+                            <span
+                              className={`rounded px-2 py-0.5 text-xs font-mono font-bold ${
+                                product.is_preorder
+                                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                  : totalStock > 0
+                                  ? 'bg-emerald-500/10 text-emerald-400'
+                                  : 'bg-red-500/10 text-red-400'
+                              }`}
+                            >
+                              {product.is_preorder
+                                ? `Pre-order Batch${product.preorder_target ? ` (${product.preorder_target} target)` : ''}`
+                                : `${totalStock} in stock`}
+                            </span>
+                          </div>
+                          {product.variants && product.variants.length > 1 && (
+                            <div className="flex flex-wrap gap-1 mt-1 text-[10px] font-mono text-stone-400">
+                              {product.variants.map((v) => (
+                                <span key={v.id || v.name} className="bg-stone-950 px-1.5 py-0.5 rounded border border-stone-800">
+                                  {v.name}: {v.stock_quantity}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-4">
                           <button

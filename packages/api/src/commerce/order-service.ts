@@ -94,7 +94,7 @@ export class OrderService {
       try {
         const { data: pData, error: prodErr } = await admin
           .from('products')
-          .select('id, name, base_price, is_active, brand_id, is_custom_print, print_placement, design_file_url, mockup_url')
+          .select('id, name, base_price, is_active, brand_id, is_custom_print, print_placement, design_file_url, mockup_url, is_preorder')
           .in('id', productIds);
         if (!prodErr && pData) {
           products = pData;
@@ -138,6 +138,7 @@ export class OrderService {
         unit_price: number;
         quantity: number;
         total_price: number;
+        is_preorder: boolean;
       }[] = [];
 
       for (const item of input.items) {
@@ -158,7 +159,8 @@ export class OrderService {
           if (!variant) {
             return { success: false, error: `Product variant not found: ${item.variant_id}` };
           }
-          if (variant.stock_quantity < item.quantity) {
+          // Pre-orders allow on-demand batch reservations even if physical warehouse stock is 0
+          if (variant.stock_quantity < item.quantity && !product.is_preorder) {
             return { success: false, error: `Insufficient stock for ${productName} (${variant.name}). Available: ${variant.stock_quantity}` };
           }
           if (variant.price_override !== null && variant.price_override !== undefined && Number(variant.price_override) > 0) {
@@ -177,6 +179,7 @@ export class OrderService {
           unit_price: unitPrice,
           quantity: item.quantity,
           total_price: totalPrice,
+          is_preorder: Boolean(product.is_preorder),
         });
       }
 

@@ -64,6 +64,9 @@ export async function POST(request: NextRequest) {
         base_price: Number(body.base_price),
         is_active: body.is_active !== undefined ? body.is_active : true,
         images: body.images || [],
+        is_preorder: Boolean(body.is_preorder),
+        preorder_message: body.preorder_message || null,
+        preorder_target: body.preorder_target ? Number(body.preorder_target) : null,
         variants: body.variants || [],
       },
       {

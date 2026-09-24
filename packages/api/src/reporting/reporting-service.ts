@@ -4,6 +4,8 @@ export interface OperationalMetrics {
   overview: {
     totalRevenue: number;
     commerceRevenue: number;
+    preorderRevenue: number;
+    inStockCommerceRevenue: number;
     barbershopRevenue: number;
     subscriptionRevenue: number;
     walkInRevenue: number;
@@ -11,6 +13,8 @@ export interface OperationalMetrics {
     totalCustomers: number;
     totalOrders: number;
     totalBookings: number;
+    preorderOrdersCount: number;
+    preorderUnitsCount: number;
   };
   orders: {
     total: number;
@@ -20,6 +24,7 @@ export interface OperationalMetrics {
     shipped: number;
     delivered: number;
     cancelled: number;
+    preorderCount: number;
   };
   bookings: {
     total: number;
@@ -44,6 +49,7 @@ export interface OperationalMetrics {
     amount: number;
     status: string;
     timestamp: string;
+    isPreorder?: boolean;
   }[];
 }
 
@@ -94,10 +100,10 @@ export class ReportingService {
     const totalRevenue = subscriptionRevenue + commerceRevenue + walkInRevenue;
     const barbershopRevenue = subscriptionRevenue + walkInRevenue;
 
-    // 3. Fetch all orders
+    // 3. Fetch all orders with items to inspect preorders
     const { data: orders } = await admin
       .from('orders')
-      .select('id, order_number, user_id, status, total, created_at')
+      .select('id, order_number, user_id, status, total, created_at, order_items(id, unit_price, quantity, total_price, is_preorder)')
       .order('created_at', { ascending: false });
 
     const orderList = orders || [];
@@ -110,6 +116,10 @@ export class ReportingService {
       cancelled: 0,
     };
 
+    let preorderOrdersCount = 0;
+    let preorderUnitsCount = 0;
+    let preorderRevenue = 0;
+
     for (const ord of orderList) {
       const st = ord.status.toLowerCase();
       if (st in orderStatusCounts) {
@@ -117,7 +127,24 @@ export class ReportingService {
       } else if (st === 'pending_payment') {
         orderStatusCounts.pending++;
       }
+
+      const items = (ord as any).order_items || [];
+      const hasPreorder = items.some((i: any) => i.is_preorder === true);
+
+      if (hasPreorder) {
+        preorderOrdersCount++;
+        for (const i of items) {
+          if (i.is_preorder) {
+            preorderUnitsCount += Number(i.quantity) || 0;
+            if (['paid', 'processing', 'shipped', 'delivered', 'completed'].includes(st)) {
+              preorderRevenue += Number(i.total_price) || 0;
+            }
+          }
+        }
+      }
     }
+
+    const inStockCommerceRevenue = Math.max(0, commerceRevenue - preorderRevenue);
 
     // 4. Fetch all bookings with staff & services
     const { data: bookings } = await admin
@@ -165,7 +192,7 @@ export class ReportingService {
       }
     }
 
-    // 4. Barber Performance
+    // 5. Barber Performance
     const { data: staffList } = await admin
       .from('staff')
       .select('id, display_name')
@@ -185,19 +212,25 @@ export class ReportingService {
       };
     });
 
-    // 5. Interleaved Recent Activity Stream
+    // 6. Interleaved Recent Activity Stream
     const activityFeed: OperationalMetrics['recentActivity'] = [];
 
     // Add recent orders
     for (const ord of orderList.slice(0, 10)) {
+      const items = (ord as any).order_items || [];
+      const isPreorder = items.some((i: any) => i.is_preorder === true);
+
       activityFeed.push({
         id: ord.id,
         type: 'order',
         title: `Order #${ord.order_number}`,
-        subtitle: `Commerce item order (${ord.status})`,
+        subtitle: isPreorder
+          ? `Pre-order batch drop (${ord.status})`
+          : `In-stock commerce order (${ord.status})`,
         amount: Number(ord.total) || 0,
         status: ord.status,
         timestamp: ord.created_at,
+        isPreorder,
       });
     }
 
@@ -230,6 +263,8 @@ export class ReportingService {
       overview: {
         totalRevenue,
         commerceRevenue,
+        preorderRevenue,
+        inStockCommerceRevenue,
         barbershopRevenue,
         subscriptionRevenue,
         walkInRevenue,
@@ -237,10 +272,13 @@ export class ReportingService {
         totalCustomers: customerCount || 0,
         totalOrders: orderList.length,
         totalBookings: bookingList.length,
+        preorderOrdersCount,
+        preorderUnitsCount,
       },
       orders: {
         total: orderList.length,
         ...orderStatusCounts,
+        preorderCount: preorderOrdersCount,
       },
       bookings: {
         total: bookingList.length,

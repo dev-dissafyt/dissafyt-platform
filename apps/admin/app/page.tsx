@@ -25,6 +25,8 @@ interface OperationalMetrics {
   overview: {
     totalRevenue: number;
     commerceRevenue: number;
+    preorderRevenue?: number;
+    inStockCommerceRevenue?: number;
     barbershopRevenue: number;
     subscriptionRevenue?: number;
     walkInRevenue?: number;
@@ -32,6 +34,8 @@ interface OperationalMetrics {
     totalCustomers: number;
     totalOrders: number;
     totalBookings: number;
+    preorderOrdersCount?: number;
+    preorderUnitsCount?: number;
   };
   orders: {
     total: number;
@@ -41,6 +45,7 @@ interface OperationalMetrics {
     shipped: number;
     delivered: number;
     cancelled: number;
+    preorderCount?: number;
   };
   bookings: {
     total: number;
@@ -65,6 +70,7 @@ interface OperationalMetrics {
     amount: number;
     status: string;
     timestamp: string;
+    isPreorder?: boolean;
   }[];
 }
 
@@ -98,7 +104,7 @@ export default function AdminDashboardPage() {
         <div>
           <h1 className="text-3xl font-bold text-white">Operations & Executive Overview</h1>
           <p className="text-sm text-stone-400">
-            Real-time unified intelligence across Dissafyt Streetwear and Ace of Fyt Barbershop.
+            Real-time unified intelligence across Dissafyt Streetwear, Pre-order Drops, and Ace of Fyt Barbershop.
           </p>
         </div>
         <Button
@@ -131,12 +137,12 @@ export default function AdminDashboardPage() {
                 })}`
               )}
             </div>
-            <div className="text-[11px] text-stone-400 mt-2 flex items-center justify-between border-t border-stone-800/80 pt-2">
-              <span>Subs: R {(metrics?.overview.subscriptionRevenue || 0).toFixed(0)}</span>
+            <div className="text-[11px] text-stone-400 mt-2 flex flex-wrap items-center gap-1.5 border-t border-stone-800/80 pt-2 font-mono">
+              <span>In-Stock: R {(metrics?.overview.inStockCommerceRevenue ?? metrics?.overview.commerceRevenue ?? 0).toFixed(0)}</span>
               <span>&bull;</span>
-              <span>Apparel: R {(metrics?.overview.commerceRevenue || 0).toFixed(0)}</span>
+              <span className="text-amber-400">Pre-orders: R {(metrics?.overview.preorderRevenue || 0).toFixed(0)}</span>
               <span>&bull;</span>
-              <span>Walk-in: R {(metrics?.overview.walkInRevenue || 0).toFixed(0)}</span>
+              <span>Barber: R {(metrics?.overview.barbershopRevenue || 0).toFixed(0)}</span>
             </div>
           </CardContent>
         </Card>
@@ -155,20 +161,22 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Commerce Orders */}
+        {/* Commerce Orders & Pre-orders */}
         <Card className="border-stone-800 bg-stone-900/60">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-stone-300">Commerce Orders</CardTitle>
+            <CardTitle className="text-sm font-medium text-stone-300">Commerce & Pre-orders</CardTitle>
             <ShoppingBag className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">
               {loading ? '...' : metrics?.overview.totalOrders ?? 0}
             </div>
-            <div className="text-xs text-stone-400 mt-2 flex items-center gap-2">
-              <span className="text-emerald-400 font-medium">{metrics?.orders.paid ?? 0} Paid</span>
+            <div className="text-xs text-stone-400 mt-2 flex flex-wrap items-center gap-1.5">
+              <span className="text-amber-400 font-medium">
+                {metrics?.overview.preorderOrdersCount ?? 0} Pre-orders ({metrics?.overview.preorderUnitsCount ?? 0} pcs)
+              </span>
               <span>&bull;</span>
-              <span className="text-amber-400 font-medium">{metrics?.orders.shipped ?? 0} Shipped</span>
+              <span className="text-emerald-400 font-medium">{metrics?.orders.paid ?? 0} Paid</span>
             </div>
           </CardContent>
         </Card>
@@ -205,17 +213,21 @@ export default function AdminDashboardPage() {
               <CardDescription>Order processing stages with Courier Guy delivery</CardDescription>
             </div>
             <Link
-              href="/commerce/orders"
+              href="/admin/commerce/orders"
               className="text-xs text-amber-500 hover:text-amber-400 flex items-center font-medium"
             >
               View Orders <ArrowRight className="ml-1 h-3 w-3" />
             </Link>
           </CardHeader>
           <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
               <div className="p-3 rounded-lg bg-stone-900/80 border border-stone-800 text-center">
                 <div className="text-xs text-stone-400 mb-1">Pending</div>
                 <div className="text-xl font-bold text-stone-200">{metrics?.orders.pending ?? 0}</div>
+              </div>
+              <div className="p-3 rounded-lg bg-amber-950/20 border border-amber-800/40 text-center">
+                <div className="text-xs text-amber-400 mb-1">Pre-orders</div>
+                <div className="text-xl font-bold text-amber-300">{metrics?.orders.preorderCount ?? 0}</div>
               </div>
               <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-800/40 text-center">
                 <div className="text-xs text-emerald-400 mb-1">Paid</div>
@@ -225,9 +237,9 @@ export default function AdminDashboardPage() {
                 <div className="text-xs text-blue-400 mb-1">Processing</div>
                 <div className="text-xl font-bold text-blue-300">{metrics?.orders.processing ?? 0}</div>
               </div>
-              <div className="p-3 rounded-lg bg-amber-950/20 border border-amber-800/40 text-center">
-                <div className="text-xs text-amber-400 mb-1">Shipped</div>
-                <div className="text-xl font-bold text-amber-300">{metrics?.orders.shipped ?? 0}</div>
+              <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-800/40 text-center">
+                <div className="text-xs text-emerald-400 mb-1">Shipped</div>
+                <div className="text-xl font-bold text-emerald-300">{metrics?.orders.shipped ?? 0}</div>
               </div>
             </div>
           </CardContent>
@@ -244,7 +256,7 @@ export default function AdminDashboardPage() {
               <CardDescription>Upcoming schedule and cut volume per barber</CardDescription>
             </div>
             <Link
-              href="/barbershop"
+              href="/admin/barbershop"
               className="text-xs text-amber-500 hover:text-amber-400 flex items-center font-medium"
             >
               Open Schedule <ArrowRight className="ml-1 h-3 w-3" />
@@ -302,7 +314,7 @@ export default function AdminDashboardPage() {
               </CardDescription>
             </div>
             <Link
-              href="/finance"
+              href="/admin/finance"
               className="text-xs text-amber-500 hover:text-amber-400 flex items-center font-medium"
             >
               Payment Audit <ArrowRight className="ml-1 h-3 w-3" />
@@ -326,7 +338,9 @@ export default function AdminDashboardPage() {
                       <div
                         className={`p-2 rounded-md ${
                           act.type === 'order'
-                            ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                            ? act.isPreorder
+                              ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
+                              : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                             : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                         }`}
                       >
@@ -337,7 +351,14 @@ export default function AdminDashboardPage() {
                         )}
                       </div>
                       <div className="min-w-0">
-                        <div className="text-sm font-medium text-white truncate">{act.title}</div>
+                        <div className="text-sm font-medium text-white truncate flex items-center gap-1.5">
+                          <span>{act.title}</span>
+                          {act.isPreorder && (
+                            <span className="rounded bg-amber-500/20 px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider text-amber-400 border border-amber-500/40">
+                              Pre-order
+                            </span>
+                          )}
+                        </div>
                         <div className="text-xs text-stone-400 truncate">{act.subtitle}</div>
                       </div>
                     </div>

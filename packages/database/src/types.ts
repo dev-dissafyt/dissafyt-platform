@@ -49,6 +49,9 @@ export interface Product {
   is_custom_print?: boolean;
   is_active: boolean;
   images: string[];
+  is_preorder?: boolean;
+  preorder_message?: string | null;
+  preorder_target?: number | null;
   created_at: string;
   updated_at: string;
 }
@@ -160,6 +163,7 @@ export interface OrderItem {
   unit_price: number;
   quantity: number;
   total_price: number;
+  is_preorder?: boolean;
 }
 
 // Barbershop Service types

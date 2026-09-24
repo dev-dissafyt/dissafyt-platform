@@ -126,11 +126,17 @@ export default async function ShopPage() {
                           <span className="font-mono text-[11px] uppercase tracking-wider">{product.name}</span>
                         </div>
                       )}
+                      {product.is_preorder ? (
+                        <span className="absolute top-3 left-3 rounded-full bg-amber-500 text-black px-2.5 py-0.5 text-[10px] font-mono font-black uppercase tracking-wider shadow-lg flex items-center gap-1.5">
+                          <span className="h-1.5 w-1.5 rounded-full bg-black animate-ping" />
+                          PRE-ORDER DROP
+                        </span>
+                      ) : null}
                       <span className="absolute top-3 right-3 rounded-full bg-black/80 backdrop-blur px-2.5 py-0.5 text-[10px] font-mono text-zinc-300 border border-zinc-700">
                         {product.category_name || 'STREETWEAR'}
                       </span>
                       <span className="absolute bottom-3 left-3 rounded-full bg-black/80 backdrop-blur px-2.5 py-0.5 text-[10px] font-mono text-amber-400 border border-amber-500/30">
-                        280GSM // CPT
+                        {product.is_preorder ? 'BATCH DROP' : '280GSM // CPT'}
                       </span>
                     </div>
 
@@ -141,12 +147,17 @@ export default async function ShopPage() {
                   <p className="text-xs text-zinc-400 mt-2 line-clamp-2 leading-relaxed">
                     {product.description || 'Authentic Dissafyt heavyweight garment crafted in Cape Town.'}
                   </p>
+                  {product.is_preorder && product.preorder_message ? (
+                    <div className="mt-2 text-[10px] font-mono text-amber-400/90 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-md line-clamp-1">
+                      🚚 {product.preorder_message}
+                    </div>
+                  ) : null}
                 </div>
 
                 <div className="mt-6 pt-5 border-t border-zinc-900 space-y-4">
                   <div className="flex items-baseline justify-between">
                     <span className="text-[11px] font-mono uppercase tracking-wider text-zinc-500">
-                      Price (incl. VAT)
+                      {product.is_preorder ? 'Pre-order Price' : 'Price (incl. VAT)'}
                     </span>
                     <span className="font-display font-black text-2xl text-amber-400">
                       R {Number(product.base_price).toFixed(2)}
@@ -157,7 +168,7 @@ export default async function ShopPage() {
                     href={productHref}
                     className="w-full inline-flex items-center justify-center rounded-xl bg-amber-500 hover:bg-amber-400 text-black py-3 px-4 font-bold text-xs uppercase tracking-wider transition-all"
                   >
-                    Select Size & Order
+                    {product.is_preorder ? 'Pre-order Garment' : 'Select Size & Order'}
                   </Link>
                 </div>
               </Card>

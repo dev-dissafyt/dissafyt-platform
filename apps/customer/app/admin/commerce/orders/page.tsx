@@ -12,6 +12,7 @@ interface OrderItem {
   quantity: number;
   unit_price: number;
   total_price: number;
+  is_preorder?: boolean;
 }
 
 interface Order {
@@ -48,6 +49,7 @@ export default function AdminOrdersPage() {
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+  const [tabFilter, setTabFilter] = useState<'all' | 'in_stock' | 'preorders'>('all');
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
@@ -91,13 +93,22 @@ export default function AdminOrdersPage() {
     }
   }
 
+  const preorderOrders = orders.filter((o) => o.order_items?.some((i) => i.is_preorder));
+  const inStockOrders = orders.filter((o) => !o.order_items?.some((i) => i.is_preorder));
+
   const filteredOrders = orders.filter((o) => {
     const q = searchTerm.toLowerCase();
-    return (
+    const matchesSearch =
       o.order_number.toLowerCase().includes(q) ||
       (o.customer_email && o.customer_email.toLowerCase().includes(q)) ||
-      (o.shipping_address?.recipient_name && o.shipping_address.recipient_name.toLowerCase().includes(q))
-    );
+      (o.shipping_address?.recipient_name && o.shipping_address.recipient_name.toLowerCase().includes(q));
+
+    if (!matchesSearch) return false;
+
+    const hasPreorder = o.order_items?.some((i) => i.is_preorder);
+    if (tabFilter === 'preorders') return hasPreorder;
+    if (tabFilter === 'in_stock') return !hasPreorder;
+    return true;
   });
 
   const paidCount = orders.filter((o) => o.status === 'paid').length;
@@ -119,7 +130,7 @@ export default function AdminOrdersPage() {
             Orders & Courier Fulfillment
           </h1>
           <p className="text-sm text-stone-400">
-            Fulfill clothing orders, inspect delivery addresses, and manage shipment progress.
+            Fulfill in-stock garments and pre-order batch manufacturing queues with Courier Guy delivery.
           </p>
         </div>
 
@@ -145,29 +156,67 @@ export default function AdminOrdersPage() {
           <div className="text-xs text-stone-400">Total Orders</div>
           <div className="text-2xl font-bold text-white mt-1">{orders.length}</div>
         </Card>
-        <Card className="border-stone-800 bg-stone-900/60 p-4">
-          <div className="text-xs text-stone-400">Paid & Awaiting Fulfillment</div>
-          <div className="text-2xl font-bold text-amber-400 mt-1">{paidCount}</div>
+        <Card className="border-stone-800 bg-stone-900/60 p-4 border-amber-500/30">
+          <div className="text-xs text-amber-400 font-medium">Pre-order Drops Pipeline</div>
+          <div className="text-2xl font-bold text-amber-400 mt-1">{preorderOrders.length}</div>
         </Card>
         <Card className="border-stone-800 bg-stone-900/60 p-4">
-          <div className="text-xs text-stone-400">In Preparation (Processing)</div>
-          <div className="text-2xl font-bold text-blue-400 mt-1">{processingCount}</div>
+          <div className="text-xs text-stone-400">Paid & Awaiting Courier</div>
+          <div className="text-2xl font-bold text-emerald-400 mt-1">{paidCount}</div>
         </Card>
         <Card className="border-stone-800 bg-stone-900/60 p-4">
           <div className="text-xs text-stone-400">Shipped with Courier Guy</div>
-          <div className="text-2xl font-bold text-emerald-400 mt-1">{shippedCount}</div>
+          <div className="text-2xl font-bold text-blue-400 mt-1">{shippedCount}</div>
         </Card>
       </div>
 
-      {/* Filter Bar */}
-      <div className="flex items-center space-x-3 max-w-md">
-        <div className="relative w-full">
+      {/* Filter and Tab Bar */}
+      <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-4">
+        {/* Category Tabs */}
+        <div className="inline-flex rounded-lg bg-stone-900 p-1 border border-stone-800 text-xs font-semibold">
+          <button
+            type="button"
+            onClick={() => setTabFilter('all')}
+            className={`px-3.5 py-1.5 rounded-md transition-all ${
+              tabFilter === 'all'
+                ? 'bg-amber-500 text-black shadow-sm font-bold'
+                : 'text-stone-400 hover:text-white'
+            }`}
+          >
+            All Orders ({orders.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setTabFilter('in_stock')}
+            className={`px-3.5 py-1.5 rounded-md transition-all ${
+              tabFilter === 'in_stock'
+                ? 'bg-amber-500 text-black shadow-sm font-bold'
+                : 'text-stone-400 hover:text-white'
+            }`}
+          >
+            In-Stock ({inStockOrders.length})
+          </button>
+          <button
+            type="button"
+            onClick={() => setTabFilter('preorders')}
+            className={`px-3.5 py-1.5 rounded-md transition-all ${
+              tabFilter === 'preorders'
+                ? 'bg-amber-500 text-black shadow-sm font-bold'
+                : 'text-stone-400 hover:text-white'
+            }`}
+          >
+            Pre-orders ({preorderOrders.length})
+          </button>
+        </div>
+
+        {/* Search */}
+        <div className="relative w-full max-w-xs">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-stone-500" />
           <Input
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            placeholder="Search order number or recipient..."
-            className="pl-9 bg-stone-900 border-stone-700"
+            placeholder="Search order or recipient..."
+            className="pl-9 bg-stone-900 border-stone-700 text-xs"
           />
         </div>
       </div>
@@ -183,7 +232,7 @@ export default function AdminOrdersPage() {
               {loading ? (
                 <div className="py-12 text-center text-stone-500">Loading orders...</div>
               ) : filteredOrders.length === 0 ? (
-                <div className="py-12 text-center text-stone-500">No orders placed yet.</div>
+                <div className="py-12 text-center text-stone-500">No matching orders found.</div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-left text-sm text-stone-300">
@@ -199,6 +248,7 @@ export default function AdminOrdersPage() {
                     <tbody className="divide-y divide-stone-800">
                       {filteredOrders.map((order) => {
                         const isSelected = selectedOrder?.id === order.id;
+                        const isPreorderOrder = order.order_items?.some((i) => i.is_preorder);
                         return (
                           <tr
                             key={order.id}
@@ -208,7 +258,14 @@ export default function AdminOrdersPage() {
                             }`}
                           >
                             <td className="py-3 px-3 font-medium text-white">
-                              <div>{order.order_number}</div>
+                              <div className="flex items-center gap-1.5">
+                                <span>{order.order_number}</span>
+                                {isPreorderOrder && (
+                                  <span className="rounded bg-amber-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400 border border-amber-500/40">
+                                    Pre-order
+                                  </span>
+                                )}
+                              </div>
                               <div className="text-[10px] text-stone-500">
                                 {new Date(order.created_at).toLocaleDateString()}
                               </div>
@@ -289,6 +346,19 @@ export default function AdminOrdersPage() {
                 </select>
               </div>
 
+              {/* Pre-order Batch Alert */}
+              {selectedOrder.order_items?.some((i) => i.is_preorder) && (
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300 space-y-1">
+                  <div className="font-bold flex items-center gap-1.5 uppercase tracking-wider text-[11px]">
+                    <Clock className="h-3.5 w-3.5 text-amber-400" />
+                    <span>Pre-order Batch Order</span>
+                  </div>
+                  <p className="text-[11px] text-stone-300">
+                    This order contains drop garments awaiting batch production. Blanks should be fulfilled in accordance with drop production schedule.
+                  </p>
+                </div>
+              )}
+
               {/* Items Breakdown */}
               <div className="space-y-2 border-t border-stone-800 pt-4">
                 <div className="text-xs font-semibold text-stone-400 uppercase tracking-wider">
@@ -298,7 +368,14 @@ export default function AdminOrdersPage() {
                   {selectedOrder.order_items?.map((item) => (
                     <div key={item.id} className="py-2 flex justify-between items-center">
                       <div>
-                        <div className="font-medium text-white">{item.product_name}</div>
+                        <div className="font-medium text-white flex items-center gap-1.5">
+                          <span>{item.product_name}</span>
+                          {item.is_preorder && (
+                            <span className="rounded bg-amber-500/20 px-1.5 py-0.2 text-[9px] font-bold uppercase tracking-wider text-amber-400 border border-amber-500/40">
+                              Pre-order
+                            </span>
+                          )}
+                        </div>
                         <div className="text-stone-500">Qty: {item.quantity}</div>
                       </div>
                       <div className="font-mono text-amber-400">

@@ -34,16 +34,28 @@ export async function GET(
     return NextResponse.json({ error: 'Product not found' }, { status: 404 });
   }
 
+  const SIZE_ORDER = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', 'Standard'];
+
   const { data: variants } = await admin
     .from('product_variants')
     .select('*')
-    .eq('product_id', product.id);
+    .eq('product_id', product.id)
+    .eq('is_active', true);
+
+  const sortedVariants = (variants || []).sort((a: any, b: any) => {
+    const idxA = SIZE_ORDER.indexOf(a.name);
+    const idxB = SIZE_ORDER.indexOf(b.name);
+    if (idxA !== -1 && idxB !== -1) return idxA - idxB;
+    if (idxA !== -1) return -1;
+    if (idxB !== -1) return 1;
+    return (a.name || '').localeCompare(b.name || '');
+  });
 
   return NextResponse.json(
     {
       ...product,
       category_name: (product as any).categories?.name,
-      variants: variants || [],
+      variants: sortedVariants,
     },
     {
       headers: {
