@@ -14,6 +14,9 @@ export interface CartItem {
   slug?: string;
   isPreorder?: boolean;
   preorderMessage?: string | null;
+  color?: string | null;
+  colorHex?: string | null;
+  size?: string | null;
 }
 
 interface CartContextType {
@@ -52,6 +55,9 @@ function normalizeItem(raw: any): CartItem | null {
     slug: raw.slug || '',
     isPreorder: Boolean(raw.isPreorder || raw.is_preorder),
     preorderMessage: raw.preorderMessage || raw.preorder_message || null,
+    color: raw.color || null,
+    colorHex: raw.colorHex || raw.color_hex || null,
+    size: raw.size || null,
   };
 }
 

@@ -125,11 +125,15 @@ export interface CreatorPayout {
 export interface ProductVariant {
   id: string;
   product_id: string;
-  name: string; // e.g. "Size L - Black"
+  name: string; // e.g. "Size L - Black" or "L"
   sku: string;
   price_override?: number | null;
   stock_quantity: number;
   is_active: boolean;
+  color?: string | null;
+  color_hex?: string | null;
+  size?: string | null;
+  image_url?: string | null;
 }
 
 export type OrderStatus =

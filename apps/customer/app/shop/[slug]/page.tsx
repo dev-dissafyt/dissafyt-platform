@@ -16,6 +16,10 @@ interface Variant {
   sku: string;
   stock_quantity: number;
   price_override?: number | null;
+  color?: string | null;
+  color_hex?: string | null;
+  size?: string | null;
+  image_url?: string | null;
 }
 
 interface Product {
@@ -40,7 +44,9 @@ export default function ProductDetailPage() {
 
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedColor, setSelectedColor] = useState<string | null>(null);
   const [selectedVariant, setSelectedVariant] = useState<Variant | null>(null);
+  const [activeHeroImage, setActiveHeroImage] = useState<string | null>(null);
   const [quantity, setQuantity] = useState(1);
   const [addedNotice, setAddedNotice] = useState(false);
   const [showSizeGuide, setShowSizeGuide] = useState(false);
@@ -53,8 +59,30 @@ export default function ProductDetailPage() {
         if (res.ok) {
           const data: Product = await res.json();
           setProduct(data);
-          if (data.variants && data.variants.length > 0) {
-            setSelectedVariant(data.variants[0]);
+
+          // Extract color options if available
+          const colorList = Array.from(
+            new Set((data.variants || []).map((v) => v.color).filter((c): c is string => Boolean(c)))
+          );
+
+          if (colorList.length > 0) {
+            const initialColor = colorList[0];
+            setSelectedColor(initialColor);
+            const firstColorVar = data.variants.find((v) => v.color === initialColor) || data.variants[0];
+            setSelectedVariant(firstColorVar);
+            if (firstColorVar?.image_url) {
+              setActiveHeroImage(firstColorVar.image_url);
+            } else if (data.images && data.images.length > 0) {
+              setActiveHeroImage(data.images[0]);
+            }
+          } else {
+            setSelectedColor(null);
+            if (data.variants && data.variants.length > 0) {
+              setSelectedVariant(data.variants[0]);
+            }
+            if (data.images && data.images.length > 0) {
+              setActiveHeroImage(data.images[0]);
+            }
           }
         }
       } catch (e) {
@@ -66,8 +94,65 @@ export default function ProductDetailPage() {
     loadProduct();
   }, [slug]);
 
+  // Consolidate all images from product.images and variant image_urls
+  const allImages: string[] = product
+    ? Array.from(
+        new Set([
+          ...(product.images || []),
+          ...(product.variants || []).map((v) => v.image_url).filter((img): img is string => Boolean(img)),
+        ])
+      )
+    : [];
+
+  // Available unique colors with their hex codes
+  const availableColors = product
+    ? Array.from(
+        new Map(
+          (product.variants || [])
+            .filter((v) => Boolean(v.color))
+            .map((v) => [
+              v.color as string,
+              {
+                name: v.color as string,
+                hex: v.color_hex || '#111111',
+                image_url: v.image_url || null,
+              },
+            ])
+        ).values()
+      )
+    : [];
+
+  // Variants filtered by current color (if colors are used)
+  const displayedVariants = product
+    ? selectedColor
+      ? product.variants.filter((v) => v.color === selectedColor)
+      : product.variants
+    : [];
+
+  function handleSelectColor(colorName: string) {
+    setSelectedColor(colorName);
+    const colorVars = (product?.variants || []).filter((v) => v.color === colorName);
+    const currentSize = selectedVariant?.size || selectedVariant?.name;
+    const matchSameSize = colorVars.find((v) => (v.size || v.name) === currentSize);
+    const nextVar = matchSameSize || colorVars[0] || null;
+    setSelectedVariant(nextVar);
+
+    // Switch hero image if color or variant has an assigned image
+    if (nextVar?.image_url) {
+      setActiveHeroImage(nextVar.image_url);
+    }
+  }
+
+  function handleSelectVariant(variant: Variant) {
+    setSelectedVariant(variant);
+    if (variant.image_url) {
+      setActiveHeroImage(variant.image_url);
+    }
+  }
+
   function handleAddToCart(openDrawer: boolean = true) {
     if (!product) return;
+    const heroImg = activeHeroImage || product.images?.[0] || selectedVariant?.image_url || '';
     addItem({
       productId: product.id,
       variantId: selectedVariant?.id || null,
@@ -75,10 +160,13 @@ export default function ProductDetailPage() {
       variantName: selectedVariant?.name || 'Standard',
       price: selectedVariant?.price_override || product.base_price,
       quantity,
-      image: product.images?.[0] || '',
+      image: heroImg,
       slug: product.slug || slug,
       isPreorder: Boolean(product.is_preorder),
       preorderMessage: product.preorder_message || null,
+      color: selectedVariant?.color || selectedColor || null,
+      colorHex: selectedVariant?.color_hex || null,
+      size: selectedVariant?.size || selectedVariant?.name || 'Standard',
     });
 
     setAddedNotice(true);
@@ -134,18 +222,29 @@ export default function ProductDetailPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
         {/* Product Media */}
         <div className="space-y-4">
-          <div className="aspect-square w-full rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden relative">
+          <div className="aspect-square w-full rounded-xl bg-zinc-900 border border-zinc-800 flex items-center justify-center overflow-hidden relative group">
             {isPreorder && (
               <div className="absolute top-4 left-4 z-10 rounded-full bg-amber-500 px-3 py-1 text-[11px] font-extrabold uppercase tracking-wider text-black shadow-lg">
                 Pre-order Drop
               </div>
             )}
-            {product.images && product.images.length > 0 ? (
+            {selectedVariant?.color && (
+              <div className="absolute bottom-4 left-4 z-10 rounded-full bg-black/80 backdrop-blur-md px-3 py-1 text-[11px] font-mono font-bold text-white border border-white/20 shadow-md flex items-center gap-1.5">
+                {selectedVariant.color_hex && (
+                  <span
+                    className="h-2.5 w-2.5 rounded-full border border-white/40"
+                    style={{ backgroundColor: selectedVariant.color_hex }}
+                  />
+                )}
+                <span>{selectedVariant.color}</span>
+              </div>
+            )}
+            {(activeHeroImage || (product.images && product.images[0])) ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img
-                src={product.images[0]}
+                src={activeHeroImage || product.images[0]}
                 alt={product.name}
-                className="h-full w-full object-cover"
+                className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
               />
             ) : (
               <div className="flex flex-col items-center justify-center text-zinc-600 space-y-2">
@@ -154,6 +253,34 @@ export default function ProductDetailPage() {
               </div>
             )}
           </div>
+
+          {/* Multi-image thumbnail strip */}
+          {allImages.length > 1 && (
+            <div className="grid grid-cols-4 sm:grid-cols-5 gap-3 pt-1">
+              {allImages.map((img, idx) => {
+                const isActive = (activeHeroImage || allImages[0]) === img;
+                return (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => setActiveHeroImage(img)}
+                    className={`aspect-square rounded-xl overflow-hidden border-2 bg-zinc-900 relative transition-all ${
+                      isActive
+                        ? 'border-amber-500 ring-2 ring-amber-500/40 shadow-md'
+                        : 'border-zinc-800 hover:border-zinc-600 opacity-70 hover:opacity-100'
+                    }`}
+                  >
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={img}
+                      alt={`${product.name} preview ${idx + 1}`}
+                      className="h-full w-full object-cover"
+                    />
+                  </button>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Product Details & Purchase Form */}
@@ -211,11 +338,59 @@ export default function ProductDetailPage() {
             </div>
           )}
 
+          {/* Colorway Selection */}
+          {availableColors.length > 0 && (
+            <div className="space-y-2 pt-2">
+              <div className="flex items-center justify-between text-sm">
+                <span className="font-semibold text-zinc-200">
+                  Select Color:{' '}
+                  <span className="font-bold text-amber-400 font-mono ml-1">
+                    {selectedColor || 'Default'}
+                  </span>
+                </span>
+                <span className="text-xs text-zinc-500 font-mono">
+                  {availableColors.length} {availableColors.length === 1 ? 'colorway' : 'colorways'}
+                </span>
+              </div>
+
+              <div className="flex flex-wrap gap-2.5">
+                {availableColors.map((c) => {
+                  const isSelected = selectedColor === c.name;
+                  return (
+                    <button
+                      key={c.name}
+                      type="button"
+                      onClick={() => handleSelectColor(c.name)}
+                      className={`group flex items-center gap-2 rounded-xl px-3.5 py-2 text-xs font-bold border transition-all ${
+                        isSelected
+                          ? 'border-amber-500 bg-amber-500/15 text-white ring-1 ring-amber-500/40 shadow-sm'
+                          : 'border-zinc-800 bg-zinc-900/60 text-zinc-400 hover:border-zinc-700 hover:text-zinc-200'
+                      }`}
+                    >
+                      <span
+                        className="h-3.5 w-3.5 rounded-full border border-white/30 shadow-inner shrink-0"
+                        style={{ backgroundColor: c.hex }}
+                      />
+                      <span>{c.name}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
           {/* Sizing & Variant Selection */}
-          {product.variants && product.variants.length > 0 && (
+          {displayedVariants.length > 0 && (
             <div className="space-y-3 pt-2">
               <div className="flex items-center justify-between text-sm">
-                <span className="font-semibold text-zinc-200">Select Size:</span>
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-zinc-200">Select Size:</span>
+                  {selectedVariant && (
+                    <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                      {selectedVariant.size || selectedVariant.name}
+                    </span>
+                  )}
+                </div>
                 <button
                   type="button"
                   onClick={() => setShowSizeGuide(true)}
@@ -227,15 +402,16 @@ export default function ProductDetailPage() {
               </div>
 
               <div className="flex flex-wrap gap-2.5">
-                {product.variants.map((v) => {
+                {displayedVariants.map((v) => {
                   const isSelected = selectedVariant?.id === v.id;
                   const isOutOfStock = !isPreorder && v.stock_quantity <= 0;
+                  const label = v.size || v.name;
                   return (
                     <button
                       key={v.id}
                       type="button"
                       disabled={isOutOfStock}
-                      onClick={() => setSelectedVariant(v)}
+                      onClick={() => handleSelectVariant(v)}
                       className={`min-w-[48px] rounded-lg px-4 py-2.5 text-sm font-bold border transition-all ${
                         isSelected
                           ? 'border-amber-500 bg-amber-500/15 text-amber-300 shadow-md ring-1 ring-amber-500/50'
@@ -244,7 +420,7 @@ export default function ProductDetailPage() {
                           : 'border-zinc-800 bg-zinc-900/60 text-zinc-300 hover:border-zinc-600 hover:text-white'
                       }`}
                     >
-                      {v.name}
+                      {label}
                     </button>
                   );
                 })}

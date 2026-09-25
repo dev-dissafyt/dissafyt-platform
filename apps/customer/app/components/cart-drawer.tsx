@@ -137,8 +137,19 @@ export function CartDrawer() {
                       </button>
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-1.5">
+                      {item.color && (
+                        <span className="inline-flex items-center gap-1 rounded border border-zinc-700/80 bg-zinc-900 px-2 py-0.5 text-[10px] font-mono text-zinc-300">
+                          {item.colorHex && (
+                            <span
+                              className="h-2 w-2 rounded-full border border-white/20"
+                              style={{ backgroundColor: item.colorHex }}
+                            />
+                          )}
+                          <span>{item.color}</span>
+                        </span>
+                      )}
                       <span className="inline-block rounded border border-zinc-700/80 bg-zinc-900 px-2 py-0.5 text-[10px] font-mono uppercase text-zinc-300">
-                        {item.variantName || 'Standard'}
+                        {item.size || item.variantName || 'Standard'}
                       </span>
                       {item.isPreorder && (
                         <span className="inline-block rounded border border-amber-500/40 bg-amber-500/10 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-amber-400">

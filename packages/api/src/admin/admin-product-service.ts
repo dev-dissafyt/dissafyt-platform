@@ -8,6 +8,10 @@ export interface ProductVariantInput {
   price_override?: number | null;
   stock_quantity: number;
   is_active?: boolean;
+  color?: string | null;
+  color_hex?: string | null;
+  size?: string | null;
+  image_url?: string | null;
 }
 
 export interface CreateProductInput {
@@ -42,12 +46,14 @@ export interface UpdateProductInput {
 const SIZE_SORT_ORDER = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', 'Standard'];
 
 function sortVariants(a: ProductVariant, b: ProductVariant) {
-  const indexA = SIZE_SORT_ORDER.indexOf(a.name);
-  const indexB = SIZE_SORT_ORDER.indexOf(b.name);
+  const sizeA = a.size || a.name;
+  const sizeB = b.size || b.name;
+  const indexA = SIZE_SORT_ORDER.indexOf(sizeA);
+  const indexB = SIZE_SORT_ORDER.indexOf(sizeB);
   if (indexA !== -1 && indexB !== -1) return indexA - indexB;
   if (indexA !== -1) return -1;
   if (indexB !== -1) return 1;
-  return a.name.localeCompare(b.name);
+  return (a.name || '').localeCompare(b.name || '');
 }
 
 export class AdminProductService {
@@ -129,11 +135,15 @@ export class AdminProductService {
       const variantsToInsert = (input.variants && input.variants.length > 0)
         ? input.variants.map((v, idx) => ({
             product_id: product.id,
-            name: v.name || 'Standard',
+            name: v.name || (v.color && v.size ? `${v.color} / ${v.size}` : v.size || 'Standard'),
             sku: v.sku?.trim() ? `${v.sku.trim()}-${Math.floor(100 + Math.random() * 900)}` : `${slug.toUpperCase().slice(0, 8)}-${(v.name || 'VAR').toUpperCase().replace(/[^A-Z0-9]/g, '')}-${Math.floor(100 + Math.random() * 900)}`,
             price_override: v.price_override || null,
             stock_quantity: v.stock_quantity ?? 10,
             is_active: v.is_active !== undefined ? v.is_active : true,
+            color: v.color || null,
+            color_hex: v.color_hex || null,
+            size: v.size || v.name || null,
+            image_url: v.image_url || null,
           }))
         : [{
             product_id: product.id,
@@ -142,6 +152,10 @@ export class AdminProductService {
             price_override: null,
             stock_quantity: 10,
             is_active: true,
+            color: null,
+            color_hex: null,
+            size: 'Standard',
+            image_url: null,
           }];
 
       await admin.from('product_variants').insert(variantsToInsert);
@@ -224,6 +238,10 @@ export class AdminProductService {
                 stock_quantity: safeStock,
                 price_override: v.price_override || null,
                 is_active: v.is_active !== undefined ? v.is_active : true,
+                color: v.color || null,
+                color_hex: v.color_hex || null,
+                size: v.size || v.name || null,
+                image_url: v.image_url || null,
               })
               .eq('id', v.id);
           } else {
@@ -236,6 +254,10 @@ export class AdminProductService {
                   stock_quantity: safeStock,
                   price_override: v.price_override || null,
                   is_active: true,
+                  color: v.color || null,
+                  color_hex: v.color_hex || null,
+                  size: v.size || v.name || null,
+                  image_url: v.image_url || null,
                 })
                 .eq('id', match.id);
             } else {
@@ -251,6 +273,10 @@ export class AdminProductService {
                 stock_quantity: safeStock,
                 price_override: v.price_override || null,
                 is_active: true,
+                color: v.color || null,
+                color_hex: v.color_hex || null,
+                size: v.size || v.name || null,
+                image_url: v.image_url || null,
               });
             }
           }
