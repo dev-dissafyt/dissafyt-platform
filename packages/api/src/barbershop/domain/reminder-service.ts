@@ -43,8 +43,8 @@ export class BarbershopReminderService {
       `👤 *Barber:* ${booking.barber?.displayName || 'Master Barber'}`,
       `📅 *Date:* ${dateFormatted}`,
       `⏰ *Time:* ${timeFormatted} (SAST)`,
-      `📍 *Location:* ${booking.location?.name || 'Dissafyt Studio, Cape Town'}`,
-      `🗺️ *Address:* ${booking.location?.address || 'Ace of Fyt Flagship Studio, Cape Town'}`,
+      `📍 *Location:* ${booking.location?.name || 'Dissafyt Studio - Bernie'}`,
+      `🗺️ *Address:* ${booking.location?.address || '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570'}`,
       `💰 *Amount:* R${booking.totalAmount.toFixed(2)} (${booking.paymentStatus.replace(/_/g, ' ')})`,
       ``,
       `📅 *Add to Google Calendar:* ${googleCalUrl}`,
@@ -75,7 +75,7 @@ export class BarbershopReminderService {
         `*REMINDER: Chair Reservation in 2 Hours* 💈`,
         ``,
         `Hi *${booking.customer.getDisplayName()}*, your appointment with *${booking.barber?.displayName || 'Ace of Fyt'}* is at *${timeFormatted}* today.`,
-        `📍 ${booking.location?.address || 'Ace of Fyt Flagship Studio, Cape Town'}`,
+        `📍 ${booking.location?.address || '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570'}`,
         ``,
         `See you soon in the lounge!`,
       ].join('\n'),
@@ -117,8 +117,8 @@ export class BarbershopReminderService {
             <p style="margin: 6px 0; font-size: 14px;"><strong>Service:</strong> ${booking.service.name}</p>
             <p style="margin: 6px 0; font-size: 14px;"><strong>Master Barber:</strong> ${booking.barber?.displayName || 'Lead Barber'}</p>
             <p style="margin: 6px 0; font-size: 14px;"><strong>Date & Time:</strong> ${dateFormatted} at ${timeFormatted} (SAST)</p>
-            <p style="margin: 6px 0; font-size: 14px;"><strong>Location:</strong> ${booking.location?.name || 'Dissafyt Studio, Cape Town'}</p>
-            <p style="margin: 6px 0; font-size: 14px;"><strong>Address:</strong> ${booking.location?.address || 'Ace of Fyt Flagship Studio, Cape Town'}</p>
+            <p style="margin: 6px 0; font-size: 14px;"><strong>Location:</strong> ${booking.location?.name || 'Dissafyt Studio - Bernie'}</p>
+            <p style="margin: 6px 0; font-size: 14px;"><strong>Address:</strong> ${booking.location?.address || '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570'}</p>
             <p style="margin: 6px 0; font-size: 14px;"><strong>Total Amount:</strong> R${booking.totalAmount.toFixed(2)}</p>
           </div>
 

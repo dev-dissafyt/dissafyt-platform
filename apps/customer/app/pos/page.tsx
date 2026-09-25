@@ -348,7 +348,7 @@ export default function PosRegisterPage() {
             </div>
             <div className="text-[10px] text-zinc-400 flex items-center gap-1">
               <MapPin className="h-2.5 w-2.5 text-amber-500" />
-              <span>Cape Town Flagship Studio</span>
+              <span>Dissafyt Studio - Bernie</span>
             </div>
           </div>
         </div>

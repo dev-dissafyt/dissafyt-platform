@@ -51,6 +51,17 @@ interface AvailableSlot {
   availableStaff: { id: string; display_name: string }[];
 }
 
+interface LocationOption {
+  id: string;
+  name: string;
+  address: string;
+  city: string;
+  province: string;
+  is_flagship: boolean;
+  phone?: string | null;
+  operating_hours_display?: string;
+}
+
 function BookContent() {
   const searchParams = useSearchParams();
   const isSubscribedParam = searchParams.get('subscribed') === 'true';
@@ -60,6 +71,8 @@ function BookContent() {
   const [justSubscribed, setJustSubscribed] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
   const [staffList, setStaffList] = useState<StaffMember[]>([]);
+  const [locations, setLocations] = useState<LocationOption[]>([]);
+  const [selectedLocation, setSelectedLocation] = useState<LocationOption | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Subscription Gating State
@@ -199,10 +212,11 @@ function BookContent() {
 
     async function init() {
       try {
-        // Fetch services & staff in parallel so booking wizard is ready immediately
-        const [sRes, stRes] = await Promise.all([
+        // Fetch services, staff & locations in parallel so booking wizard is ready immediately
+        const [sRes, stRes, locRes] = await Promise.all([
           fetch('/api/services'),
           fetch('/api/staff'),
+          fetch('/api/locations'),
         ]);
 
         if (sRes.ok && mounted) {
@@ -218,6 +232,13 @@ function BookContent() {
         if (stRes.ok && mounted) {
           const stData: StaffMember[] = await stRes.json();
           setStaffList(stData);
+        }
+
+        if (locRes.ok && mounted) {
+          const locData: LocationOption[] = await locRes.json();
+          setLocations(locData);
+          const flagship = locData.find((l) => l.is_flagship) || locData[0];
+          if (flagship) setSelectedLocation(flagship);
         }
 
         // Set default date to tomorrow or next valid day
@@ -449,7 +470,7 @@ function BookContent() {
           start_time: selectedSlot.startTime,
           notes,
           payment_choice: chosenPayment,
-          location_id: 'loc-cpt-flagship',
+          location_id: selectedLocation?.id || 'loc-cpt-flagship',
         }),
       });
 
@@ -510,7 +531,7 @@ function BookContent() {
           <div className="space-y-2">
             <h1 className="text-2xl font-bold text-white">Appointment Confirmed!</h1>
             <p className="text-sm text-zinc-400">
-              Your appointment at <span className="text-white font-semibold">Ace of Fyt Barbershop</span> has been secured.
+              Your appointment at <span className="text-white font-semibold">{selectedLocation?.name || 'Dissafyt Studio - Bernie'}</span> has been secured.
             </p>
           </div>
 
@@ -528,7 +549,7 @@ function BookContent() {
             <div className="flex justify-between border-b border-zinc-800 pb-2">
               <span className="text-xs text-zinc-400 uppercase tracking-wider">Location</span>
               <span className="text-sm font-semibold text-white flex items-center">
-                <MapPin className="h-3.5 w-3.5 text-amber-500 mr-1.5" /> Dissafyt Studio, Cape Town
+                <MapPin className="h-3.5 w-3.5 text-amber-500 mr-1.5" /> {selectedLocation?.name || 'Dissafyt Studio - Bernie'}
               </span>
             </div>
             <div className="flex justify-between border-b border-zinc-800 pb-2">
@@ -566,7 +587,7 @@ function BookContent() {
           {confirmedBooking.start_time && (
             <div className="pt-2">
               <a
-                href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`Ace of Fyt: ${confirmedBooking.serviceName}`)}&dates=${new Date(confirmedBooking.start_time).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}/${new Date(confirmedBooking.end_time || new Date(new Date(confirmedBooking.start_time).getTime() + 30 * 60000)).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}&details=${encodeURIComponent(`Appointment with Ace of Fyt Barbershop.\nService: ${confirmedBooking.serviceName}\nStudio: Dissafyt Studio, Cape Town`)}&location=${encodeURIComponent('Dissafyt Studio, Cape Town, Western Cape, South Africa')}`}
+                href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`Ace of Fyt: ${confirmedBooking.serviceName}`)}&dates=${new Date(confirmedBooking.start_time).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}/${new Date(confirmedBooking.end_time || new Date(new Date(confirmedBooking.start_time).getTime() + 30 * 60000)).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}&details=${encodeURIComponent(`Appointment with Ace of Fyt Barbershop.\nService: ${confirmedBooking.serviceName}\nStudio: ${selectedLocation?.name || 'Dissafyt Studio - Bernie'}\nAddress: ${selectedLocation?.address || '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570'}`)}&location=${encodeURIComponent(selectedLocation?.address || '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570')}`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="w-full inline-flex items-center justify-center rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-xs font-bold text-amber-300 hover:bg-amber-500/20 transition-all shadow-sm"
@@ -638,7 +659,7 @@ function BookContent() {
 
         <div className="flex items-center space-x-2 text-xs text-zinc-400 bg-zinc-900/90 border border-zinc-800 px-3.5 py-2 rounded-xl backdrop-blur-md">
           <MapPin className="h-4 w-4 text-amber-500" />
-          <span className="font-medium">Dissafyt Studio, Cape Town (CPT)</span>
+          <span className="font-medium">{selectedLocation?.name || 'Dissafyt Studio - Bernie'}</span>
         </div>
       </div>
 
@@ -1023,7 +1044,7 @@ function BookContent() {
               <div className="flex justify-between items-center">
                 <span className="text-zinc-400">Location</span>
                 <span className="text-white font-medium flex items-center">
-                  <MapPin className="h-3 w-3 mr-1 text-amber-500" /> Dissafyt Studio, CPT
+                  <MapPin className="h-3 w-3 mr-1 text-amber-500" /> {selectedLocation?.name || 'Dissafyt Studio - Bernie'}
                 </span>
               </div>
             </div>

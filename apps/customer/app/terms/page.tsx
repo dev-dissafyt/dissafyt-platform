@@ -47,7 +47,7 @@ export default function TermsAndConditionsPage() {
           </h2>
           <ul className="list-disc list-inside space-y-2 text-sm text-zinc-400 ml-2">
             <li>
-              <strong className="text-white">Studio Location:</strong> All in-person grooming sessions take place at Ace of Fyt Flagship Studio, Cape Town, Western Cape, South Africa.
+              <strong className="text-white">Studio Location:</strong> All in-person grooming sessions take place at Dissafyt Studio - Bernie, 1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570, Western Cape, South Africa.
             </li>
             <li>
               <strong className="text-white">Punctuality:</strong> We pride ourselves on precision and respect for everyone&apos;s schedule. Please arrive <strong>5 minutes prior</strong> to your scheduled appointment time.
@@ -179,7 +179,7 @@ export default function TermsAndConditionsPage() {
           </h2>
           <div className="p-4 rounded border border-zinc-800 bg-zinc-900/40 text-xs text-zinc-300 space-y-1 font-mono">
             <p><strong className="text-white">Business Name:</strong> Dissafyt Platform & Ace of Fyt Barbershop</p>
-            <p><strong className="text-white">Studio Address:</strong> Ace of Fyt Flagship Studio, Cape Town, Western Cape, South Africa</p>
+            <p><strong className="text-white">Studio Address:</strong> 1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570, Western Cape, South Africa</p>
             <p><strong className="text-white">Telephone / WhatsApp:</strong> +27 81 808 2570</p>
             <p><strong className="text-white">Email:</strong> support@dissafyt.com // legal@dissafyt.com</p>
           </div>

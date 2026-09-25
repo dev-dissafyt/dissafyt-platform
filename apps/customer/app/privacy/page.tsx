@@ -202,7 +202,7 @@ export default function PrivacyPolicyPage() {
           <div className="p-4 rounded border border-zinc-800 bg-zinc-900/40 text-xs text-zinc-300 space-y-1 font-mono">
             <p><strong className="text-white">Organization:</strong> Dissafyt Platform / Ace of Fyt Barbershop</p>
             <p><strong className="text-white">Information Officer:</strong> Curtis Lee</p>
-            <p><strong className="text-white">Studio Address:</strong> Ace of Fyt Flagship Studio, Cape Town, Western Cape, South Africa</p>
+            <p><strong className="text-white">Studio Address:</strong> 1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570, Western Cape, South Africa</p>
             <p><strong className="text-white">WhatsApp / Phone:</strong> +27 81 808 2570</p>
             <p><strong className="text-white">Email:</strong> privacy@dissafyt.com // support@dissafyt.com</p>
           </div>

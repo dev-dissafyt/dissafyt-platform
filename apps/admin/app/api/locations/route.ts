@@ -3,6 +3,7 @@ import { BarbershopService } from '@dissafyt/api';
 import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
+export const revalidate = 0;
 
 /**
  * GET /api/locations
@@ -14,7 +15,11 @@ export async function GET(request: NextRequest) {
 
   try {
     const locations = await BarbershopService.listLocations();
-    return NextResponse.json(locations);
+    return NextResponse.json(locations, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate, proxy-revalidate',
+      },
+    });
   } catch (error: any) {
     console.error('Error fetching admin locations:', error);
     return NextResponse.json({ error: 'Failed to fetch locations' }, { status: 500 });

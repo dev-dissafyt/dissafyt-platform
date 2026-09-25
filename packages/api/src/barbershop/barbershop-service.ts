@@ -65,17 +65,17 @@ export function getEffectiveDurationMinutes(durationMinutes: number): number {
 export const DEFAULT_LOCATIONS: BarbershopLocation[] = [
   {
     id: 'loc-cpt-flagship',
-    name: 'Dissafyt Studio, Cape Town',
+    name: 'Dissafyt Studio - Bernie',
     slug: 'dissafyt-studio-cpt',
-    address: 'Ace of Fyt Flagship Studio, Cape Town',
+    address: '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570',
     city: 'Cape Town',
     province: 'Western Cape',
     country: 'South Africa',
-    phone: '+27 82 123 4567',
+    phone: '+27 818082570',
     is_flagship: true,
     is_active: true,
-    capacity_chairs: 2,
-    operating_hours_display: 'Mon-Fri: 09:00 - 18:00 | Sat: 09:00 - 17:00 | Sun: Closed',
+    capacity_chairs: 4,
+    operating_hours_display: 'Tue-Sat: 09:00 - 19:00 | Sun: 10:00 - 16:00 | Mon: By Appointment',
   },
 ];
 
@@ -199,21 +199,42 @@ export class BarbershopService {
     actor?: { email?: string; role?: string }
   ): Promise<{ success: boolean; location?: BarbershopLocation; error?: string }> {
     const admin = getSupabaseAdminClient();
+
+    // Ensure runtime locations is loaded from DB if not already populated
+    if (RUNTIME_LOCATIONS.length <= 1) {
+      await BarbershopService.listLocations().catch(() => {});
+    }
+
     const existing = RUNTIME_LOCATIONS.find((l) => l.id === id);
 
+    let dbUpdated: BarbershopLocation | null = null;
     try {
-      await admin.from('locations').update({ ...input, updated_at: new Date().toISOString() }).eq('id', id);
-    } catch {
-      // Fallback
+      const { data, error } = await admin
+        .from('locations')
+        .update({ ...input, updated_at: new Date().toISOString() })
+        .eq('id', id)
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('[BarbershopService.updateLocation] Database update failed:', error);
+        return { success: false, error: error.message };
+      }
+      dbUpdated = data as BarbershopLocation;
+    } catch (err: any) {
+      console.error('[BarbershopService.updateLocation] Exception:', err);
+      return { success: false, error: err?.message || 'Database update failed' };
     }
+
+    const updated = dbUpdated || ({ ...existing, ...input, id } as BarbershopLocation);
 
     // Update runtime store
     const idx = RUNTIME_LOCATIONS.findIndex((l) => l.id === id);
     if (idx !== -1) {
-      RUNTIME_LOCATIONS[idx] = { ...RUNTIME_LOCATIONS[idx], ...input };
+      RUNTIME_LOCATIONS[idx] = updated;
+    } else {
+      RUNTIME_LOCATIONS.push(updated);
     }
-
-    const updated = RUNTIME_LOCATIONS.find((l) => l.id === id) || { ...input, id } as BarbershopLocation;
 
     // Invisible Audit Trail
     await AuditService.recordLog({

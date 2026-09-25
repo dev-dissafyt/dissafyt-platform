@@ -75,7 +75,7 @@ export function FloatingContact() {
               </div>
               <div className="flex items-center space-x-1.5">
                 <MapPin className="h-3 w-3 text-amber-500/80" />
-                <span>Cape Town Flagship Lounge, Western Cape</span>
+                <span>Dissafyt Studio - Bernie &bull; Kraaifontein</span>
               </div>
             </div>
           </div>

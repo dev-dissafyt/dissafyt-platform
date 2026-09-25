@@ -17,12 +17,24 @@ import {
 } from 'lucide-react';
 import { SubscriptionCarousel } from './components/subscription-carousel';
 import { FaqAccordion } from './components/faq-accordion';
-import { AdminBarbershopService } from '@dissafyt/api';
+import { AdminBarbershopService, BarbershopService } from '@dissafyt/api';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const allServices = await AdminBarbershopService.listServices().catch(() => []);
+  const [allServices, locations] = await Promise.all([
+    AdminBarbershopService.listServices().catch(() => []),
+    BarbershopService.listLocations().catch(() => []),
+  ]);
+  const flagship = locations.find((l) => l.is_flagship) || locations[0] || {
+    id: 'loc-cpt-flagship',
+    name: 'Dissafyt Studio - Bernie',
+    address: '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570',
+    city: 'Cape Town',
+    province: 'Western Cape',
+    phone: '+27 818082570',
+    operating_hours_display: 'Tue-Sat: 09:00 - 19:00 | Sun: 10:00 - 16:00 | Mon: By Appointment',
+  };
   const activeServices = (allServices || []).filter((s) => s.is_active && !s.is_subscription);
   const displayServices = activeServices.length > 0 ? activeServices.slice(0, 3) : [
     {
@@ -431,29 +443,28 @@ export default async function HomePage() {
             <div className="lg:col-span-7 space-y-4">
               <div className="inline-flex items-center space-x-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-400 font-mono">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>OPEN TUE – SUN &bull; CAPE TOWN, SOUTH AFRICA</span>
+                <span>OPEN TUE – SUN &bull; {(flagship.city || 'Cape Town').toUpperCase()}, SOUTH AFRICA</span>
               </div>
 
               <h2 className="font-display text-3xl sm:text-4xl font-black uppercase text-white">
-                Dissafyt Flagship Lounge & Studio
+                {flagship.name}
               </h2>
 
               <p className="text-sm text-zinc-400 max-w-lg">
-                Conveniently located in Cape Town. Experience the cutting-edge fusion of high-precision grooming, garment prototyping, and specialty espresso.
+                Conveniently located at {flagship.address}. Experience the cutting-edge fusion of high-precision grooming, garment prototyping, and specialty espresso.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 text-xs font-mono">
                 <div className="space-y-1">
                   <span className="text-zinc-500 uppercase">Hours</span>
-                  <p className="text-white font-semibold">Tue – Sat: 09:00 – 19:00</p>
-                  <p className="text-zinc-400">Sun: 10:00 – 16:00</p>
-                  <p className="text-zinc-500">Mon: VIP Private Appointments</p>
+                  <p className="text-white font-semibold">{flagship.operating_hours_display}</p>
                 </div>
                 <div className="space-y-1">
                   <span className="text-zinc-500 uppercase">Flagship Location</span>
-                  <p className="text-white font-semibold">Dissafyt Studio, Cape Town</p>
-                  <p className="text-zinc-400">Western Cape, South Africa</p>
-                  <p className="text-amber-400">SAST (UTC+2)</p>
+                  <p className="text-white font-semibold">{flagship.name}</p>
+                  <p className="text-zinc-300">{flagship.address}</p>
+                  <p className="text-zinc-400">{flagship.city}, {flagship.province}</p>
+                  <p className="text-amber-400">SAST (UTC+2) &bull; {flagship.phone || '+27 818082570'}</p>
                 </div>
               </div>
             </div>
@@ -463,7 +474,7 @@ export default async function HomePage() {
                 href="/book"
                 className="w-full text-center rounded-xl bg-amber-500 hover:bg-amber-400 px-6 py-4 text-xs font-black uppercase tracking-wider text-black shadow-lg shadow-amber-500/10 transition-all hover:scale-[1.02] active:scale-95"
               >
-                Book Chair in Cape Town
+                Book Chair at {flagship.name}
               </Link>
               <Link
                 href="/shop"

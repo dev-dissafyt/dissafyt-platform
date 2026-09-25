@@ -75,6 +75,11 @@ interface BookingItem {
     id: string;
     display_name: string;
   } | null;
+  location?: {
+    id: string;
+    name: string;
+    address?: string;
+  } | null;
 }
 
 interface AvailableSlot {
@@ -906,7 +911,7 @@ export default function AccountPage() {
                             </span>
                             <span className="flex items-center text-zinc-300">
                               <MapPin className="mr-1 h-3.5 w-3.5 text-amber-500" />
-                              Dissafyt Studio, Cape Town
+                              {booking.location?.name || 'Dissafyt Studio - Bernie'}
                             </span>
                             {booking.service?.duration_minutes && (
                               <span className="text-zinc-500">

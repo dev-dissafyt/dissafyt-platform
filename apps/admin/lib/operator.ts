@@ -135,6 +135,7 @@ export async function adminFetch(input: RequestInfo | URL, init?: RequestInit): 
   }
 
   let res = await fetch(input, {
+    cache: init?.cache || 'no-store',
     ...init,
     headers,
   });
