@@ -52,16 +52,16 @@ function PosLoginContent() {
 
       const assignedRole = isAdmin ? 'admin' : isStaff ? 'staff' : 'admin';
 
-      // Set cookie for Next.js edge middleware
+      // Set cookie for Edge middleware & POS register
       const maxAge = 60 * 60 * 24 * 7; // 7 days
       document.cookie = `dissafyt_pos_token=${encodeURIComponent(token)}; path=/; max-age=${maxAge}; SameSite=Lax`;
       document.cookie = `dissafyt_pos_operator=${encodeURIComponent(userEmail)}; path=/; max-age=${maxAge}; SameSite=Lax`;
       document.cookie = `dissafyt_pos_role=${encodeURIComponent(assignedRole)}; path=/; max-age=${maxAge}; SameSite=Lax`;
 
-      if (redirectUrl && !redirectUrl.startsWith('/login')) {
+      if (redirectUrl && !redirectUrl.startsWith('/pos/login')) {
         router.push(redirectUrl);
       } else {
-        router.push('/');
+        router.push('/pos');
       }
     } catch (err: any) {
       setErrorMsg(err.message || 'Authentication failed. Please verify credentials.');
@@ -158,7 +158,7 @@ function PosLoginContent() {
             </button>
           </form>
 
-          {/* Quick presets for Curtis-Lee / Operator */}
+          {/* Operator Fast-Presets */}
           <div className="pt-2 border-t border-zinc-800/80 space-y-2">
             <span className="text-[10px] font-mono text-zinc-500 uppercase tracking-wider block text-center">
               Quick Operator Presets

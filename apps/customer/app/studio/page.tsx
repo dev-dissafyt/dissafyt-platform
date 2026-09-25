@@ -225,14 +225,14 @@ export default function CreatorStudioPage() {
               <span>Brand Profile</span>
             </button>
             <Link
-              href="/creator/sales"
+              href="/studio/sales"
               className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-900 transition flex items-center space-x-1.5"
             >
               <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
               <span>Sales & Profits</span>
             </Link>
             <Link
-              href="/creator/payouts"
+              href="/studio/payouts"
               className="px-3.5 py-1.5 rounded-lg text-xs font-bold text-zinc-400 hover:text-white hover:bg-zinc-900 transition flex items-center space-x-1.5"
             >
               <DollarSign className="w-3.5 h-3.5 text-purple-400" />

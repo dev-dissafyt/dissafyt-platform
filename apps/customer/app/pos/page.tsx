@@ -43,9 +43,12 @@ interface ProductVariant {
 
 interface ProductItem {
   id: string;
+  name?: string;
   title: string;
   description: string;
   base_price: number;
+  is_preorder?: boolean;
+  preorder_message?: string | null;
   variants: ProductVariant[];
 }
 
@@ -99,18 +102,29 @@ export default function PosRegisterPage() {
   // Receipt Modal state
   const [completedReceipt, setCompletedReceipt] = useState<any | null>(null);
 
-  // Read operator from cookie
+  // Read operator from cookie & enforce staff/admin auth guard
   useEffect(() => {
     const cookies = document.cookie.split(';');
+    let operator = '';
+    let token = '';
     for (const c of cookies) {
       const [k, v] = c.trim().split('=');
       if (k === 'dissafyt_pos_operator' || k === 'dissafyt_admin_email') {
-        setOperatorEmail(decodeURIComponent(v || 'Staff Operator'));
-        break;
+        operator = decodeURIComponent(v || '');
+      }
+      if (k === 'dissafyt_pos_token' || k === 'dissafyt_admin_token') {
+        token = decodeURIComponent(v || '');
       }
     }
+
+    if (!token && !operator) {
+      router.push('/pos/login');
+      return;
+    }
+
+    setOperatorEmail(operator || 'Staff Operator');
     loadCatalog();
-  }, []);
+  }, [router]);
 
   async function loadCatalog() {
     setLoading(true);
@@ -172,13 +186,13 @@ export default function PosRegisterPage() {
     const variant = product.variants.find((v) => v.id === selectedVariantId) || product.variants[0];
 
     if (!variant) return;
-    if (variant.stock_quantity <= 0) return;
+    if (!product.is_preorder && variant.stock_quantity <= 0) return;
 
     const cartId = `product-${variant.id}`;
     setCart((prev) => {
       const existing = prev.find((item) => item.cartId === cartId);
       if (existing) {
-        if (existing.quantity >= variant.stock_quantity) return prev; // Do not exceed live stock
+        if (!product.is_preorder && existing.quantity >= variant.stock_quantity) return prev; // Do not exceed live stock
         return prev.map((item) =>
           item.cartId === cartId ? { ...item, quantity: item.quantity + 1 } : item
         );
@@ -190,10 +204,10 @@ export default function PosRegisterPage() {
           type: 'product',
           id: product.id,
           variant_id: variant.id,
-          name: `${product.title} (${variant.name})`,
+          name: `${product.title || product.name} (${variant.name})${product.is_preorder ? ' [PRE-ORDER]' : ''}`,
           price: Number(variant.price),
           quantity: 1,
-          availableStock: variant.stock_quantity,
+          availableStock: product.is_preorder ? 999 : variant.stock_quantity,
         },
       ];
     });
@@ -296,7 +310,7 @@ export default function PosRegisterPage() {
     document.cookie = 'dissafyt_pos_token=; path=/; max-age=0';
     document.cookie = 'dissafyt_pos_operator=; path=/; max-age=0';
     document.cookie = 'dissafyt_pos_role=; path=/; max-age=0';
-    router.push('/login');
+    router.push('/pos/login');
   }
 
   // Filter items
@@ -518,7 +532,11 @@ export default function PosRegisterPage() {
                         {/* Stock & Add Action */}
                         <div className="flex items-center justify-between pt-2 border-t border-zinc-800/80">
                           <div>
-                            {isOutOfStock ? (
+                            {product.is_preorder ? (
+                              <span className="text-[10px] font-bold text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded border border-amber-500/20">
+                                Pre-order Drop
+                              </span>
+                            ) : isOutOfStock ? (
                               <span className="text-[10px] font-bold text-rose-400 bg-rose-500/10 px-1.5 py-0.5 rounded border border-rose-500/20">
                                 Sold Out
                               </span>
@@ -534,12 +552,12 @@ export default function PosRegisterPage() {
                           </div>
 
                           <button
-                            disabled={isOutOfStock}
+                            disabled={!product.is_preorder && isOutOfStock}
                             onClick={() => addProductToCart(product)}
                             className="py-1.5 px-3 rounded-lg bg-amber-500 hover:bg-amber-400 disabled:bg-zinc-800 disabled:text-zinc-600 text-black font-bold text-xs transition-all active:scale-95 cursor-pointer disabled:cursor-not-allowed flex items-center gap-1"
                           >
                             <Plus className="w-3 h-3" />
-                            <span>Add</span>
+                            <span>{product.is_preorder ? 'Pre-order' : 'Add'}</span>
                           </button>
                         </div>
                       </div>
