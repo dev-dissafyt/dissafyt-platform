@@ -140,7 +140,7 @@ export default function AdminCommercePage() {
     setTimeout(() => setCopiedFeed(false), 2500);
   }
 
-  async function uploadFilesToStorage(files: FileList | File[]): Promise<string[]> {
+  async function uploadFilesToStorage(files: FileList | File[]): Promise<{ urls: string[]; telemetry?: string }> {
     const formData = new FormData();
     for (let i = 0; i < files.length; i++) {
       formData.append('files', files[i]);
@@ -153,16 +153,23 @@ export default function AdminCommercePage() {
     if (!res.ok || !data.success) {
       throw new Error(data.error || 'Failed to upload image(s)');
     }
-    return data.urls || (data.url ? [data.url] : []);
+    const urls: string[] = data.urls || (data.url ? [data.url] : []);
+    let telemetry = '';
+    if (data.compression && data.compression.originalSizeBytes > 0) {
+      const origMb = (data.compression.originalSizeBytes / (1024 * 1024)).toFixed(2);
+      const compKb = Math.round(data.compression.compressedSizeBytes / 1024);
+      telemetry = ` (optimized from ${origMb}MB to ${compKb}KB, -${data.compression.savingsPercent}%)`;
+    }
+    return { urls, telemetry };
   }
 
   async function handleAddImagesUpload(files: FileList | File[]) {
     try {
       setUploadingImages(true);
       setStatusMsg(null);
-      const urls = await uploadFilesToStorage(files);
+      const { urls, telemetry } = await uploadFilesToStorage(files);
       setImages((prev) => [...prev, ...urls]);
-      setStatusMsg(`Uploaded ${urls.length} product image(s) to Supabase Storage.`);
+      setStatusMsg(`Uploaded ${urls.length} product image(s)${telemetry || ''} to Supabase Storage.`);
     } catch (err: any) {
       setStatusMsg(`Upload failed: ${err.message}`);
     } finally {
@@ -174,9 +181,9 @@ export default function AdminCommercePage() {
     try {
       setEditUploadingImages(true);
       setStatusMsg(null);
-      const urls = await uploadFilesToStorage(files);
+      const { urls, telemetry } = await uploadFilesToStorage(files);
       setEditImages((prev) => [...prev, ...urls]);
-      setStatusMsg(`Uploaded ${urls.length} product image(s) to Supabase Storage.`);
+      setStatusMsg(`Uploaded ${urls.length} product image(s)${telemetry || ''} to Supabase Storage.`);
     } catch (err: any) {
       setStatusMsg(`Upload failed: ${err.message}`);
     } finally {
