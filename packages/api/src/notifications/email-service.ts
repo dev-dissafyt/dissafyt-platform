@@ -115,6 +115,17 @@ export interface PreorderBalanceSettledPayload {
   trackingUrl?: string;
 }
 
+export interface PreorderDropMilestonePayload {
+  recipientEmail: string;
+  recipientName: string;
+  productName: string;
+  productSlug: string;
+  productImage?: string;
+  currentClaimed: number;
+  targetUnits: number;
+  backerOrderNumber: string;
+}
+
 export class EmailService {
   private static readonly DEFAULT_FROM = 'Dissafyt Concierge <concierge@dissafyt.com>';
   private static readonly DEFAULT_REPLY_TO = 'letstalk@dissafyt.com';
@@ -837,6 +848,113 @@ export class EmailService {
       subject: `Order #${payload.orderNumber} Fully Settled - Handover Receipt`,
       html: this.renderShell(content, `Order #${payload.orderNumber} is fully settled. Thank you for shopping with Dissafyt.`),
       tags: [{ name: 'category', value: 'preorder_balance_settled' }],
+    });
+  }
+
+  /**
+   * 9. Pre-Order Drop Milestone Notification
+   * Dispatched to all existing drop backers each time a new order is placed into the drop.
+   * Notifies existing customers how close the drop is to reaching full batch production.
+   */
+  static async sendPreorderDropMilestoneNotification(payload: PreorderDropMilestonePayload) {
+    const target = Math.max(1, payload.targetUnits);
+    const claimed = payload.currentClaimed;
+    const pct = Math.min(100, Math.round((claimed / target) * 100));
+    const remaining = Math.max(0, target - claimed);
+    const dropUrl = `https://dissafyt.com/shop/${payload.productSlug}`;
+    const isCompleted = remaining === 0;
+
+    const content = `
+      <!-- Top Alert Pill -->
+      <div style="text-align:center;margin-bottom:20px;">
+        <span style="background-color:rgba(255,85,0,0.15);color:#ff5500;border:1px solid rgba(255,85,0,0.3);font-family:monospace;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;padding:4px 12px;border-radius:9999px;display:inline-block;">
+          Cape Town Garment Lab &bull; Live Drop Feed
+        </span>
+      </div>
+
+      <div style="text-align:center;margin-bottom:24px;">
+        <h2 style="color:#ffffff;font-size:22px;font-weight:900;text-transform:uppercase;margin:0 0 8px 0;letter-spacing:0.5px;">
+          ${isCompleted ? 'Drop 100% Unlocked! All Blanks Claimed' : 'Another Blank Claimed in Your Drop!'}
+        </h2>
+        <p style="color:#a1a1aa;font-size:14px;margin:0;line-height:1.5;">
+          ${payload.recipientName}, hype is rising in the garment lab! A new order was just placed into the <strong style="color:#ffffff;">${payload.productName}</strong> drop.
+        </p>
+      </div>
+
+      <!-- Live Drop Progress Meter Card -->
+      <div style="background-color:#18181b;border:1px solid #27272a;border-radius:10px;padding:24px;margin-bottom:24px;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom:12px;">
+          <tr>
+            <td align="left">
+              <span style="font-size:11px;font-weight:800;letter-spacing:1px;color:#a1a1aa;text-transform:uppercase;">
+                Batch Progress
+              </span>
+            </td>
+            <td align="right">
+              <span style="color:#ff5500;font-family:monospace;font-weight:900;font-size:14px;">
+                ${pct}% UNLOCKED
+              </span>
+            </td>
+          </tr>
+        </table>
+
+        <!-- Metric Numbers -->
+        <div style="text-align:center;padding:12px 0 16px 0;">
+          <div style="font-size:36px;font-weight:900;color:#ffffff;font-family:monospace;letter-spacing:1px;line-height:1;">
+            ${claimed} <span style="font-size:20px;color:#71717a;">/ ${target}</span>
+          </div>
+          <div style="font-size:12px;color:#a1a1aa;text-transform:uppercase;letter-spacing:1px;margin-top:6px;font-weight:600;">
+            Garments Claimed to Date
+          </div>
+        </div>
+
+        <!-- Progress Bar (Table-based for universal email client compatibility) -->
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color:#27272a;border-radius:6px;overflow:hidden;height:12px;margin-bottom:14px;">
+          <tr>
+            <td width="${pct}%" style="background-color:#ff5500;height:12px;border-radius:6px;"></td>
+            <td width="${100 - pct}%" style="background-color:#27272a;height:12px;"></td>
+          </tr>
+        </table>
+
+        <!-- Countdown / Status Text -->
+        <div style="text-align:center;font-size:13px;color:#d4d4d8;">
+          ${
+            isCompleted
+              ? `<span style="color:#22c55e;font-weight:700;">&#10004; Target Goal Achieved! Batch manufacturing is entering production.</span>`
+              : `Only <strong style="color:#ff5500;font-family:monospace;font-size:15px;">${remaining}</strong> ${remaining === 1 ? 'blank remains' : 'blanks remain'} before this batch locks.`
+          }
+        </div>
+      </div>
+
+      <!-- Your Reservation Callout -->
+      <div style="background-color:#0c0a09;border:1px solid #1f1f23;border-radius:8px;padding:16px 20px;margin-bottom:24px;">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size:12px;">
+          <tr>
+            <td style="color:#71717a;">Your Pre-Order Reference:</td>
+            <td align="right" style="color:#ffffff;font-family:monospace;font-weight:700;">#${payload.backerOrderNumber}</td>
+          </tr>
+          <tr>
+            <td style="color:#71717a;padding-top:4px;">Reservation Status:</td>
+            <td align="right" style="color:#22c55e;font-weight:700;padding-top:4px;">Secured & Queued</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- CTA -->
+      <div style="text-align:center;">
+        <a href="${dropUrl}" style="background-color:#ff5500;color:#09090b;text-decoration:none;padding:14px 28px;border-radius:6px;font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase;display:inline-block;box-shadow:0 4px 14px rgba(255,85,0,0.35);">
+          View Live Drop Room
+        </a>
+      </div>
+    `;
+
+    return this.send({
+      to: payload.recipientEmail,
+      subject: isCompleted
+        ? `Drop 100% Complete! ${payload.productName} Factory Production Unlocked`
+        : `Drop Update &bull; Another blank claimed in ${payload.productName} (${claimed}/${target})`,
+      html: this.renderShell(content, `Drop update for ${payload.productName}: ${claimed}/${target} claimed (${pct}% complete).`),
+      tags: [{ name: 'category', value: 'preorder_drop_milestone' }],
     });
   }
 }

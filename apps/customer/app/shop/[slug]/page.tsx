@@ -33,6 +33,8 @@ interface Product {
   is_preorder?: boolean;
   preorder_message?: string | null;
   preorder_target?: number | null;
+  preorder_claimed_count?: number;
+  preorder_deposit_pct?: number;
   variants: Variant[];
 }
 
@@ -320,22 +322,85 @@ export default function ProductDetailPage() {
             </p>
           </div>
 
-          {/* Pre-order Batch Announcement Notice */}
+          {/* Pre-order Live Drop Progress & Production Timeline Card */}
           {isPreorder && (
-            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-2">
-              <div className="flex items-center space-x-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
-                <Clock className="h-4 w-4" />
-                <span>Pre-order Production & Dispatch Timeline</span>
-              </div>
-              <p className="text-xs text-zinc-300 leading-relaxed">
-                {product.preorder_message || 'Batch manufacturing will commence once the drop period closes. Door-to-door courier delivery estimated in 2–3 weeks.'}
-              </p>
-              {product.preorder_target && (
-                <div className="pt-1 flex items-center space-x-2 text-[11px] font-mono text-amber-300/80">
-                  <Sparkles className="h-3.5 w-3.5" />
-                  <span>Limited Batch Allocation: {product.preorder_target} total garments planned</span>
+            <div className="rounded-2xl border border-amber-500/30 bg-gradient-to-b from-amber-500/10 via-zinc-900/60 to-zinc-950 p-5 space-y-4 shadow-xl shadow-amber-500/5">
+              {/* Header Badges */}
+              <div className="flex items-center justify-between gap-2 border-b border-amber-500/20 pb-3">
+                <div className="flex items-center space-x-2">
+                  <span className="relative flex h-2.5 w-2.5">
+                    <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                    <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+                  </span>
+                  <span className="text-[11px] font-mono font-bold tracking-wider uppercase text-amber-400">
+                    Live Drop Batch 01
+                  </span>
                 </div>
-              )}
+                <span className="text-[11px] font-mono font-extrabold px-2 py-0.5 rounded bg-amber-500/20 text-amber-300 border border-amber-500/30">
+                  {Math.min(100, Math.round(((product.preorder_claimed_count || 0) / (product.preorder_target || 50)) * 100))}% UNLOCKED
+                </span>
+              </div>
+
+              {/* Progress Count Metric */}
+              <div className="space-y-2">
+                <div className="flex items-baseline justify-between">
+                  <div className="space-y-0.5">
+                    <div className="text-2xl sm:text-3xl font-extrabold font-mono text-white tracking-tight">
+                      {product.preorder_claimed_count || 0}{' '}
+                      <span className="text-zinc-500 text-lg font-normal">/ {product.preorder_target || 50}</span>
+                    </div>
+                    <div className="text-[11px] font-mono text-zinc-400 uppercase tracking-wide">
+                      Garments Claimed Toward Batch Lock
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    {Math.max(0, (product.preorder_target || 50) - (product.preorder_claimed_count || 0)) === 0 ? (
+                      <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-2 py-1 rounded">
+                        Target Reached
+                      </span>
+                    ) : (
+                      <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded">
+                        {Math.max(0, (product.preorder_target || 50) - (product.preorder_claimed_count || 0))} Blanks Left
+                      </span>
+                    )}
+                  </div>
+                </div>
+
+                {/* Glowing Progress Bar */}
+                <div className="h-2.5 w-full bg-zinc-900 rounded-full overflow-hidden border border-zinc-800 p-0.5">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-amber-500 via-orange-500 to-amber-400 transition-all duration-700 shadow-md shadow-orange-500/50"
+                    style={{
+                      width: `${Math.max(
+                        4,
+                        Math.min(100, Math.round(((product.preorder_claimed_count || 0) / (product.preorder_target || 50)) * 100))
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Drop Explanation & Milestone Details */}
+              <div className="space-y-2 pt-1 text-xs text-zinc-300 leading-relaxed">
+                <p>
+                  {product.preorder_message ||
+                    'Batch manufacturing locks once the drop goal is reached. Raw cotton blanks are secured and custom printed at our Cape Town garment lab.'}
+                </p>
+                <div className="flex items-center gap-2 pt-1 text-[11px] text-amber-400/90 font-mono">
+                  <ShieldCheck className="h-3.5 w-3.5 text-amber-400 shrink-0" />
+                  <span>
+                    Pay only <strong>{product.preorder_deposit_pct || 50}% deposit</strong> today to secure your blank. Balance due upon studio collection or courier dispatch.
+                  </span>
+                </div>
+              </div>
+
+              {/* Live Community Notification Guarantee */}
+              <div className="rounded-xl border border-zinc-800 bg-zinc-950/80 p-3 flex items-start space-x-2.5 text-[11px] text-zinc-400">
+                <Sparkles className="h-4 w-4 text-amber-400 shrink-0 mt-0.5" />
+                <div className="leading-snug">
+                  <strong className="text-zinc-200">Live Drop Updates:</strong> All backers who reserve a garment receive instant email notifications each time another order enters this drop.
+                </div>
+              </div>
             </div>
           )}
 

@@ -53,6 +53,7 @@ export interface Product {
   preorder_message?: string | null;
   preorder_target?: number | null;
   preorder_deposit_pct?: number;
+  preorder_claimed_count?: number;
   created_at: string;
   updated_at: string;
 }

@@ -33,6 +33,7 @@ interface Product {
   preorder_message?: string | null;
   preorder_target?: number | null;
   preorder_deposit_pct?: number | null;
+  preorder_claimed_count?: number | null;
   variants: Variant[];
 }
 
@@ -1931,7 +1932,7 @@ export default function AdminCommercePage() {
                               }`}
                             >
                               {product.is_preorder
-                                ? `Pre-order Batch${product.preorder_target ? ` (${product.preorder_target} target)` : ''}`
+                                ? `Drop: ${product.preorder_claimed_count || 0}/${product.preorder_target || 50} Claimed`
                                 : `${totalStock} in stock`}
                             </span>
                           </div>

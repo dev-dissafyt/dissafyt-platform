@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AdminProductService } from '@dissafyt/api';
+import { AdminProductService, OrderService } from '@dissafyt/api';
 import { getSupabaseAdminClient } from '@dissafyt/database';
 import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 
@@ -51,10 +51,21 @@ export async function GET(
     return (a.name || '').localeCompare(b.name || '');
   });
 
+  let claimedCount = 0;
+  if (product.is_preorder) {
+    try {
+      const counts = await OrderService.getPreorderClaimedCounts([product.id]);
+      claimedCount = counts[product.id] || 0;
+    } catch (e) {
+      console.warn('Failed to compute claimed count for product:', product.id, e);
+    }
+  }
+
   return NextResponse.json(
     {
       ...product,
       category_name: (product as any).categories?.name,
+      preorder_claimed_count: claimedCount,
       variants: sortedVariants,
     },
     {

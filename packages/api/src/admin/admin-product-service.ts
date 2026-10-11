@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient, Product, ProductVariant, ProductCategory } from '@dissafyt/database';
 import { AuditService } from '../audit/audit-service';
+import { OrderService } from '../commerce/order-service';
 
 export interface ProductVariantInput {
   id?: string;
@@ -74,20 +75,23 @@ export class AdminProductService {
       return [];
     }
 
-    // Fetch variants for all products
+    // Fetch variants and preorder claimed counts for all products
     const productIds = products.map((p) => p.id);
     let variants: ProductVariant[] = [];
+    let preorderCounts: Record<string, number> = {};
     if (productIds.length > 0) {
-      const { data: varData } = await admin
-        .from('product_variants')
-        .select('*')
-        .in('product_id', productIds);
+      const [{ data: varData }, counts] = await Promise.all([
+        admin.from('product_variants').select('*').in('product_id', productIds),
+        OrderService.getPreorderClaimedCounts(productIds),
+      ]);
       variants = varData || [];
+      preorderCounts = counts;
     }
 
     return products.map((p: any) => ({
       ...p,
       category_name: p.categories?.name || 'Uncategorized',
+      preorder_claimed_count: preorderCounts[p.id] || 0,
       variants: variants
         .filter((v) => v.product_id === p.id && v.is_active !== false)
         .sort(sortVariants),

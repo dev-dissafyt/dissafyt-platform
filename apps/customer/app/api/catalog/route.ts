@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdminClient } from '@dissafyt/database';
+import { OrderService } from '@dissafyt/api';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -42,6 +43,16 @@ export async function GET(request: NextRequest) {
 
     if (pErr) throw pErr;
 
+    const productIds = (products || []).map((p: any) => p.id);
+    let preorderCounts: Record<string, number> = {};
+    if (productIds.length > 0) {
+      try {
+        preorderCounts = await OrderService.getPreorderClaimedCounts(productIds);
+      } catch (countErr) {
+        console.warn('Failed to compute preorder claimed counts in catalog:', countErr);
+      }
+    }
+
     return NextResponse.json({
       success: true,
       services: services || [],
@@ -67,6 +78,7 @@ export async function GET(request: NextRequest) {
           is_preorder: Boolean(p.is_preorder),
           preorder_message: p.preorder_message || null,
           preorder_target: p.preorder_target || null,
+          preorder_claimed_count: preorderCounts[p.id] || 0,
           images: p.images || [],
           variants: activeVariants.map((v: any) => ({
             id: v.id,

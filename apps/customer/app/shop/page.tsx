@@ -147,6 +147,40 @@ export default async function ShopPage() {
                   <p className="text-xs text-zinc-400 mt-2 line-clamp-2 leading-relaxed">
                     {product.description || 'Authentic Dissafyt heavyweight garment crafted in Cape Town.'}
                   </p>
+                  {product.is_preorder ? (
+                    <div className="mt-3 p-2.5 rounded-xl border border-amber-500/20 bg-amber-500/5 space-y-1.5">
+                      {(() => {
+                        const target = product.preorder_target || 50;
+                        const claimed = product.preorder_claimed_count || 0;
+                        const pct = Math.min(100, Math.round((claimed / target) * 100));
+                        const remaining = Math.max(0, target - claimed);
+                        return (
+                          <>
+                            <div className="flex items-center justify-between text-[10px] font-mono">
+                              <span className="text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1">
+                                <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                Drop: {claimed}/{target} Claimed
+                              </span>
+                              <span className="text-zinc-400">
+                                {remaining === 0 ? (
+                                  <strong className="text-emerald-400">Locked</strong>
+                                ) : (
+                                  <strong className="text-amber-300">{remaining} left</strong>
+                                )}
+                              </span>
+                            </div>
+                            <div className="h-1.5 w-full bg-zinc-900 rounded-full overflow-hidden border border-zinc-800">
+                              <div
+                                className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full"
+                                style={{ width: `${Math.max(5, pct)}%` }}
+                              />
+                            </div>
+                          </>
+                        );
+                      })()}
+                    </div>
+                  ) : null}
+
                   {product.is_preorder && product.preorder_message ? (
                     <div className="mt-2 text-[10px] font-mono text-amber-400/90 bg-amber-500/10 border border-amber-500/20 px-2.5 py-1 rounded-md line-clamp-1">
                       🚚 {product.preorder_message}

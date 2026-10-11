@@ -484,6 +484,13 @@ export class OrderService {
       console.warn('[OrderService] Warning: Failed to dispatch order confirmation email:', mailErr);
     }
 
+    // 5. If this order contained pre-order garments, notify all previous backers of the drop update
+    try {
+      await this.notifyDropBackersOnNewPreorder(order.id, orderItems);
+    } catch (dropNotifyErr) {
+      console.warn('[OrderService] Warning: Failed to dispatch drop backer updates:', dropNotifyErr);
+    }
+
     return { success: true };
   }
 
@@ -626,6 +633,145 @@ export class OrderService {
       success: true,
       order: updatedOrder as OrderWithItems,
     };
+  }
+
+  /**
+   * Authoritatively computes how many units have been claimed/pre-ordered for given product IDs.
+   * Only counts orders with confirmed deposit ('deposit_paid', 'fully_settled') or paid/processing/completed status.
+   */
+  static async getPreorderClaimedCounts(productIds?: string[]): Promise<Record<string, number>> {
+    const admin = getSupabaseAdminClient();
+    try {
+      // 1. Fetch confirmed/paid orders
+      const { data: confirmedOrders, error: orderErr } = await admin
+        .from('orders')
+        .select('id')
+        .or('deposit_status.in.(deposit_paid,fully_settled),status.in.(processing,completed,shipped,paid)');
+
+      if (orderErr || !confirmedOrders || confirmedOrders.length === 0) {
+        return {};
+      }
+
+      const orderIds = confirmedOrders.map((o) => o.id);
+
+      // 2. Fetch order items for these orders
+      let query = admin
+        .from('order_items')
+        .select('product_id, quantity')
+        .in('order_id', orderIds);
+
+      if (productIds && productIds.length > 0) {
+        query = query.in('product_id', productIds);
+      }
+
+      const { data: items, error: itemsErr } = await query;
+      if (itemsErr || !items) {
+        return {};
+      }
+
+      const counts: Record<string, number> = {};
+      for (const item of items) {
+        if (!item.product_id) continue;
+        counts[item.product_id] = (counts[item.product_id] || 0) + Number(item.quantity || 1);
+      }
+
+      return counts;
+    } catch (e) {
+      console.error('[OrderService] Error computing preorder claimed counts:', e);
+      return {};
+    }
+  }
+
+  /**
+   * Notifies all existing drop backers each time a new pre-order item is placed into the drop.
+   * Gives backers real-time transparency and excitement as their drop nears production lock.
+   */
+  static async notifyDropBackersOnNewPreorder(
+    currentOrderId: string,
+    orderItems: any[]
+  ): Promise<void> {
+    const admin = getSupabaseAdminClient();
+    const productIds = Array.from(new Set(orderItems.map((i) => i.product_id).filter(Boolean)));
+    if (productIds.length === 0) return;
+
+    for (const productId of productIds) {
+      try {
+        const { data: product } = await admin
+          .from('products')
+          .select('id, name, slug, is_preorder, preorder_target, images')
+          .eq('id', productId)
+          .maybeSingle();
+
+        if (!product || !product.is_preorder) continue;
+
+        const targetUnits = Number(product.preorder_target) || 50;
+
+        // Compute current claimed units across all confirmed orders
+        const counts = await this.getPreorderClaimedCounts([productId]);
+        const currentClaimed = counts[productId] || 0;
+
+        // Fetch confirmed orders (excluding currentOrderId) that ordered this product
+        const { data: confirmedOrders } = await admin
+          .from('orders')
+          .select('id, order_number, customer_email, customer_name, shipping_address')
+          .neq('id', currentOrderId)
+          .or('deposit_status.in.(deposit_paid,fully_settled),status.in.(processing,completed,shipped,paid)');
+
+        if (!confirmedOrders || confirmedOrders.length === 0) continue;
+
+        const confirmedOrderIds = confirmedOrders.map((o) => o.id);
+
+        // Filter for orders that actually contain this productId
+        const { data: matchingItems } = await admin
+          .from('order_items')
+          .select('order_id')
+          .eq('product_id', productId)
+          .in('order_id', confirmedOrderIds);
+
+        if (!matchingItems || matchingItems.length === 0) continue;
+
+        const matchingOrderIds = new Set(matchingItems.map((mi) => mi.order_id));
+        const relevantOrders = confirmedOrders.filter((co) => matchingOrderIds.has(co.id));
+
+        // Deduplicate backers by email
+        const backerMap = new Map<string, { email: string; name: string; orderNumber: string }>();
+        for (const bo of relevantOrders) {
+          const email = (bo.customer_email || (bo.shipping_address as any)?.recipient_email || '').trim().toLowerCase();
+          const name = bo.customer_name || (bo.shipping_address as any)?.recipient_name || 'Valued Collector';
+          if (email && email.includes('@') && !backerMap.has(email)) {
+            backerMap.set(email, {
+              email,
+              name,
+              orderNumber: bo.order_number || bo.id.slice(0, 8),
+            });
+          }
+        }
+
+        const backerList = Array.from(backerMap.values());
+        if (backerList.length === 0) continue;
+
+        console.log(`[OrderService] Notifying ${backerList.length} previous backers for drop "${product.name}" (${currentClaimed}/${targetUnits} claimed)`);
+
+        const productImage = product.images?.[0] || undefined;
+
+        await Promise.allSettled(
+          backerList.map((backer) =>
+            EmailService.sendPreorderDropMilestoneNotification({
+              recipientEmail: backer.email,
+              recipientName: backer.name,
+              productName: product.name,
+              productSlug: product.slug,
+              productImage,
+              currentClaimed,
+              targetUnits,
+              backerOrderNumber: backer.orderNumber,
+            })
+          )
+        );
+      } catch (err) {
+        console.warn(`[OrderService] Failed to notify backers for product ${productId}:`, err);
+      }
+    }
   }
 
   /**
