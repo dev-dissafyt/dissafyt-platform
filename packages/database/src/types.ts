@@ -367,3 +367,37 @@ export interface NewsletterSubscriber {
   updated_at: string;
 }
 
+// Founder Pass Entitlement & Capital Engine
+export type FounderPassStatus = 'active' | 'exhausted' | 'expired' | 'pending_payment' | 'cancelled';
+
+export interface FounderPass {
+  id: string;
+  pass_number: string; // e.g. 'FP-0030'
+  user_id?: string | null;
+  customer_name: string;
+  customer_email: string;
+  customer_phone: string;
+  total_cuts: number; // 12
+  cuts_used: number; // 0
+  amount_paid: number; // 1200.00
+  status: FounderPassStatus;
+  payment_method?: string | null;
+  payment_ref?: string | null;
+  order_id?: string | null;
+  notes?: string | null;
+  expires_at: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface FounderPassRedemption {
+  id: string;
+  pass_id: string;
+  booking_id?: string | null;
+  cut_number: number;
+  service_name: string;
+  barber_name?: string | null;
+  notes?: string | null;
+  redeemed_at: string;
+}
+

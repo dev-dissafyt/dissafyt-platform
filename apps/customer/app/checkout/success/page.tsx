@@ -70,6 +70,82 @@ function SuccessContent() {
     fetchOrder();
   }, [orderNumber]);
 
+  const isFounderPass = searchParams.get('type') === 'founder_pass' || Boolean(searchParams.get('pass_id'));
+  const passNumber = searchParams.get('pass_number') || 'FP-FOUNDER';
+
+  if (isFounderPass) {
+    return (
+      <div className="container mx-auto max-w-3xl px-4 py-12 sm:py-20 text-center space-y-8">
+        <div className="inline-flex h-24 w-24 items-center justify-center rounded-full bg-[#ff5500]/15 border-2 border-[#ff5500]/40 text-[#ff5500] shadow-lg shadow-[#ff5500]/20">
+          <CheckCircle2 className="h-12 w-12 text-[#ff5500] stroke-[2.5]" />
+        </div>
+
+        <div className="space-y-2">
+          <span className="text-xs font-mono tracking-widest text-[#ff5500] uppercase font-bold bg-[#ff5500]/10 border border-[#ff5500]/30 px-3 py-1 rounded-full">
+            ✦ FOUNDER PATRON CIRCLE ACTIVATED ✦
+          </span>
+          <h1 className="font-display text-3xl sm:text-5xl font-black uppercase text-white tracking-tight pt-2">
+            Welcome to the Founder's Circle!
+          </h1>
+          <p className="text-sm text-zinc-300 max-w-lg mx-auto leading-relaxed">
+            Your <strong>R1,200</strong> payment was successfully confirmed via PayFast. Your investment has been directly contributed to the physical buildout of our flagship studio at <strong>1 Norwalk Way, Bernadino Heights</strong>.
+          </p>
+        </div>
+
+        {/* 3D Card Summary Box */}
+        <div className="max-w-md mx-auto rounded-2xl border-2 border-[#ff5500]/50 bg-gradient-to-br from-zinc-950 via-[#181512] to-zinc-950 p-6 text-left space-y-4 shadow-2xl shadow-[#ff5500]/15">
+          <div className="flex justify-between items-center border-b border-zinc-800 pb-3">
+            <span className="font-mono text-xs uppercase tracking-widest text-[#ff5500] font-black">
+              FOUNDER'S PASS
+            </span>
+            <span className="font-mono text-xs font-bold bg-zinc-900 border border-zinc-700 px-2.5 py-0.5 rounded text-white">
+              #{passNumber}
+            </span>
+          </div>
+
+          <div className="space-y-2.5 text-xs font-mono">
+            <div className="flex justify-between">
+              <span className="text-zinc-400">Total Cuts Entitled:</span>
+              <span className="text-white font-bold">12 Master Haircuts</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-400">Balance Available Today:</span>
+              <span className="text-emerald-400 font-black">12 / 12 Cuts Ready</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-400">Validity:</span>
+              <span className="text-white font-bold">1 Full Year (365 Days)</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-400">Physical Studio Plaque:</span>
+              <span className="text-amber-400 font-bold">Name Laser-Engraved</span>
+            </div>
+            <div className="flex justify-between">
+              <span className="text-zinc-400">Streetwear Drop Perk:</span>
+              <span className="text-[#ff5500] font-bold">15% Lifetime Discount</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center justify-center gap-3 pt-4">
+          <Link
+            href="/book"
+            className="w-full sm:w-auto px-8 py-3.5 rounded-xl bg-gradient-to-r from-[#ff5500] to-amber-500 hover:brightness-110 text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg shadow-[#ff5500]/20 flex items-center justify-center gap-2"
+          >
+            <span>Book Your First Haircut (R0.00)</span>
+            <ArrowRight className="w-4 h-4" />
+          </Link>
+          <Link
+            href="/"
+            className="w-full sm:w-auto px-6 py-3.5 rounded-xl border border-zinc-800 hover:border-zinc-700 bg-zinc-950 text-zinc-300 font-mono text-xs transition-all"
+          >
+            Return to Homepage
+          </Link>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="container mx-auto max-w-4xl px-4 py-12 sm:py-20">
       {/* Hero Confirmation Banner */}

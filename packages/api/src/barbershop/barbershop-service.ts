@@ -510,7 +510,7 @@ export class BarbershopService {
   ): boolean {
     if (!service) return false;
     const plan = (planCode || '').toLowerCase();
-    if (plan === 'executive') return true;
+    if (plan === 'executive' || plan === 'founder_pass_12cuts') return true;
 
     // Solo and Regular (twice) only cover standard 30-min haircuts (e.g. Classic Haircut)
     // Excludes combos, beard packages, and executive services
@@ -548,6 +548,45 @@ export class BarbershopService {
     if (!userId) return emptyResult;
 
     try {
+      // 0. Check public.founder_passes for active 12-cut entitlement
+      const { data: founderPasses } = await admin
+        .from('founder_passes')
+        .select('*')
+        .eq('user_id', userId)
+        .eq('status', 'active')
+        .gte('expires_at', nowIso)
+        .order('created_at', { ascending: false })
+        .limit(1);
+
+      if (founderPasses && founderPasses.length > 0) {
+        const fp = founderPasses[0];
+        const totalCuts = fp.total_cuts || 12;
+        const usedCuts = fp.cuts_used || 0;
+        const availableCuts = Math.max(0, totalCuts - usedCuts);
+
+        return {
+          hasActiveSubscription: true,
+          subscription: {
+            id: fp.id,
+            user_id: fp.user_id,
+            plan_code: 'founder_pass_12cuts',
+            plan_name: "Founder's Circle Pass (12 Master Cuts)",
+            price: Number(fp.amount_paid || 1200),
+            status: fp.status,
+            current_period_start: fp.created_at,
+            current_period_end: fp.expires_at,
+          },
+          planCode: 'founder_pass_12cuts',
+          planName: "Founder's Circle Pass (12 Master Cuts)",
+          totalCuts,
+          usedCuts,
+          availableCuts,
+          periodStart: fp.created_at,
+          periodEnd: fp.expires_at,
+          canBookCovered: availableCuts > 0,
+        };
+      }
+
       // 1. Query public.subscriptions for active membership
       let activeSub: any = null;
       const { data: subs, error: subErr } = await admin
@@ -900,6 +939,29 @@ export class BarbershopService {
 
     if (!bookingResult.location_id) {
       bookingResult.location_id = resolvedLocationId;
+    }
+
+    // If booking was covered by Founder Pass, decrement cut balance
+    if (isCoveredBySubscription && activeSubId) {
+      try {
+        const { data: fpCheck } = await admin
+          .from('founder_passes')
+          .select('id')
+          .eq('id', activeSubId)
+          .maybeSingle();
+
+        if (fpCheck) {
+          const { FounderPassService } = await import('./founder-pass-service');
+          await FounderPassService.redeemCut({
+            passId: activeSubId,
+            bookingId: bookingResult.id,
+            serviceName: service.name || 'Master Haircut',
+            notes: `Redeemed via online booking #${bookingResult.id}`,
+          });
+        }
+      } catch (fpErr) {
+        console.warn('Founder pass cut decrement hook warning:', fpErr);
+      }
     }
 
     // 4. Dispatch Studio Booking Confirmation email

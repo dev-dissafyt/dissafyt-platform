@@ -31,18 +31,36 @@ export function FounderPassBanner() {
   const cardRef = useRef<HTMLDivElement>(null);
   const sceneRef = useRef<HTMLDivElement>(null);
 
-  // Initial simulated progress: 29 of 50 claimed
-  const totalSpots = 50;
-  const claimedSpots = 29;
-  const totalCapitalTarget = 60000;
-  const currentCapital = claimedSpots * 1200;
-  const pctFunded = Math.round((currentCapital / totalCapitalTarget) * 100);
+  // Live stats from database
+  const [stats, setStats] = useState({
+    totalSpots: 50,
+    claimedSpots: 29,
+    totalCapitalTarget: 60000,
+    currentCapital: 34800,
+    pctFunded: 58,
+    remainingSpots: 21,
+  });
+
+  const { totalSpots, claimedSpots, totalCapitalTarget, currentCapital, pctFunded, remainingSpots } = stats;
 
   useEffect(() => {
     if (cardRef.current) {
       cardRef.current.style.setProperty('--shine-x', '50%');
       cardRef.current.style.setProperty('--shine-y', '50%');
     }
+
+    async function loadStats() {
+      try {
+        const res = await fetch('/api/founders-pass');
+        const data = await res.json();
+        if (data.success && data.stats) {
+          setStats(data.stats);
+        }
+      } catch (err) {
+        console.warn('Failed to load live founder pass stats:', err);
+      }
+    }
+    loadStats();
   }, []);
 
   function handleMouseMove(e: React.MouseEvent<HTMLDivElement>) {
@@ -142,6 +160,27 @@ export function FounderPassBanner() {
       const data = await res.json();
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Failed to submit pledge');
+      }
+
+      if (pledgeType === 'pay_now' && data.payfast) {
+        // Dynamically create and submit PayFast form for live R1,200 payment
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = data.payfast.action;
+
+        for (const [key, value] of Object.entries(data.payfast.fields)) {
+          if (value !== undefined && value !== null) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = String(value);
+            form.appendChild(input);
+          }
+        }
+
+        document.body.appendChild(form);
+        form.submit();
+        return;
       }
 
       setSubmitted(true);

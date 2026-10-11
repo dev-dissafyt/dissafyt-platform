@@ -410,6 +410,20 @@ export class PayfastService {
             console.error('Failed to create/update subscription in table:', subErr);
           }
         }
+
+        // 5. Activate Founder Pass if this was a founder pass payment
+        const isFounderPass = payload.custom_str3 === 'founder_pass' || payload.m_payment_id?.startsWith('founder-');
+        if (isFounderPass) {
+          const passId = payload.custom_str1 || payload.m_payment_id?.replace('founder-', '');
+          if (passId) {
+            try {
+              const { FounderPassService } = await import('../barbershop/founder-pass-service');
+              await FounderPassService.activatePass(passId, payload.pf_payment_id || `PF_${Date.now()}`);
+            } catch (fpErr) {
+              console.error('Failed to activate founder pass from PayFast webhook:', fpErr);
+            }
+          }
+        }
       } else if (paymentStatus === 'FAILED') {
         if (orderId && !isSubscription) {
           await admin

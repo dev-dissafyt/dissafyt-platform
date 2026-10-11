@@ -115,6 +115,24 @@ export default function PosRegisterPage() {
   const [preorderSuccessMsg, setPreorderSuccessMsg] = useState<string | null>(null);
   const [preorderErrorMsg, setPreorderErrorMsg] = useState<string | null>(null);
 
+  // Founder Pass Modal states
+  const [showFounderModal, setShowFounderModal] = useState(false);
+  const [founderSearchTerm, setFounderSearchTerm] = useState('');
+  const [founderPasses, setFounderPasses] = useState<any[]>([]);
+  const [loadingFounderPasses, setLoadingFounderPasses] = useState(false);
+  const [selectedFounderPass, setSelectedFounderPass] = useState<any | null>(null);
+  const [founderActionSuccess, setFounderActionSuccess] = useState<string | null>(null);
+  const [founderActionError, setFounderActionError] = useState<string | null>(null);
+  const [redeemingCut, setRedeemingCut] = useState(false);
+
+  // Issue pass at POS counter states
+  const [founderTab, setFounderTab] = useState<'redeem' | 'issue'>('redeem');
+  const [issueName, setIssueName] = useState('');
+  const [issueEmail, setIssueEmail] = useState('');
+  const [issuePhone, setIssuePhone] = useState('');
+  const [issuePaymentMethod, setIssuePaymentMethod] = useState<'pos_card' | 'pos_cash'>('pos_card');
+  const [issuingPass, setIssuingPass] = useState(false);
+
   // Read operator from cookie & enforce staff/admin auth guard
   useEffect(() => {
     const cookies = document.cookie.split(';');
@@ -387,6 +405,103 @@ export default function PosRegisterPage() {
     }
   }
 
+  async function searchFounderPasses(query?: string) {
+    setLoadingFounderPasses(true);
+    setFounderActionError(null);
+    try {
+      const q = query !== undefined ? query : founderSearchTerm;
+      const res = await fetch(`/api/founders-pass/lookup?query=${encodeURIComponent(q || '')}`);
+      if (!res.ok) throw new Error('Failed to lookup founder passes');
+      const data = await res.json();
+      setFounderPasses(data.passes || []);
+    } catch (e: any) {
+      setFounderActionError(e.message || 'Error looking up founder passes');
+    } finally {
+      setLoadingFounderPasses(false);
+    }
+  }
+
+  async function handleRedeemFounderCut() {
+    if (!selectedFounderPass) return;
+    setRedeemingCut(true);
+    setFounderActionError(null);
+    setFounderActionSuccess(null);
+    try {
+      const barber = staffList.find((s) => s.id === selectedStaffId)?.display_name || 'Ace Barber';
+      const res = await fetch('/api/founders-pass/redeem', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          passId: selectedFounderPass.id,
+          barberName: barber,
+          notes: `Walk-in cut at Studio Register (Operator: ${operatorEmail})`,
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to redeem cut');
+      }
+
+      setFounderActionSuccess(`Cut #${data.cutNumber} successfully redeemed! ${data.cutsRemaining} cuts remaining on pass.`);
+      setSelectedFounderPass((prev: any) =>
+        prev
+          ? {
+              ...prev,
+              cuts_used: data.cutNumber,
+              cuts_remaining: data.cutsRemaining,
+              status: data.cutsRemaining <= 0 ? 'exhausted' : 'active',
+            }
+          : null
+      );
+      searchFounderPasses(founderSearchTerm);
+    } catch (err: any) {
+      setFounderActionError(err.message || 'Error redeeming cut');
+    } finally {
+      setRedeemingCut(false);
+    }
+  }
+
+  async function handleIssueFounderPass(e: React.FormEvent) {
+    e.preventDefault();
+    if (!issueName.trim() || !issueEmail.trim() || !issuePhone.trim()) {
+      setFounderActionError('Name, email, and phone number are required.');
+      return;
+    }
+
+    setIssuingPass(true);
+    setFounderActionError(null);
+    setFounderActionSuccess(null);
+    try {
+      const adminRes = await fetch('/api/founders-pass', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: issueName.trim(),
+          email: issueEmail.trim(),
+          phone: issuePhone.trim(),
+          pledgeType: 'pay_now',
+          notes: `Purchased at Studio Register (${issuePaymentMethod})`,
+        }),
+      });
+
+      const data = await adminRes.json();
+      if (!adminRes.ok || !data.pass) {
+        throw new Error(data.error || 'Failed to issue Founder Pass');
+      }
+
+      setFounderActionSuccess(`Founder Pass #${data.pass.pass_number} successfully issued! R1,200 collected. 12 cuts activated.`);
+      setIssueName('');
+      setIssueEmail('');
+      setIssuePhone('');
+      searchFounderPasses(data.pass.pass_number);
+      setFounderTab('redeem');
+    } catch (err: any) {
+      setFounderActionError(err.message || 'Error issuing Founder Pass');
+    } finally {
+      setIssuingPass(false);
+    }
+  }
+
   // Filter items
   const filteredServices = useMemo(() => {
     if (selectedCategory === 'apparel' || selectedCategory === 'care') return [];
@@ -444,6 +559,18 @@ export default function PosRegisterPage() {
           >
             <Clock className="h-3.5 w-3.5 text-amber-400" />
             <span className="hidden sm:inline">Pre-Order Collections</span>
+          </button>
+
+          <button
+            onClick={() => {
+              setShowFounderModal(true);
+              searchFounderPasses();
+            }}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-[#ff5500]/10 hover:bg-[#ff5500]/20 text-[#ff5500] border border-[#ff5500]/40 transition-all font-semibold cursor-pointer"
+            title="Look up Founder Passes and redeem cuts"
+          >
+            <Sparkles className="h-3.5 w-3.5 text-[#ff5500]" />
+            <span className="hidden sm:inline">Founder Passes (12 Cuts)</span>
           </button>
 
           <button
@@ -1141,6 +1268,346 @@ export default function PosRegisterPage() {
                 )}
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* 5. FOUNDER PASS LOOKUP & REDEMPTION MODAL */}
+      {showFounderModal && (
+        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-zinc-950 border-2 border-[#ff5500]/50 rounded-2xl w-full max-w-4xl max-h-[90vh] flex flex-col shadow-2xl overflow-hidden animate-in fade-in zoom-in-95 duration-150">
+            {/* Header with Tabs */}
+            <div className="p-4 border-b border-zinc-800 bg-zinc-900/90 flex items-center justify-between shrink-0">
+              <div className="flex items-center space-x-3">
+                <div className="h-9 w-9 rounded-xl bg-[#ff5500]/20 border border-[#ff5500]/40 flex items-center justify-center text-[#ff5500]">
+                  <Sparkles className="h-5 w-5" />
+                </div>
+                <div>
+                  <h2 className="text-sm font-bold text-white uppercase tracking-wider font-display">
+                    Founder's Circle &bull; 12 Master Cuts Pass
+                  </h2>
+                  <p className="text-[11px] text-zinc-400">
+                    Physical Barbershop Buildout Entitlement &bull; 1 Norwalk Way Counter
+                  </p>
+                </div>
+              </div>
+
+              {/* Tab Selector */}
+              <div className="flex items-center space-x-2">
+                <div className="flex bg-zinc-950 p-1 rounded-xl border border-zinc-800 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFounderTab('redeem');
+                      setFounderActionError(null);
+                      setFounderActionSuccess(null);
+                    }}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      founderTab === 'redeem'
+                        ? 'bg-[#ff5500] text-black shadow-sm shadow-[#ff5500]/20'
+                        : 'text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    Look Up & Redeem
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFounderTab('issue');
+                      setFounderActionError(null);
+                      setFounderActionSuccess(null);
+                    }}
+                    className={`px-3 py-1 rounded-lg font-bold transition-all cursor-pointer ${
+                      founderTab === 'issue'
+                        ? 'bg-[#ff5500] text-black shadow-sm shadow-[#ff5500]/20'
+                        : 'text-zinc-400 hover:text-white'
+                    }`}
+                  >
+                    + Issue Pass (R1,200)
+                  </button>
+                </div>
+
+                <button
+                  onClick={() => {
+                    setShowFounderModal(false);
+                    setSelectedFounderPass(null);
+                    setFounderActionError(null);
+                    setFounderActionSuccess(null);
+                  }}
+                  className="p-1.5 rounded-lg text-zinc-400 hover:text-white bg-zinc-800/60 hover:bg-zinc-800 cursor-pointer"
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Content Body */}
+            {founderTab === 'redeem' ? (
+              <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-12 divide-y md:divide-y-0 md:divide-x divide-zinc-800">
+                {/* Left: Search & Pass List */}
+                <div className="md:col-span-5 flex flex-col p-4 space-y-3 overflow-hidden bg-zinc-950">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-3.5 w-3.5 text-zinc-500" />
+                    <input
+                      type="text"
+                      placeholder="Pass # (e.g. FP-0029), phone, name, email..."
+                      value={founderSearchTerm}
+                      onChange={(e) => {
+                        setFounderSearchTerm(e.target.value);
+                        searchFounderPasses(e.target.value);
+                      }}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl pl-9 pr-3 py-2 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-[#ff5500]"
+                    />
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto space-y-2 pr-1">
+                    {loadingFounderPasses ? (
+                      <div className="py-8 text-center text-xs text-zinc-500 flex items-center justify-center gap-2">
+                        <RefreshCw className="w-3.5 h-3.5 animate-spin text-[#ff5500]" />
+                        <span>Searching passes...</span>
+                      </div>
+                    ) : founderPasses.length === 0 ? (
+                      <div className="py-8 text-center text-xs text-zinc-500 space-y-1">
+                        <p>No active Founder Passes match search.</p>
+                        <p className="text-[10px] text-zinc-600">Type customer phone or click "+ Issue Pass" to register one.</p>
+                      </div>
+                    ) : (
+                      founderPasses.map((p) => {
+                        const isSelected = selectedFounderPass?.id === p.id;
+                        return (
+                          <div
+                            key={p.id}
+                            onClick={() => {
+                              setSelectedFounderPass(p);
+                              setFounderActionError(null);
+                              setFounderActionSuccess(null);
+                            }}
+                            className={`p-3 rounded-xl border text-left cursor-pointer transition-all ${
+                              isSelected
+                                ? 'border-[#ff5500] bg-[#ff5500]/10'
+                                : 'border-zinc-800/80 bg-zinc-900/60 hover:border-zinc-700'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-xs font-mono">
+                              <span className="font-bold text-[#ff5500]">{p.pass_number}</span>
+                              <span className={`text-[10px] px-2 py-0.5 rounded font-bold ${
+                                p.cuts_remaining > 0 ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-zinc-800 text-zinc-500'
+                              }`}>
+                                {p.cuts_remaining} of 12 Cuts Left
+                              </span>
+                            </div>
+                            <div className="text-xs font-semibold text-white mt-1 truncate">{p.customer_name}</div>
+                            <div className="text-[10px] font-mono text-zinc-400 mt-0.5">{p.customer_phone}</div>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+
+                {/* Right: Selected Pass Card & Punch Card Redemption */}
+                <div className="md:col-span-7 flex flex-col p-6 space-y-4 overflow-y-auto bg-zinc-900/40">
+                  {founderActionSuccess && (
+                    <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-400 flex items-center gap-2">
+                      <CheckCircle className="w-4 h-4 shrink-0" />
+                      <span>{founderActionSuccess}</span>
+                    </div>
+                  )}
+
+                  {founderActionError && (
+                    <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-400 flex items-center gap-2">
+                      <AlertCircle className="w-4 h-4 shrink-0" />
+                      <span>{founderActionError}</span>
+                    </div>
+                  )}
+
+                  {selectedFounderPass ? (
+                    <div className="space-y-4">
+                      {/* Pass Header Card */}
+                      <div className="rounded-2xl border border-[#ff5500]/40 bg-gradient-to-br from-zinc-950 via-[#181512] to-zinc-950 p-5 space-y-3 shadow-xl">
+                        <div className="flex justify-between items-center border-b border-zinc-800 pb-2.5">
+                          <div>
+                            <span className="text-[10px] font-mono uppercase tracking-widest text-[#ff5500] font-bold">
+                              FOUNDER'S PASS &bull; PATRON ENTITLEMENT
+                            </span>
+                            <h3 className="text-base font-bold text-white mt-0.5">
+                              {selectedFounderPass.customer_name}
+                            </h3>
+                          </div>
+                          <span className="font-mono text-sm font-bold bg-zinc-900 border border-zinc-700 px-3 py-1 rounded-lg text-white">
+                            {selectedFounderPass.pass_number}
+                          </span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 text-xs font-mono text-zinc-300">
+                          <div>
+                            <span className="text-zinc-500 text-[10px] block">Contact:</span>
+                            <span>{selectedFounderPass.customer_phone}</span>
+                          </div>
+                          <div>
+                            <span className="text-zinc-500 text-[10px] block">Status:</span>
+                            <span className="text-emerald-400 font-bold uppercase">{selectedFounderPass.status}</span>
+                          </div>
+                        </div>
+
+                        {/* Punch Card Matrix */}
+                        <div className="pt-2 border-t border-zinc-800/80">
+                          <div className="flex justify-between items-center text-xs font-mono mb-2">
+                            <span className="text-zinc-400">12 Cuts Punch Card</span>
+                            <span className="text-[#ff5500] font-bold">
+                              {selectedFounderPass.cuts_remaining} of 12 Cuts Remaining
+                            </span>
+                          </div>
+                          <div className="grid grid-cols-6 gap-2">
+                            {Array.from({ length: 12 }).map((_, i) => {
+                              const isUsed = i < (selectedFounderPass.cuts_used || 0);
+                              return (
+                                <div
+                                  key={i}
+                                  className={`h-9 rounded-lg border flex flex-col items-center justify-center font-mono text-[10px] ${
+                                    isUsed
+                                      ? 'border-zinc-800 bg-zinc-900/60 text-zinc-600 line-through'
+                                      : 'border-[#ff5500]/60 bg-[#ff5500]/10 text-white font-bold shadow-sm shadow-[#ff5500]/10'
+                                  }`}
+                                >
+                                  <span>#{i + 1}</span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Action to Redeem */}
+                      {selectedFounderPass.cuts_remaining > 0 ? (
+                        <div className="space-y-2 pt-2">
+                          <button
+                            type="button"
+                            disabled={redeemingCut}
+                            onClick={handleRedeemFounderCut}
+                            className="w-full py-4 px-6 rounded-xl bg-gradient-to-r from-[#ff5500] via-amber-500 to-[#ff7700] hover:brightness-110 text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-xl shadow-[#ff5500]/25 cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                          >
+                            {redeemingCut ? (
+                              <>
+                                <RefreshCw className="w-4 h-4 animate-spin text-black" />
+                                <span>Redeeming Cut #{selectedFounderPass.cuts_used + 1}...</span>
+                              </>
+                            ) : (
+                              <>
+                                <Scissors className="w-4 h-4 text-black" />
+                                <span>Redeem Haircut (Cut #{selectedFounderPass.cuts_used + 1} of 12) &bull; R0.00</span>
+                              </>
+                            )}
+                          </button>
+                          <p className="text-[10px] text-center text-zinc-500 font-mono">
+                            Redeeming will immediately decrement the punch card balance and log the transaction.
+                          </p>
+                        </div>
+                      ) : (
+                        <div className="p-4 rounded-xl bg-zinc-950 border border-zinc-800 text-center text-xs text-zinc-500">
+                          All 12 cuts on this Founder Pass have been redeemed!
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="h-full flex flex-col items-center justify-center text-center p-6 text-zinc-600 space-y-2">
+                      <Sparkles className="w-10 h-10 stroke-[1.2] text-zinc-700" />
+                      <p className="text-xs font-medium text-zinc-400">No Founder Pass Selected</p>
+                      <p className="text-[11px] max-w-[240px]">
+                        Select a pass from the left or search by customer name/phone to inspect available cut punch-card balance.
+                      </p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              /* Tab 2: Issue / Sell Founder Pass at Counter */
+              <form onSubmit={handleIssueFounderPass} className="p-6 space-y-4 max-w-lg mx-auto w-full">
+                <div className="text-center space-y-1 mb-2">
+                  <h3 className="font-display text-lg font-bold text-white uppercase">
+                    Issue Founder Pass at Register
+                  </h3>
+                  <p className="text-xs text-zinc-400">
+                    Collect R1,200 for 12 prepaid haircuts and credit to the physical buildout capital pool.
+                  </p>
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <label className="text-xs font-semibold text-zinc-300 block mb-1">Patron Full Name</label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Jason Adams"
+                      value={issueName}
+                      onChange={(e) => setIssueName(e.target.value)}
+                      className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-[#ff5500]"
+                    />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="text-xs font-semibold text-zinc-300 block mb-1">Email Address</label>
+                      <input
+                        type="email"
+                        required
+                        placeholder="patron@gmail.com"
+                        value={issueEmail}
+                        onChange={(e) => setIssueEmail(e.target.value)}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-600 focus:outline-none focus:border-[#ff5500]"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-xs font-semibold text-zinc-300 block mb-1">WhatsApp / Phone</label>
+                      <input
+                        type="tel"
+                        required
+                        placeholder="082 123 4567"
+                        value={issuePhone}
+                        onChange={(e) => setIssuePhone(e.target.value)}
+                        className="w-full bg-zinc-900 border border-zinc-800 rounded-xl px-3.5 py-2 text-xs text-white placeholder-zinc-600 font-mono focus:outline-none focus:border-[#ff5500]"
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-xs font-semibold text-zinc-300 block mb-1">Payment Method</label>
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setIssuePaymentMethod('pos_card')}
+                        className={`p-3 rounded-xl border text-center font-bold text-xs transition-all cursor-pointer ${
+                          issuePaymentMethod === 'pos_card'
+                            ? 'border-[#ff5500] bg-[#ff5500]/10 text-white'
+                            : 'border-zinc-800 bg-zinc-900 text-zinc-400'
+                        }`}
+                      >
+                        Card Terminal (PayFast)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIssuePaymentMethod('pos_cash')}
+                        className={`p-3 rounded-xl border text-center font-bold text-xs transition-all cursor-pointer ${
+                          issuePaymentMethod === 'pos_cash'
+                            ? 'border-[#ff5500] bg-[#ff5500]/10 text-white'
+                            : 'border-zinc-800 bg-zinc-900 text-zinc-400'
+                        }`}
+                      >
+                        Studio Cash (R1,200)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                <button
+                  type="submit"
+                  disabled={issuingPass}
+                  className="w-full py-3.5 rounded-xl bg-gradient-to-r from-[#ff5500] to-amber-500 hover:brightness-110 text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg shadow-[#ff5500]/25 cursor-pointer disabled:opacity-50 mt-2"
+                >
+                  {issuingPass ? 'Issuing & Crediting Capital...' : 'Collect R1,200 & Activate 12 Cuts Pass'}
+                </button>
+              </form>
+            )}
           </div>
         </div>
       )}
