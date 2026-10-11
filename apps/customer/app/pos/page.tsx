@@ -22,6 +22,8 @@ import {
   Phone,
   Clock,
   ShieldCheck,
+  X,
+  CheckCircle,
 } from 'lucide-react';
 import { ReceiptModal } from '@/app/components/receipt-modal';
 
@@ -101,6 +103,17 @@ export default function PosRegisterPage() {
 
   // Receipt Modal state
   const [completedReceipt, setCompletedReceipt] = useState<any | null>(null);
+
+  // Pre-Order Collection Modal states
+  const [showPreorderModal, setShowPreorderModal] = useState(false);
+  const [preorderSearchTerm, setPreorderSearchTerm] = useState('');
+  const [preorderOrders, setPreorderOrders] = useState<any[]>([]);
+  const [loadingPreorders, setLoadingPreorders] = useState(false);
+  const [selectedPreorder, setSelectedPreorder] = useState<any | null>(null);
+  const [preorderPaymentMethod, setPreorderPaymentMethod] = useState<'pos_card' | 'pos_cash'>('pos_card');
+  const [preorderSettling, setPreorderSettling] = useState(false);
+  const [preorderSuccessMsg, setPreorderSuccessMsg] = useState<string | null>(null);
+  const [preorderErrorMsg, setPreorderErrorMsg] = useState<string | null>(null);
 
   // Read operator from cookie & enforce staff/admin auth guard
   useEffect(() => {
@@ -313,6 +326,67 @@ export default function PosRegisterPage() {
     router.push('/pos/login');
   }
 
+  async function searchPreorderOrders(query?: string) {
+    setLoadingPreorders(true);
+    setPreorderErrorMsg(null);
+    try {
+      const res = await fetch('/api/orders?scope=admin');
+      if (!res.ok) {
+        throw new Error('Failed to load orders');
+      }
+      const data = await res.json();
+      const allOrders: any[] = Array.isArray(data) ? data : [];
+      const filtered = allOrders.filter((o) => {
+        const hasBalance = Number(o.balance_due || 0) > 0 || o.deposit_status === 'deposit_paid';
+        if (!hasBalance) return false;
+        if (!query || query.trim() === '') return true;
+        const q = query.toLowerCase().trim();
+        const num = (o.order_number || '').toLowerCase();
+        const name = (o.customer_name || o.shipping_address?.recipient_name || '').toLowerCase();
+        const phone = (o.customer_phone || o.shipping_address?.recipient_phone || '').toLowerCase();
+        const email = (o.customer_email || o.shipping_address?.recipient_email || '').toLowerCase();
+        return num.includes(q) || name.includes(q) || phone.includes(q) || email.includes(q);
+      });
+      setPreorderOrders(filtered);
+    } catch (e: any) {
+      setPreorderErrorMsg(e.message || 'Error loading pre-orders');
+    } finally {
+      setLoadingPreorders(false);
+    }
+  }
+
+  async function handleSettlePreorderBalance() {
+    if (!selectedPreorder) return;
+    setPreorderSettling(true);
+    setPreorderErrorMsg(null);
+    setPreorderSuccessMsg(null);
+
+    try {
+      const res = await fetch(`/api/orders/${selectedPreorder.id}/settle`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          amountPaid: Number(selectedPreorder.balance_due),
+          paymentMethod: preorderPaymentMethod,
+          notes: `Settled at Dissafyt Studio POS counter by ${operatorEmail}`,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Failed to settle balance');
+      }
+
+      setPreorderSuccessMsg(`Order #${selectedPreorder.order_number} successfully settled! R${Number(selectedPreorder.balance_due).toFixed(2)} received.`);
+      setSelectedPreorder(null);
+      searchPreorderOrders(preorderSearchTerm);
+    } catch (err: any) {
+      setPreorderErrorMsg(err.message || 'Error settling balance');
+    } finally {
+      setPreorderSettling(false);
+    }
+  }
+
   // Filter items
   const filteredServices = useMemo(() => {
     if (selectedCategory === 'apparel' || selectedCategory === 'care') return [];
@@ -359,6 +433,18 @@ export default function PosRegisterPage() {
             <User className="h-3.5 w-3.5 text-amber-500" />
             <span className="font-medium truncate max-w-[150px]">{operatorEmail}</span>
           </div>
+
+          <button
+            onClick={() => {
+              setShowPreorderModal(true);
+              searchPreorderOrders();
+            }}
+            className="flex items-center space-x-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 border border-amber-500/30 transition-all font-semibold cursor-pointer"
+            title="Look up pre-order drops and collect balances"
+          >
+            <Clock className="h-3.5 w-3.5 text-amber-400" />
+            <span className="hidden sm:inline">Pre-Order Collections</span>
+          </button>
 
           <button
             onClick={() => loadCatalog()}
@@ -817,6 +903,246 @@ export default function PosRegisterPage() {
           receipt={completedReceipt}
           onClose={() => setCompletedReceipt(null)}
         />
+      )}
+
+      {/* 5. PRE-ORDER COLLECTIONS & BALANCE SETTLEMENT MODAL */}
+      {showPreorderModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-4xl bg-zinc-900 border border-zinc-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            {/* Header */}
+            <div className="p-5 border-b border-zinc-800 bg-zinc-950/80 flex items-center justify-between">
+              <div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-[10px] font-mono text-amber-400 uppercase tracking-wider bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                    Studio Pickup & Balance Settlement
+                  </span>
+                  <span className="text-[10px] text-zinc-400 font-mono">1 Norwalk Way</span>
+                </div>
+                <h2 className="text-xl font-bold text-white font-serif mt-1">
+                  Pre-Order Milestone Collections
+                </h2>
+                <p className="text-xs text-zinc-400">
+                  Search pre-order drop orders, inspect blanks & DTF garments, and collect remaining milestone balances.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  setShowPreorderModal(false);
+                  setSelectedPreorder(null);
+                  setPreorderSuccessMsg(null);
+                  setPreorderErrorMsg(null);
+                }}
+                className="text-zinc-500 hover:text-white p-2 rounded-lg bg-zinc-800/50 hover:bg-zinc-800 transition-colors cursor-pointer"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Search Bar */}
+            <div className="p-4 border-b border-zinc-800 bg-zinc-900/60 flex gap-2">
+              <div className="relative flex-1">
+                <Search className="w-4 h-4 absolute left-3 top-3 text-zinc-400" />
+                <input
+                  type="text"
+                  placeholder="Search by Order #, Customer Name, Phone, or Email..."
+                  value={preorderSearchTerm}
+                  onChange={(e) => setPreorderSearchTerm(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') searchPreorderOrders(preorderSearchTerm);
+                  }}
+                  className="w-full bg-zinc-950 border border-zinc-800 rounded-xl pl-9 pr-4 py-2.5 text-xs text-white placeholder-zinc-500 focus:outline-none focus:border-amber-500"
+                />
+              </div>
+              <button
+                onClick={() => searchPreorderOrders(preorderSearchTerm)}
+                disabled={loadingPreorders}
+                className="px-4 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs transition-colors cursor-pointer disabled:opacity-50 flex items-center gap-1.5"
+              >
+                {loadingPreorders ? <RefreshCw className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
+                <span>Find Orders</span>
+              </button>
+            </div>
+
+            {/* Content Area: Split View */}
+            <div className="flex-1 flex flex-col md:flex-row overflow-hidden divide-y md:divide-y-0 md:divide-x divide-zinc-800">
+              {/* Order List Column */}
+              <div className="w-full md:w-1/2 overflow-y-auto p-4 space-y-2.5">
+                {preorderSuccessMsg && (
+                  <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-400 flex items-center gap-2">
+                    <CheckCircle className="w-4 h-4 shrink-0" />
+                    <span>{preorderSuccessMsg}</span>
+                  </div>
+                )}
+                {preorderErrorMsg && (
+                  <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-xl text-xs text-rose-400 flex items-center gap-2">
+                    <AlertCircle className="w-4 h-4 shrink-0" />
+                    <span>{preorderErrorMsg}</span>
+                  </div>
+                )}
+
+                {loadingPreorders ? (
+                  <div className="py-12 text-center text-zinc-500 text-xs flex flex-col items-center gap-2">
+                    <RefreshCw className="w-5 h-5 animate-spin text-amber-400" />
+                    <span>Scanning active pre-orders...</span>
+                  </div>
+                ) : preorderOrders.length === 0 ? (
+                  <div className="py-12 text-center text-zinc-500 text-xs">
+                    No orders with outstanding balances found. Try a different search query.
+                  </div>
+                ) : (
+                  preorderOrders.map((order) => {
+                    const isSelected = selectedPreorder?.id === order.id;
+                    const balance = Number(order.balance_due || 0);
+                    return (
+                      <div
+                        key={order.id}
+                        onClick={() => {
+                          setSelectedPreorder(order);
+                          setPreorderSuccessMsg(null);
+                          setPreorderErrorMsg(null);
+                        }}
+                        className={`p-3.5 rounded-xl border text-left transition-all cursor-pointer ${
+                          isSelected
+                            ? 'border-amber-500 bg-amber-500/10 shadow-lg shadow-amber-500/5'
+                            : 'border-zinc-800 bg-zinc-950/60 hover:border-zinc-700 hover:bg-zinc-950'
+                        }`}
+                      >
+                        <div className="flex items-start justify-between">
+                          <div>
+                            <div className="font-mono font-bold text-xs text-white">
+                              #{order.order_number || order.id.slice(0, 8)}
+                            </div>
+                            <div className="text-xs text-zinc-300 font-medium mt-0.5">
+                              {order.customer_name || order.shipping_address?.recipient_name || 'Customer'}
+                            </div>
+                            <div className="text-[10px] text-zinc-500 font-mono mt-0.5">
+                              {order.customer_phone || order.shipping_address?.recipient_phone || order.customer_email || 'No contact'}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-[10px] font-mono uppercase px-2 py-0.5 rounded font-bold border border-zinc-700 bg-zinc-800 text-zinc-300">
+                              {order.fulfillment_choice === 'studio_collection' ? 'Studio Pickup' : 'Courier'}
+                            </span>
+                            <div className="font-mono font-bold text-xs text-amber-400 mt-1.5">
+                              Due: R {balance.toFixed(2)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+
+              {/* Order Detail & Balance Settlement Column */}
+              <div className="w-full md:w-1/2 overflow-y-auto p-5 bg-zinc-950/50 flex flex-col justify-between">
+                {selectedPreorder ? (
+                  <div className="space-y-4">
+                    <div>
+                      <span className="text-[10px] font-mono uppercase tracking-wider text-zinc-400">
+                        Selected Order
+                      </span>
+                      <h3 className="font-bold text-base text-white font-mono">
+                        #{selectedPreorder.order_number || selectedPreorder.id.slice(0, 8)}
+                      </h3>
+                      <div className="text-xs text-zinc-400 mt-1">
+                        Client: <strong className="text-zinc-200">{selectedPreorder.customer_name || selectedPreorder.shipping_address?.recipient_name}</strong>
+                      </div>
+                      <div className="text-xs text-zinc-400">
+                        Phone: <span className="font-mono text-zinc-200">{selectedPreorder.customer_phone || selectedPreorder.shipping_address?.recipient_phone || 'None'}</span>
+                      </div>
+                    </div>
+
+                    {/* Financial Summary */}
+                    <div className="p-4 rounded-xl bg-zinc-900 border border-zinc-800 space-y-2">
+                      <div className="flex justify-between text-xs text-zinc-400">
+                        <span>Total Garment Value:</span>
+                        <span className="font-mono text-zinc-200">R {Number(selectedPreorder.total || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="flex justify-between text-xs text-emerald-400">
+                        <span>Milestone Deposit Paid:</span>
+                        <span className="font-mono font-bold">R {Number(selectedPreorder.deposit_paid || 0).toFixed(2)}</span>
+                      </div>
+                      <div className="pt-2 border-t border-zinc-800 flex justify-between items-baseline">
+                        <span className="text-xs font-bold text-white uppercase tracking-wider">Remaining Balance Due:</span>
+                        <span className="font-mono font-extrabold text-lg text-amber-400">
+                          R {Number(selectedPreorder.balance_due || 0).toFixed(2)}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Settlement Controls */}
+                    {Number(selectedPreorder.balance_due || 0) > 0 ? (
+                      <div className="space-y-3 pt-2">
+                        <label className="text-xs font-semibold text-zinc-300 block">
+                          Settlement Payment Method:
+                        </label>
+                        <div className="grid grid-cols-2 gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setPreorderPaymentMethod('pos_card')}
+                            className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                              preorderPaymentMethod === 'pos_card'
+                                ? 'border-amber-500 bg-amber-500/10 text-amber-400'
+                                : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200'
+                            }`}
+                          >
+                            <CreditCard className="w-3.5 h-3.5" />
+                            <span>Card Machine</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setPreorderPaymentMethod('pos_cash')}
+                            className={`py-2 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center gap-1.5 transition-all cursor-pointer ${
+                              preorderPaymentMethod === 'pos_cash'
+                                ? 'border-amber-500 bg-amber-500/10 text-amber-400'
+                                : 'border-zinc-800 bg-zinc-900 text-zinc-400 hover:text-zinc-200'
+                            }`}
+                          >
+                            <Receipt className="w-3.5 h-3.5" />
+                            <span>Studio Cash</span>
+                          </button>
+                        </div>
+
+                        <button
+                          type="button"
+                          disabled={preorderSettling}
+                          onClick={handleSettlePreorderBalance}
+                          className="w-full py-3.5 px-4 rounded-xl bg-gradient-to-r from-amber-500 to-amber-400 hover:from-amber-400 hover:to-amber-300 text-black font-bold text-xs shadow-lg shadow-amber-500/20 transition-all cursor-pointer disabled:opacity-50 flex items-center justify-center gap-2"
+                        >
+                          {preorderSettling ? (
+                            <>
+                              <RefreshCw className="w-4 h-4 animate-spin" />
+                              <span>Settling & Confirming...</span>
+                            </>
+                          ) : (
+                            <>
+                              <CheckCircle className="w-4 h-4" />
+                              <span>Collect R {Number(selectedPreorder.balance_due || 0).toFixed(2)} & Handover</span>
+                            </>
+                          )}
+                        </button>
+                      </div>
+                    ) : (
+                      <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-xs text-emerald-400 flex items-center gap-2">
+                        <CheckCircle className="w-4 h-4 shrink-0" />
+                        <span>Order is fully settled. Garment is cleared for customer handover!</span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="h-full flex flex-col items-center justify-center text-center p-6 text-zinc-600 space-y-2">
+                    <ShoppingBag className="w-10 h-10 stroke-[1.2]" />
+                    <p className="text-xs font-medium text-zinc-400">No Pre-Order Selected</p>
+                    <p className="text-[11px] max-w-[220px]">
+                      Select an order from the list on the left to inspect customer details and collect remaining balance.
+                    </p>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

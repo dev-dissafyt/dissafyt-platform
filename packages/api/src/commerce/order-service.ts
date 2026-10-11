@@ -27,11 +27,14 @@ export interface CreateOrderInput {
   customer_id?: string;
   customer_email?: string;
   customer_phone?: string;
+  customer_name?: string;
   items: CreateOrderItemInput[];
   shipping_address: any;
   shipping_method?: string;
   shipping_cost?: number;
   payment_method?: string;
+  fulfillment_choice?: 'courier' | 'studio_collection';
+  collection_location_id?: string;
 }
 
 export interface OrderWithItems extends Order {
@@ -95,7 +98,7 @@ export class OrderService {
       try {
         const { data: pData, error: prodErr } = await admin
           .from('products')
-          .select('id, name, base_price, is_active, brand_id, is_custom_print, print_placement, design_file_url, mockup_url, is_preorder')
+          .select('id, name, base_price, is_active, brand_id, is_custom_print, print_placement, design_file_url, mockup_url, is_preorder, preorder_deposit_pct')
           .in('id', productIds);
         if (!prodErr && pData) {
           products = pData;
@@ -131,6 +134,8 @@ export class OrderService {
 
       // Calculate totals with strictly authoritative pricing
       let orderSubtotal = 0;
+      let orderDepositTotal = 0;
+      let orderBalanceTotal = 0;
       const orderItemsToInsert: {
         id?: string;
         product_id: string;
@@ -140,6 +145,8 @@ export class OrderService {
         quantity: number;
         total_price: number;
         is_preorder: boolean;
+        deposit_amount: number;
+        balance_amount: number;
       }[] = [];
 
       for (const item of input.items) {
@@ -171,7 +178,21 @@ export class OrderService {
         }
 
         const totalPrice = unitPrice * item.quantity;
+        const isPreorder = Boolean(product.is_preorder);
+        let depositAmount = totalPrice;
+        let balanceAmount = 0;
+
+        if (isPreorder) {
+          const depositPct = product.preorder_deposit_pct
+            ? Math.min(Math.max(Number(product.preorder_deposit_pct), 10), 100)
+            : 50;
+          depositAmount = Math.round((totalPrice * (depositPct / 100)) * 100) / 100;
+          balanceAmount = Math.round((totalPrice - depositAmount) * 100) / 100;
+        }
+
         orderSubtotal += totalPrice;
+        orderDepositTotal += depositAmount;
+        orderBalanceTotal += balanceAmount;
 
         orderItemsToInsert.push({
           product_id: item.product_id,
@@ -180,9 +201,15 @@ export class OrderService {
           unit_price: unitPrice,
           quantity: item.quantity,
           total_price: totalPrice,
-          is_preorder: Boolean(product.is_preorder),
+          is_preorder: isPreorder,
+          deposit_amount: depositAmount,
+          balance_amount: balanceAmount,
         });
       }
+
+      const fulfillmentChoice = input.fulfillment_choice === 'studio_collection' ? 'studio_collection' : 'courier';
+      const shippingCost = fulfillmentChoice === 'studio_collection' ? 0 : (input.shipping_cost || 0);
+      const orderTotal = orderSubtotal + shippingCost;
 
       // 2. Insert into orders table with valid user_id
       const orderNumber = this.generateOrderNumber();
@@ -196,7 +223,15 @@ export class OrderService {
             order_number: orderNumber,
             status: 'pending_payment',
             subtotal: orderSubtotal,
-            total: orderSubtotal + (input.shipping_cost || 0),
+            total: orderTotal,
+            deposit_paid: 0.00,
+            balance_due: orderBalanceTotal,
+            deposit_status: 'none',
+            fulfillment_choice: fulfillmentChoice,
+            collection_location_id: input.collection_location_id || 'loc-cpt-flagship',
+            customer_email: recipientEmail || null,
+            customer_phone: input.customer_phone || input.shipping_address?.recipient_phone || null,
+            customer_name: input.customer_name || input.shipping_address?.recipient_name || null,
             shipping_address: input.shipping_address,
           })
           .select()
@@ -271,14 +306,20 @@ export class OrderService {
       return { success: false, error: `Order not found: ${orderId}` };
     }
 
-    if (order.status === 'paid') {
+    if (order.status === 'paid' || order.deposit_status === 'fully_settled') {
       return { success: true };
     }
 
     // Authoritative payment amount verification
-    // Must satisfy gross payment >= order total (with 0.05 margin for currency rounding)
-    if (amountPaid < Number(order.total) - 0.05) {
-      console.warn(`Payment underpaid for order ${order.id}: received R${amountPaid}, expected R${order.total}`);
+    const balanceDue = Number(order.balance_due || 0);
+    const isMilestoneDeposit = balanceDue > 0;
+    const expectedAmount = isMilestoneDeposit
+      ? Number(order.total) - balanceDue
+      : Number(order.total);
+
+    // Must satisfy gross payment >= expected amount (with 0.05 margin for currency rounding)
+    if (amountPaid < expectedAmount - 0.05) {
+      console.warn(`Payment underpaid for order ${order.id}: received R${amountPaid}, expected R${expectedAmount}`);
       await admin
         .from('orders')
         .update({
@@ -286,14 +327,21 @@ export class OrderService {
           updated_at: new Date().toISOString(),
         })
         .eq('id', orderId);
-      return { success: false, error: `Payment underpaid: received R${amountPaid}, required R${order.total}` };
+      return { success: false, error: `Payment underpaid: received R${amountPaid}, required R${expectedAmount}` };
     }
 
-    // Mark order as paid
+    // Update order status:
+    // Pre-orders transition to 'processing' with deposit_status 'deposit_paid'
+    // Standard full orders transition to 'paid' with deposit_status 'none'
+    const nextStatus = isMilestoneDeposit ? 'processing' : 'paid';
+    const nextDepositStatus = isMilestoneDeposit ? 'deposit_paid' : 'none';
+
     const { error: updateErr } = await admin
       .from('orders')
       .update({
-        status: 'paid',
+        status: nextStatus,
+        deposit_paid: amountPaid,
+        deposit_status: nextDepositStatus,
         updated_at: new Date().toISOString(),
       })
       .eq('id', orderId);
@@ -379,12 +427,12 @@ export class OrderService {
       }
     }
 
-    // 4. Dispatch Sovereign Order Confirmation & Digital Receipt via EmailService
+    // 4. Dispatch Sovereign Confirmation & Digital Receipt via EmailService
     try {
-      let recipientEmail = (order.shipping_address as any)?.recipient_email;
-      let recipientName = (order.shipping_address as any)?.recipient_name || 'Valued Collector';
+      let recipientEmail = order.customer_email || (order.shipping_address as any)?.recipient_email;
+      let recipientName = order.customer_name || (order.shipping_address as any)?.recipient_name || 'Valued Collector';
 
-      if (!recipientEmail && order.user_id && order.user_id !== '00000000-0000-0000-0000-000000000000') {
+      if (!recipientEmail && order.user_id && order.user_id !== '00000000-0000-0000-0000-000000000000' && order.user_id !== GUEST_USER_ID) {
         const { data: userProfile } = await admin
           .from('profiles')
           .select('email, full_name')
@@ -404,23 +452,180 @@ export class OrderService {
           total: Number(i.total_price),
         }));
 
-        await EmailService.sendOrderConfirmation({
-          orderNumber: order.order_number,
-          customerName: recipientName,
-          customerEmail: recipientEmail,
-          items: emailItems,
-          subtotal: Number(order.subtotal || 0),
-          shippingCost: Math.max(0, Number(order.total) - Number(order.subtotal || 0)),
-          total: Number(order.total),
-          shippingAddress: order.shipping_address as any,
-          trackingUrl: `https://dissafyt.com/account/orders?order_id=${order.id}`,
-        });
+        if (isMilestoneDeposit) {
+          await EmailService.sendPreorderDepositReceipt({
+            orderNumber: order.order_number,
+            orderId: order.id,
+            customerName: recipientName,
+            customerEmail: recipientEmail,
+            items: emailItems,
+            depositPaid: amountPaid,
+            balanceDue: balanceDue,
+            total: Number(order.total),
+            fulfillmentChoice: (order.fulfillment_choice as any) || 'courier',
+            shippingAddress: order.shipping_address as any,
+            trackingUrl: `https://dissafyt.com/account/orders?order_id=${order.id}`,
+          });
+        } else {
+          await EmailService.sendOrderConfirmation({
+            orderNumber: order.order_number,
+            customerName: recipientName,
+            customerEmail: recipientEmail,
+            items: emailItems,
+            subtotal: Number(order.subtotal || 0),
+            shippingCost: Math.max(0, Number(order.total) - Number(order.subtotal || 0)),
+            total: Number(order.total),
+            shippingAddress: order.shipping_address as any,
+            trackingUrl: `https://dissafyt.com/account/orders?order_id=${order.id}`,
+          });
+        }
       }
     } catch (mailErr) {
       console.warn('[OrderService] Warning: Failed to dispatch order confirmation email:', mailErr);
     }
 
     return { success: true };
+  }
+
+  /**
+   * Settles the outstanding balance of a pre-order (e.g. collected in-person at POS counter or online).
+   * Transitions deposit_status to 'fully_settled', updates financial ledgers, and dispatches the final receipt.
+   */
+  static async settleOrderBalance(params: {
+    orderId: string;
+    amountPaid: number;
+    paymentMethod?: string;
+    operatorEmail?: string;
+    notes?: string;
+  }): Promise<{ success: boolean; order?: OrderWithItems; error?: string }> {
+    const admin = getSupabaseAdminClient();
+
+    const { data: order, error: orderErr } = await admin
+      .from('orders')
+      .select('*, order_items(*)')
+      .eq('id', params.orderId)
+      .maybeSingle();
+
+    if (orderErr || !order) {
+      return { success: false, error: `Order not found: ${params.orderId}` };
+    }
+
+    const balanceDue = Number(order.balance_due || 0);
+    if (balanceDue <= 0 || order.deposit_status === 'fully_settled') {
+      return { success: false, error: `Order ${order.order_number} has no outstanding balance due.` };
+    }
+
+    if (params.amountPaid < balanceDue - 0.05) {
+      return {
+        success: false,
+        error: `Settlement amount underpaid: received R${params.amountPaid}, required R${balanceDue}`,
+      };
+    }
+
+    const previousDepositPaid = Number(order.deposit_paid || 0);
+    const newTotalPaid = previousDepositPaid + params.amountPaid;
+
+    const { data: updatedOrder, error: updateErr } = await admin
+      .from('orders')
+      .update({
+        deposit_paid: newTotalPaid,
+        balance_due: 0.00,
+        deposit_status: 'fully_settled',
+        status: 'completed',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', params.orderId)
+      .select('*, order_items(*)')
+      .single();
+
+    if (updateErr || !updatedOrder) {
+      return { success: false, error: updateErr?.message || 'Failed to update order settlement status.' };
+    }
+
+    // 1. Record payment ledger entry
+    try {
+      await admin.from('payments').insert({
+        user_id: order.user_id || GUEST_USER_ID,
+        provider: params.paymentMethod || 'pos_card',
+        amount: params.amountPaid,
+        currency: 'ZAR',
+        status: 'paid',
+        related_type: 'order',
+        related_id: order.id,
+        is_test: false,
+      });
+    } catch (payErr) {
+      console.warn('[OrderService] Warning: Failed to record payment ledger for balance settlement:', payErr);
+    }
+
+    // 2. Record audit log
+    try {
+      await AuditService.recordLog({
+        actor_email: params.operatorEmail || 'pos-counter@dissafyt.com',
+        actor_role: 'staff',
+        action: 'order.balance_settled',
+        entity_type: 'order',
+        entity_id: order.id,
+        entity_name: `Order ${order.order_number} Balance Settled`,
+        changes: {
+          balance_settled: params.amountPaid,
+          deposit_status: 'fully_settled',
+          payment_method: params.paymentMethod || 'pos_card',
+          notes: params.notes,
+        },
+      });
+    } catch (auditErr) {
+      console.warn('[OrderService] Audit log warning:', auditErr);
+    }
+
+    // 3. Dispatch final settlement receipt email
+    try {
+      let recipientEmail = updatedOrder.customer_email || (updatedOrder.shipping_address as any)?.recipient_email;
+      let recipientName = updatedOrder.customer_name || (updatedOrder.shipping_address as any)?.recipient_name || 'Valued Collector';
+
+      if (!recipientEmail && updatedOrder.user_id && updatedOrder.user_id !== GUEST_USER_ID) {
+        const { data: profile } = await admin
+          .from('profiles')
+          .select('email, full_name')
+          .eq('id', updatedOrder.user_id)
+          .maybeSingle();
+        if (profile?.email) {
+          recipientEmail = profile.email;
+          if (profile.full_name) recipientName = profile.full_name;
+        }
+      }
+
+      if (recipientEmail) {
+        const emailItems = (updatedOrder.order_items || []).map((i: any) => ({
+          name: i.product_name,
+          quantity: i.quantity,
+          price: Number(i.unit_price),
+          total: Number(i.total_price),
+        }));
+
+        await EmailService.sendPreorderBalanceSettledReceipt({
+          orderNumber: updatedOrder.order_number,
+          orderId: updatedOrder.id,
+          customerName: recipientName,
+          customerEmail: recipientEmail,
+          items: emailItems,
+          depositPaid: previousDepositPaid,
+          balanceSettled: params.amountPaid,
+          totalPaid: newTotalPaid,
+          paymentMethod: (params.paymentMethod || 'Card Machine').replace('_', ' ').toUpperCase(),
+          fulfillmentChoice: (updatedOrder.fulfillment_choice as any) || 'studio_collection',
+          collectionLocation: 'Dissafyt Studio - Bernie (1 Norwalk Way)',
+          trackingUrl: `https://dissafyt.com/account/orders?order_id=${updatedOrder.id}`,
+        });
+      }
+    } catch (mailErr) {
+      console.warn('[OrderService] Warning: Failed to dispatch balance settled receipt email:', mailErr);
+    }
+
+    return {
+      success: true,
+      order: updatedOrder as OrderWithItems,
+    };
   }
 
   /**

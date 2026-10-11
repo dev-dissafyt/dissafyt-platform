@@ -80,6 +80,41 @@ export interface AbandonedCartPayload {
   checkoutUrl: string;
 }
 
+export interface PreorderDepositReceiptPayload {
+  orderNumber: string;
+  orderId?: string;
+  customerName: string;
+  customerEmail: string;
+  items: OrderEmailItem[];
+  depositPaid: number;
+  balanceDue: number;
+  total: number;
+  fulfillmentChoice: 'courier' | 'studio_collection';
+  shippingAddress?: {
+    recipient_name?: string;
+    street_address?: string;
+    suburb?: string;
+    city?: string;
+    postal_code?: string;
+  };
+  trackingUrl?: string;
+}
+
+export interface PreorderBalanceSettledPayload {
+  orderNumber: string;
+  orderId?: string;
+  customerName: string;
+  customerEmail: string;
+  items: OrderEmailItem[];
+  depositPaid: number;
+  balanceSettled: number;
+  totalPaid: number;
+  paymentMethod: string;
+  fulfillmentChoice: 'courier' | 'studio_collection';
+  collectionLocation?: string;
+  trackingUrl?: string;
+}
+
 export class EmailService {
   private static readonly DEFAULT_FROM = 'Dissafyt Concierge <concierge@dissafyt.com>';
   private static readonly DEFAULT_REPLY_TO = 'letstalk@dissafyt.com';
@@ -568,6 +603,240 @@ export class EmailService {
       subject: `Reset your Dissafyt password`,
       html: this.renderShell(content, 'Reset your Dissafyt password securely.'),
       tags: [{ name: 'category', value: 'auth_password_reset' }],
+    });
+  }
+
+  /**
+   * 7. Pre-Order Milestone Deposit Receipt
+   * Dispatched when customer pays the upfront production deposit (e.g. 50%) for drop apparel.
+   */
+  static async sendPreorderDepositReceipt(payload: PreorderDepositReceiptPayload) {
+    const itemsRows = payload.items
+      .map(
+        (item) => `
+        <tr style="border-bottom:1px solid #27272a;">
+          <td style="padding:12px 0;vertical-align:top;">
+            <div style="font-weight:700;color:#ffffff;font-size:14px;">${item.name}</div>
+            ${item.variant ? `<div style="color:#a1a1aa;font-size:12px;margin-top:2px;">Size / Fit: ${item.variant}</div>` : ''}
+            <div style="color:#ff5500;font-size:11px;font-weight:700;letter-spacing:1px;text-transform:uppercase;margin-top:4px;">
+              &bull; Pre-Order Batch Production
+            </div>
+          </td>
+          <td align="center" style="padding:12px 8px;vertical-align:top;color:#d4d4d8;font-size:13px;font-family:monospace;">
+            &times;${item.quantity}
+          </td>
+          <td align="right" style="padding:12px 0;vertical-align:top;font-weight:700;color:#f4f4f5;font-size:14px;font-family:monospace;">
+            R${item.total.toFixed(2)}
+          </td>
+        </tr>
+      `
+      )
+      .join('');
+
+    const fulfillmentDetailsHtml =
+      payload.fulfillmentChoice === 'studio_collection'
+        ? `
+        <div style="background-color:#1c1917;border:1px solid #292524;border-radius:8px;padding:16px;margin-top:20px;">
+          <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;color:#ff5500;text-transform:uppercase;margin-bottom:6px;">
+            💈 Fulfillment: Free Studio Collection
+          </div>
+          <div style="color:#f4f4f5;font-weight:700;font-size:13px;">
+            Dissafyt Studio &bull; Cape Town Flagship
+          </div>
+          <div style="color:#a1a1aa;font-size:12px;margin-top:2px;">
+            1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570
+          </div>
+          <div style="color:#71717a;font-size:11px;margin-top:8px;border-top:1px solid #27272a;padding-top:8px;">
+            Your remaining balance of <strong style="color:#ffffff;">R${payload.balanceDue.toFixed(2)}</strong> will be settled upon garment collection at the Studio POS register (card or cash).
+          </div>
+        </div>
+      `
+        : `
+        <div style="background-color:#1c1917;border:1px solid #292524;border-radius:8px;padding:16px;margin-top:20px;">
+          <div style="font-size:10px;font-weight:800;letter-spacing:1.5px;color:#ff5500;text-transform:uppercase;margin-bottom:6px;">
+            🚚 Fulfillment: Nationwide Courier Delivery
+          </div>
+          <div style="color:#f4f4f5;font-weight:700;font-size:13px;">
+            ${payload.shippingAddress?.recipient_name || payload.customerName}
+          </div>
+          <div style="color:#a1a1aa;font-size:12px;margin-top:2px;">
+            ${payload.shippingAddress?.street_address || ''}, ${payload.shippingAddress?.suburb || ''}, ${payload.shippingAddress?.city || ''} ${payload.shippingAddress?.postal_code || ''}
+          </div>
+          <div style="color:#71717a;font-size:11px;margin-top:8px;border-top:1px solid #27272a;padding-top:8px;">
+            Your remaining balance of <strong style="color:#ffffff;">R${payload.balanceDue.toFixed(2)}</strong> will be settled online prior to courier dispatch.
+          </div>
+        </div>
+      `;
+
+    const trackingUrl = payload.trackingUrl || `https://dissafyt.com/account/orders?order=${payload.orderNumber}`;
+
+    const content = `
+      <div style="margin-bottom:24px;">
+        <span style="background-color:rgba(255,85,0,0.15);color:#ff5500;border:1px solid rgba(255,85,0,0.4);border-radius:4px;padding:4px 8px;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;">
+          Pre-Order Deposit Confirmed
+        </span>
+        <h2 style="color:#ffffff;font-size:24px;font-weight:800;margin:12px 0 6px;">
+          Drop Garment Queued For Production
+        </h2>
+        <p style="color:#a1a1aa;font-size:14px;margin:0;line-height:1.5;">
+          ${payload.customerName}, your milestone deposit for pre-order drop <strong style="color:#ffffff;">#${payload.orderNumber}</strong> has been secured. Your blanks are being sourced and added to the DTF printing queue.
+        </p>
+      </div>
+
+      <!-- Garments Table -->
+      <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom:20px;">
+        <thead>
+          <tr style="border-bottom:1px solid #3f3f46;">
+            <th align="left" style="padding-bottom:8px;font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:1px;">Garment</th>
+            <th align="center" style="padding-bottom:8px;font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:1px;">Qty</th>
+            <th align="right" style="padding-bottom:8px;font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:1px;">Full Value</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsRows}
+        </tbody>
+      </table>
+
+      <!-- Milestone Financial Breakdown Card -->
+      <div style="background-color:#18181b;border:1px solid #27272a;border-radius:8px;padding:18px;margin-bottom:20px;">
+        <div style="font-size:11px;font-weight:800;letter-spacing:1px;color:#a1a1aa;text-transform:uppercase;margin-bottom:12px;">
+          Milestone Financial Summary
+        </div>
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size:13px;line-height:1.8;">
+          <tr>
+            <td style="color:#a1a1aa;">Total Garment Value</td>
+            <td align="right" style="color:#ffffff;font-family:monospace;font-weight:700;">R${payload.total.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="color:#22c55e;font-weight:700;">Production Deposit Paid Today</td>
+            <td align="right" style="color:#22c55e;font-family:monospace;font-weight:800;font-size:14px;">- R${payload.depositPaid.toFixed(2)}</td>
+          </tr>
+          <tr style="border-top:1px solid #27272a;">
+            <td style="padding-top:8px;color:#ff5500;font-weight:800;">Outstanding Balance Due Upon Handover</td>
+            <td align="right" style="padding-top:8px;color:#ff5500;font-family:monospace;font-weight:800;font-size:16px;">R${payload.balanceDue.toFixed(2)}</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Fulfillment Card -->
+      ${fulfillmentDetailsHtml}
+
+      <!-- CTA -->
+      <div style="text-align:center;margin-top:28px;">
+        <a href="${trackingUrl}" style="background-color:#ff5500;color:#09090b;text-decoration:none;padding:14px 28px;border-radius:6px;font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase;display:inline-block;box-shadow:0 4px 14px rgba(255,85,0,0.35);">
+          Track Production Progress
+        </a>
+      </div>
+    `;
+
+    return this.send({
+      to: payload.customerEmail,
+      subject: `Pre-Order Confirmed #${payload.orderNumber} - Production Deposit Received`,
+      html: this.renderShell(content, `Pre-order #${payload.orderNumber} deposit received. Production begun.`),
+      tags: [{ name: 'category', value: 'preorder_deposit_receipt' }],
+    });
+  }
+
+  /**
+   * 8. Pre-Order Balance Settled Receipt
+   * Dispatched when the customer settles the remaining balance at the studio POS or prior to dispatch.
+   */
+  static async sendPreorderBalanceSettledReceipt(payload: PreorderBalanceSettledPayload) {
+    const itemsRows = payload.items
+      .map(
+        (item) => `
+        <tr style="border-bottom:1px solid #27272a;">
+          <td style="padding:10px 0;vertical-align:top;">
+            <div style="font-weight:700;color:#ffffff;font-size:14px;">${item.name}</div>
+            ${item.variant ? `<div style="color:#a1a1aa;font-size:12px;margin-top:2px;">Size / Fit: ${item.variant}</div>` : ''}
+          </td>
+          <td align="center" style="padding:10px 8px;vertical-align:top;color:#d4d4d8;font-size:13px;font-family:monospace;">
+            &times;${item.quantity}
+          </td>
+          <td align="right" style="padding:10px 0;vertical-align:top;font-weight:700;color:#f4f4f5;font-size:14px;font-family:monospace;">
+            R${item.total.toFixed(2)}
+          </td>
+        </tr>
+      `
+      )
+      .join('');
+
+    const trackingUrl = payload.trackingUrl || `https://dissafyt.com/account/orders?order=${payload.orderNumber}`;
+
+    const content = `
+      <div style="margin-bottom:24px;">
+        <span style="background-color:rgba(34,197,94,0.15);color:#22c55e;border:1px solid rgba(34,197,94,0.4);border-radius:4px;padding:4px 8px;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;">
+          Balance Settled &bull; Handover Complete
+        </span>
+        <h2 style="color:#ffffff;font-size:24px;font-weight:800;margin:12px 0 6px;">
+          Order #${payload.orderNumber} Fully Cleared
+        </h2>
+        <p style="color:#a1a1aa;font-size:14px;margin:0;line-height:1.5;">
+          ${payload.customerName}, your remaining balance has been received. Your pre-order is 100% settled and completed.
+        </p>
+      </div>
+
+      <!-- Garments Table -->
+      <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="margin-bottom:20px;">
+        <thead>
+          <tr style="border-bottom:1px solid #3f3f46;">
+            <th align="left" style="padding-bottom:8px;font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:1px;">Garment</th>
+            <th align="center" style="padding-bottom:8px;font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:1px;">Qty</th>
+            <th align="right" style="padding-bottom:8px;font-size:11px;color:#71717a;text-transform:uppercase;letter-spacing:1px;">Total</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${itemsRows}
+        </tbody>
+      </table>
+
+      <!-- Settlement Breakdown Card -->
+      <div style="background-color:#18181b;border:1px solid #27272a;border-radius:8px;padding:18px;margin-bottom:20px;">
+        <div style="font-size:11px;font-weight:800;letter-spacing:1px;color:#a1a1aa;text-transform:uppercase;margin-bottom:12px;">
+          Final Payment Ledger
+        </div>
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size:13px;line-height:1.8;">
+          <tr>
+            <td style="color:#a1a1aa;">Initial Deposit Paid</td>
+            <td align="right" style="color:#ffffff;font-family:monospace;">R${payload.depositPaid.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="color:#a1a1aa;">Balance Settled (${payload.paymentMethod})</td>
+            <td align="right" style="color:#22c55e;font-family:monospace;font-weight:700;">R${payload.balanceSettled.toFixed(2)}</td>
+          </tr>
+          <tr style="border-top:1px solid #27272a;">
+            <td style="padding-top:8px;color:#ffffff;font-weight:700;">Total Paid to Date</td>
+            <td align="right" style="padding-top:8px;color:#22c55e;font-family:monospace;font-weight:800;font-size:15px;">R${payload.totalPaid.toFixed(2)}</td>
+          </tr>
+          <tr>
+            <td style="color:#a1a1aa;font-size:12px;">Remaining Balance</td>
+            <td align="right" style="color:#22c55e;font-family:monospace;font-weight:700;font-size:13px;">R0.00 (Fully Settled)</td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="background-color:#0c0a09;border:1px solid #1f1f23;border-radius:8px;padding:16px;text-align:center;">
+        <div style="color:#d4d4d8;font-size:13px;font-weight:600;">
+          Thank you for backing Dissafyt Streetwear culture.
+        </div>
+        <div style="color:#71717a;font-size:11px;margin-top:4px;">
+          Wear your pieces with pride. If you need any size adjustments or support, reply to this email anytime.
+        </div>
+      </div>
+
+      <!-- CTA -->
+      <div style="text-align:center;margin-top:24px;">
+        <a href="${trackingUrl}" style="background-color:#ff5500;color:#09090b;text-decoration:none;padding:12px 24px;border-radius:6px;font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase;display:inline-block;">
+          View Order History
+        </a>
+      </div>
+    `;
+
+    return this.send({
+      to: payload.customerEmail,
+      subject: `Order #${payload.orderNumber} Fully Settled - Handover Receipt`,
+      html: this.renderShell(content, `Order #${payload.orderNumber} is fully settled. Thank you for shopping with Dissafyt.`),
+      tags: [{ name: 'category', value: 'preorder_balance_settled' }],
     });
   }
 }

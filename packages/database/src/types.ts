@@ -52,6 +52,7 @@ export interface Product {
   is_preorder?: boolean;
   preorder_message?: string | null;
   preorder_target?: number | null;
+  preorder_deposit_pct?: number;
   created_at: string;
   updated_at: string;
 }
@@ -146,13 +147,24 @@ export type OrderStatus =
   | 'cancelled'
   | 'refunded';
 
+export type DepositStatus = 'none' | 'deposit_paid' | 'fully_settled' | 'refunded';
+export type FulfillmentChoice = 'courier' | 'studio_collection';
+
 export interface Order {
   id: string;
-  user_id: string;
+  user_id?: string | null;
   order_number: string;
   status: OrderStatus;
   subtotal: number;
   total: number;
+  deposit_paid?: number;
+  balance_due?: number;
+  deposit_status?: DepositStatus;
+  fulfillment_choice?: FulfillmentChoice;
+  collection_location_id?: string;
+  customer_email?: string | null;
+  customer_phone?: string | null;
+  customer_name?: string | null;
   shipping_address?: Record<string, unknown> | null;
   created_at: string;
   updated_at: string;
@@ -168,6 +180,8 @@ export interface OrderItem {
   quantity: number;
   total_price: number;
   is_preorder?: boolean;
+  deposit_amount?: number;
+  balance_amount?: number;
 }
 
 // Barbershop Service types

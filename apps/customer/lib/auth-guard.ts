@@ -22,7 +22,10 @@ export async function requireAdminAuth(
   let token = authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null;
 
   if (!token) {
-    token = request.cookies.get('dissafyt_admin_token')?.value || null;
+    token =
+      request.cookies.get('dissafyt_admin_token')?.value ||
+      request.cookies.get('dissafyt_pos_token')?.value ||
+      null;
   }
 
   if (!token) {

@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { items, shippingAddress } = body;
+    const { items, shippingAddress, fulfillmentChoice, collectionLocationId } = body;
 
     if (!items || !items.length || !shippingAddress) {
       return NextResponse.json({ error: 'Items and shippingAddress are required' }, { status: 400 });
@@ -79,13 +79,17 @@ export async function POST(request: NextRequest) {
 
     const recipientEmail = (shippingAddress.recipient_email || '').trim();
     const recipientPhone = (shippingAddress.recipient_phone || '').trim();
+    const recipientName = (shippingAddress.recipient_name || '').trim();
 
     const result = await OrderService.createOrder({
       user_id: userId,
       customer_email: recipientEmail,
       customer_phone: recipientPhone,
+      customer_name: recipientName || null,
       items,
       shipping_address: shippingAddress,
+      fulfillment_choice: fulfillmentChoice || 'courier',
+      collection_location_id: collectionLocationId || 'loc-cpt-flagship',
     });
 
     if (!result.success || !result.order) {
@@ -94,6 +98,18 @@ export async function POST(request: NextRequest) {
 
     const order = result.order;
 
+    // Calculate upfront amount to charge today:
+    // If order has balance_due, charge only the deposit today
+    const balanceDue = Number(order.balance_due || 0);
+    const amountToPayToday = balanceDue > 0
+      ? Math.max(0, Number(order.total) - balanceDue)
+      : Number(order.total);
+
+    const isPreorder = balanceDue > 0;
+    const itemName = isPreorder
+      ? `Dissafyt Pre-Order Deposit #${order.order_number}`
+      : `Dissafyt Order #${order.order_number}`;
+
     // Generate PayFast payload with MD5 signature
     const isProd = process.env.NODE_ENV === 'production';
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL
@@ -101,7 +117,6 @@ export async function POST(request: NextRequest) {
     const merchantId = process.env.PAYFAST_MERCHANT_ID || process.env.NEXT_PUBLIC_PAYFAST_MERCHANT_ID || '17675995';
 
     // Extract customer details from shippingAddress for PayFast prefill
-    const recipientName = (shippingAddress.recipient_name || '').trim();
     const nameParts = recipientName ? recipientName.split(' ') : ['Customer'];
     const firstName = nameParts[0] || 'Customer';
     const lastName = nameParts.slice(1).join(' ') || '';
@@ -117,8 +132,8 @@ export async function POST(request: NextRequest) {
       ...(recipientEmail ? { email_address: recipientEmail } : {}),
       ...(recipientPhone ? { cell_number: recipientPhone } : {}),
       m_payment_id: order.id,
-      amount: Number(order.total).toFixed(2),
-      item_name: `Dissafyt Order ${order.order_number}`,
+      amount: amountToPayToday.toFixed(2),
+      item_name: itemName,
       custom_str1: order.id,
       custom_str2: userId,
     };
@@ -128,6 +143,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       order,
       payfast,
+      amountDueToday: amountToPayToday,
+      balanceDue,
     }, { status: 201 });
   } catch (err: any) {
     return NextResponse.json({ error: err.message || 'Internal server error' }, { status: 500 });

@@ -164,6 +164,7 @@ export default function ProductDetailPage() {
       slug: product.slug || slug,
       isPreorder: Boolean(product.is_preorder),
       preorderMessage: product.preorder_message || null,
+      preorderDepositPct: (product as any).preorder_deposit_pct ?? 50,
       color: selectedVariant?.color || selectedColor || null,
       colorHex: selectedVariant?.color_hex || null,
       size: selectedVariant?.size || selectedVariant?.name || 'Standard',

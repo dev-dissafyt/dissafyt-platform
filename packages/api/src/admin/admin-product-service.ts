@@ -25,6 +25,7 @@ export interface CreateProductInput {
   is_preorder?: boolean;
   preorder_message?: string | null;
   preorder_target?: number | null;
+  preorder_deposit_pct?: number | null;
   variants?: ProductVariantInput[];
 }
 
@@ -40,6 +41,7 @@ export interface UpdateProductInput {
   is_preorder?: boolean;
   preorder_message?: string | null;
   preorder_target?: number | null;
+  preorder_deposit_pct?: number | null;
   variants?: ProductVariantInput[];
 }
 
@@ -123,6 +125,9 @@ export class AdminProductService {
           is_preorder: Boolean(input.is_preorder),
           preorder_message: input.preorder_message || null,
           preorder_target: input.preorder_target ? Number(input.preorder_target) : null,
+          preorder_deposit_pct: input.preorder_deposit_pct !== undefined && input.preorder_deposit_pct !== null
+            ? Math.min(Math.max(Number(input.preorder_deposit_pct), 10), 100)
+            : 50,
         })
         .select()
         .single();
@@ -206,6 +211,11 @@ export class AdminProductService {
       }
       if (input.preorder_target !== undefined) {
         updateData.preorder_target = input.preorder_target ? Number(input.preorder_target) : null;
+      }
+      if (input.preorder_deposit_pct !== undefined) {
+        updateData.preorder_deposit_pct = input.preorder_deposit_pct !== null
+          ? Math.min(Math.max(Number(input.preorder_deposit_pct), 10), 100)
+          : 50;
       }
 
       const { data, error } = await admin

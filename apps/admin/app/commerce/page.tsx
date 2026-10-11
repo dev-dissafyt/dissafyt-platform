@@ -32,6 +32,7 @@ interface Product {
   is_preorder?: boolean;
   preorder_message?: string | null;
   preorder_target?: number | null;
+  preorder_deposit_pct?: number | null;
   variants: Variant[];
 }
 
@@ -76,6 +77,7 @@ export default function AdminCommercePage() {
   const [editIsPreorder, setEditIsPreorder] = useState(false);
   const [editPreorderMessage, setEditPreorderMessage] = useState('');
   const [editPreorderTarget, setEditPreorderTarget] = useState('');
+  const [editPreorderDepositPct, setEditPreorderDepositPct] = useState('50');
   const [editImages, setEditImages] = useState<string[]>([]);
   const [editManualUrl, setEditManualUrl] = useState('');
   const [editUploadingImages, setEditUploadingImages] = useState(false);
@@ -104,6 +106,7 @@ export default function AdminCommercePage() {
   const [isPreorder, setIsPreorder] = useState(false);
   const [preorderMessage, setPreorderMessage] = useState('Batch 01: Ships 2–3 weeks from drop close');
   const [preorderTarget, setPreorderTarget] = useState('50');
+  const [preorderDepositPct, setPreorderDepositPct] = useState('50');
 
   // Colorways & Size Matrix (Add Product)
   const [selectedColorways, setSelectedColorways] = useState<StreetwearColorway[]>([]);
@@ -400,6 +403,7 @@ export default function AdminCommercePage() {
           is_preorder: isPreorder,
           preorder_message: isPreorder ? preorderMessage : null,
           preorder_target: isPreorder && preorderTarget ? parseInt(preorderTarget, 10) : null,
+          preorder_deposit_pct: isPreorder && preorderDepositPct ? parseInt(preorderDepositPct, 10) : 50,
           variants: variantsToSubmit,
         }),
       });
@@ -416,6 +420,7 @@ export default function AdminCommercePage() {
         setIsPreorder(false);
         setPreorderMessage('Batch 01: Ships 2–3 weeks from drop close');
         setPreorderTarget('50');
+        setPreorderDepositPct('50');
         setShowAddModal(false);
         loadData();
       } else {
@@ -462,6 +467,7 @@ export default function AdminCommercePage() {
     setEditIsPreorder(Boolean(prod.is_preorder));
     setEditPreorderMessage(prod.preorder_message || '');
     setEditPreorderTarget(prod.preorder_target ? String(prod.preorder_target) : '');
+    setEditPreorderDepositPct(prod.preorder_deposit_pct ? String(prod.preorder_deposit_pct) : '50');
     setEditImages(prod.images || []);
 
     const existingColorways: StreetwearColorway[] = [];
@@ -520,6 +526,7 @@ export default function AdminCommercePage() {
           is_preorder: editIsPreorder,
           preorder_message: editIsPreorder ? editPreorderMessage : null,
           preorder_target: editIsPreorder && editPreorderTarget ? parseInt(editPreorderTarget, 10) : null,
+          preorder_deposit_pct: editIsPreorder && editPreorderDepositPct ? parseInt(editPreorderDepositPct, 10) : 50,
           variants: editVariants.map((v) => ({
             id: v.id,
             name: v.name,
@@ -884,7 +891,7 @@ export default function AdminCommercePage() {
               </label>
 
               {isPreorder && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-amber-500/20">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-amber-500/20">
                   <div className="space-y-1">
                     <Label className="text-xs text-stone-300">Estimated Dispatch Notice</Label>
                     <Input
@@ -895,7 +902,7 @@ export default function AdminCommercePage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-stone-300">Batch Target Units (Gauge Drop Interest)</Label>
+                    <Label className="text-xs text-stone-300">Batch Target Units (Drop Goal)</Label>
                     <Input
                       type="number"
                       value={preorderTarget}
@@ -903,6 +910,19 @@ export default function AdminCommercePage() {
                       placeholder="e.g. 50"
                       className="bg-stone-950 border-stone-700 text-xs"
                     />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-amber-400 font-bold">Milestone Deposit %</Label>
+                    <Input
+                      type="number"
+                      min={10}
+                      max={100}
+                      value={preorderDepositPct}
+                      onChange={(e) => setPreorderDepositPct(e.target.value)}
+                      placeholder="50"
+                      className="bg-stone-950 border-amber-500/40 text-amber-400 font-bold text-xs"
+                    />
+                    <p className="text-[10px] text-stone-400">Default 50% upfront deposit</p>
                   </div>
                 </div>
               )}
@@ -1418,7 +1438,7 @@ export default function AdminCommercePage() {
               </label>
 
               {editIsPreorder && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-amber-500/20">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-amber-500/20">
                   <div className="space-y-1">
                     <Label className="text-xs text-stone-300">Estimated Dispatch Notice</Label>
                     <Input
@@ -1429,7 +1449,7 @@ export default function AdminCommercePage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-stone-300">Batch Target Units (Gauge Drop Interest)</Label>
+                    <Label className="text-xs text-stone-300">Batch Target Units (Drop Goal)</Label>
                     <Input
                       type="number"
                       value={editPreorderTarget}
@@ -1437,6 +1457,19 @@ export default function AdminCommercePage() {
                       placeholder="e.g. 50"
                       className="bg-stone-950 border-stone-700 text-xs"
                     />
+                  </div>
+                  <div className="space-y-1">
+                    <Label className="text-xs text-amber-400 font-bold">Milestone Deposit %</Label>
+                    <Input
+                      type="number"
+                      min={10}
+                      max={100}
+                      value={editPreorderDepositPct}
+                      onChange={(e) => setEditPreorderDepositPct(e.target.value)}
+                      placeholder="50"
+                      className="bg-stone-950 border-amber-500/40 text-amber-400 font-bold text-xs"
+                    />
+                    <p className="text-[10px] text-stone-400">Default 50% upfront deposit</p>
                   </div>
                 </div>
               )}
