@@ -186,9 +186,14 @@ export default async function HomePage() {
   return (
     <div className="space-y-16 sm:space-y-24 pb-24 overflow-hidden bg-black text-white">
       {/* ============================================================== */}
-      {/* 1. SECTION 1: THE BARBERSHOP EXPERIENCE (80-90vh)              */}
+      {/* 1. HERO LANDING: THE FOUNDER'S PASS (85-90vh)                  */}
       {/* ============================================================== */}
-      <section className="relative min-h-[85vh] lg:h-[88vh] flex flex-col justify-between container mx-auto max-w-7xl px-4 sm:px-6 pt-6 sm:pt-8 pb-4">
+      <FounderPassBanner />
+
+      {/* ============================================================== */}
+      {/* 2. SECTION 2: THE BARBERSHOP EXPERIENCE (80-90vh)              */}
+      {/* ============================================================== */}
+      <section id="barbershop-section" className="relative min-h-[85vh] lg:h-[88vh] flex flex-col justify-between container mx-auto max-w-7xl px-4 sm:px-6 pt-6 sm:pt-8 pb-4">
         {/* Ambient Top Glow */}
         <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-amber-500/10 blur-[130px] rounded-full pointer-events-none" />
 
@@ -357,14 +362,9 @@ export default async function HomePage() {
       </section>
 
       {/* ============================================================== */}
-      {/* 2. THE FOUNDER'S BUILDOUT CAPITAL BANNER (12 CUTS FOR R1,200)  */}
+      {/* 3. SECTION 3: THE STREETWEAR DROP ROOM (80-90vh - 4x1 GRID)   */}
       {/* ============================================================== */}
-      <FounderPassBanner />
-
-      {/* ============================================================== */}
-      {/* 3. SECTION 2: THE STREETWEAR DROP ROOM (80-90vh - 4x1 GRID)   */}
-      {/* ============================================================== */}
-      <section className="relative min-h-[85vh] lg:h-[88vh] flex flex-col justify-between container mx-auto max-w-7xl px-4 sm:px-6 pt-6 sm:pt-8 pb-4">
+      <section id="streetwear-section" className="relative min-h-[85vh] lg:h-[88vh] flex flex-col justify-between container mx-auto max-w-7xl px-4 sm:px-6 pt-6 sm:pt-8 pb-4">
         {/* Ambient Orange Glow */}
         <div className="absolute top-1/3 right-1/4 w-[500px] h-[300px] bg-orange-600/10 blur-[130px] rounded-full pointer-events-none" />
 
