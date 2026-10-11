@@ -14,18 +14,23 @@ import {
   MapPin,
   CalendarCheck,
   Layers,
+  Crown,
+  Check,
+  Truck,
 } from 'lucide-react';
-import { SubscriptionCarousel } from './components/subscription-carousel';
+import { FounderPassBanner } from './components/founder-pass-banner';
 import { FaqAccordion } from './components/faq-accordion';
-import { AdminBarbershopService, BarbershopService } from '@dissafyt/api';
+import { AdminBarbershopService, BarbershopService, AdminProductService } from '@dissafyt/api';
 
 export const dynamic = 'force-dynamic';
 
 export default async function HomePage() {
-  const [allServices, locations] = await Promise.all([
+  const [allServices, locations, allProducts] = await Promise.all([
     AdminBarbershopService.listServices().catch(() => []),
     BarbershopService.listLocations().catch(() => []),
+    AdminProductService.listProducts().catch(() => []),
   ]);
+
   const flagship = locations.find((l) => l.is_flagship) || locations[0] || {
     id: 'loc-cpt-flagship',
     name: 'Dissafyt Studio - Bernie',
@@ -35,450 +40,525 @@ export default async function HomePage() {
     phone: '+27 818082570',
     operating_hours_display: 'Tue-Sat: 09:00 - 19:00 | Sun: 10:00 - 16:00 | Mon: By Appointment',
   };
-  const activeServices = (allServices || []).filter((s) => s.is_active && !s.is_subscription);
-  const displayServices = activeServices.length > 0 ? activeServices.slice(0, 3) : [
+
+  // 1. Curate 4 Normal Haircut Services
+  const normalCuts = [
     {
-      id: 'default-1',
-      name: 'The Executive Combo',
-      description: 'Full service transformation: razor skin fade, beard architectural lineup, hot towel sculpt, and scalp treatment.',
-      price: 220,
-      duration_minutes: 45,
-    },
-    {
-      id: 'default-2',
+      id: 'cut-skin-fade',
       name: 'The Ace Skin Fade',
-      description: 'Zero-guard skin fade, taper fade, or burst fade with razor edge crisping and matte styling clay.',
+      duration: '30 min',
       price: 120,
-      duration_minutes: 30,
+      tag: 'POPULAR CHOICE',
+      description: 'Zero-guard razor skin fade, taper fade, or burst fade with crisp perimeter lineup and matte clay styling.',
+      href: '/book',
     },
     {
-      id: 'default-3',
+      id: 'cut-executive-combo',
+      name: 'The Executive Combo',
+      duration: '45 min',
+      price: 220,
+      featured: true,
+      tag: 'FLAGSHIP SIGNATURE',
+      description: 'Full transformation: master razor skin fade, architectural beard sculpting, and essential oil steamed towel.',
+      href: '/book',
+    },
+    {
+      id: 'cut-beard-sculpt',
       name: 'Beard Sculpt & Towel',
-      description: 'Beard shaping, razor perimeter definition, steamed essential oil towel, and organic beard butter massage.',
+      duration: '30 min',
       price: 100,
-      duration_minutes: 30,
+      tag: 'BEARD CARE',
+      description: 'Crisp razor boundary shaping, mustache trim, steamed hot towel therapy, and organic beard butter massage.',
+      href: '/book',
+    },
+    {
+      id: 'cut-precision-master',
+      name: 'Master Precision Cut',
+      duration: '35 min',
+      price: 150,
+      tag: 'TEXTURE & CRAFT',
+      description: 'Expert shear texture work, taper fade finish, razor neck cleanup, and luxury styling pomade.',
+      href: '/book',
     },
   ];
 
-  const marqueeItems = [
-    'ACE OF FYT BARBERSHOP',
-    'CAPE TOWN FLAGSHIP',
-    'DISSAFYT GARMENT LAB',
-    'ZERO QUEUE WAITING',
-    '280GSM HEAVYWEIGHT STREETWEAR',
-    'THE EXECUTIVE COMBO',
-    'HOT TOWEL SCULPTING',
-    'LIMITED CAPSULE DROPS',
-    'MOTHER CITY CULTURE',
+  // 2. Curate 4 Haircut Membership Options
+  const membershipOptions = [
+    {
+      id: 'mem-solo',
+      name: 'The Solo Pass',
+      price: 100,
+      period: '/mo',
+      tag: 'ESSENTIAL',
+      perk: '1 Master Haircut per month (R100/cut)',
+      details: 'Guaranteed chair time, priority booking, cancel anytime.',
+      href: '/book',
+    },
+    {
+      id: 'mem-regular',
+      name: 'The Regular Pass',
+      price: 190,
+      period: '/mo',
+      featured: true,
+      tag: 'MOST POPULAR',
+      perk: '2 Master Haircuts per month (R95/cut)',
+      details: 'Skip the queue, hot towel finish, priority Saturday chairs.',
+      href: '/book',
+    },
+    {
+      id: 'mem-executive',
+      name: 'The Executive Club',
+      price: 350,
+      period: '/mo',
+      tag: 'VIP SUITE',
+      perk: '2 Full Combos (Hair + Beard Sculpt)',
+      details: 'Hot towel sculpting, scalp therapy, and private espresso lounge.',
+      href: '/book',
+    },
+    {
+      id: 'mem-father-son',
+      name: 'Father & Son Pass',
+      price: 190,
+      period: '/mo',
+      tag: 'FAMILY DUAL',
+      perk: '1 Adult Cut + 1 Junior Cut per month',
+      details: 'Side-by-side chair sessions, priority weekend booking.',
+      href: '/book',
+    },
   ];
+
+  // 3. Curate Exactly 4 Clothes for 4x1 Shop Grid
+  const activeProducts = (allProducts || []).filter((p) => p.is_active);
+  const fallbackGarments = [
+    {
+      id: 'garment-1',
+      slug: 'dissafyt-280gsm-heavyweight-hoodie',
+      name: '280GSM Studio Heavyweight Hoodie',
+      base_price: 650,
+      is_preorder: true,
+      preorder_target: 50,
+      preorder_claimed_count: 34,
+      preorder_deposit_pct: 50,
+      images: ['/images/hero-collaboration.png'],
+      description: 'Ultra-dense 280GSM French terry with permanent DTF back artwork and double-lined hood.',
+    },
+    {
+      id: 'garment-2',
+      slug: 'ace-of-fyt-acid-wash-tee',
+      name: 'Ace of Fyt Acid-Wash Boxy Tee',
+      base_price: 350,
+      is_preorder: true,
+      preorder_target: 50,
+      preorder_claimed_count: 42,
+      preorder_deposit_pct: 50,
+      images: ['/images/barber-tools.png'],
+      description: 'Custom mineral-washed ring-spun cotton tee with embroidered gold barbershop crest.',
+    },
+    {
+      id: 'garment-3',
+      slug: 'cpt-garment-lab-oversized-tee',
+      name: 'Garment Lab Capsule Oversized Tee',
+      base_price: 380,
+      is_preorder: true,
+      preorder_target: 50,
+      preorder_claimed_count: 26,
+      preorder_deposit_pct: 50,
+      images: ['/images/barber-hero.png'],
+      description: 'Drop-shoulder silhouette with high-density direct-to-garment chest typography.',
+    },
+    {
+      id: 'garment-4',
+      slug: 'bernie-french-terry-crewneck',
+      name: 'Bernie 1970 French Terry Crewneck',
+      base_price: 550,
+      is_preorder: true,
+      preorder_target: 50,
+      preorder_claimed_count: 38,
+      preorder_deposit_pct: 50,
+      images: ['/images/father-son.png'],
+      description: 'Heavyweight ribbed cuffs and hem with tonal Bernadino Heights studio coordinates.',
+    },
+  ];
+
+  // Merge active products with fallbacks to guarantee 4 items
+  const displayProducts = [...activeProducts, ...fallbackGarments].slice(0, 4);
 
   return (
-    <div className="space-y-20 pb-24 overflow-hidden bg-black">
-      {/* 1. BILLBOARD HERO SECTION */}
-      <section className="relative pt-12 pb-16 sm:pt-20 sm:pb-28 border-b border-zinc-900 overflow-hidden">
-        {/* Ambient Gold Glow backdrop */}
-        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[350px] bg-amber-500/10 blur-[130px] rounded-full pointer-events-none" />
+    <div className="space-y-16 sm:space-y-24 pb-24 overflow-hidden bg-black text-white">
+      {/* ============================================================== */}
+      {/* 1. SECTION 1: THE BARBERSHOP EXPERIENCE (80-90vh)              */}
+      {/* ============================================================== */}
+      <section className="relative min-h-[85vh] lg:h-[88vh] flex flex-col justify-between container mx-auto max-w-7xl px-4 sm:px-6 pt-6 sm:pt-8 pb-4">
+        {/* Ambient Top Glow */}
+        <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-amber-500/10 blur-[130px] rounded-full pointer-events-none" />
 
-        <div className="container mx-auto max-w-7xl px-4 sm:px-6 relative z-10">
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-12 lg:gap-8 items-center">
-            {/* Left: Billboard Copy */}
-            <div className="lg:col-span-7 space-y-8 text-left">
-              {/* Mother City / Flagship pill */}
-              <div className="inline-flex items-center space-x-2 rounded-full border border-amber-500/30 bg-amber-500/10 px-4 py-1.5 text-xs font-semibold text-amber-400">
-                <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
-                <span className="tracking-wider uppercase font-mono text-[11px]">
-                  CAPE TOWN FLAGSHIP // DUAL PILLAR ECOSYSTEM
-                </span>
-              </div>
-
-              {/* Massive Billboard Headline */}
-              <h1 className="font-display text-5xl sm:text-7xl lg:text-8xl font-black uppercase tracking-tight text-white leading-[0.92]">
-                THE SHARPEST CUT. <br />
-                <span className="text-transparent bg-clip-text bg-gradient-to-r from-amber-400 via-amber-500 to-amber-200">
-                  THE HEAVIEST DRIP.
-                </span>
-              </h1>
-
-              {/* Editorial Subtitle */}
-              <p className="text-base sm:text-xl text-zinc-300 max-w-xl font-light leading-relaxed">
-                Cape Town&apos;s definitive culture house. Master barbering chair reservations at{' '}
-                <span className="text-white font-medium">Ace of Fyt</span> paired with limited-edition heavyweight streetwear engineered in our{' '}
-                <span className="text-white font-medium">Dissafyt Studio</span>.
-              </p>
-
-              {/* Dual Action CTAs */}
-              <div className="flex flex-wrap items-center gap-4 pt-2">
-                <Link
-                  href="/book"
-                  className="group inline-flex items-center justify-center rounded-xl bg-amber-500 hover:bg-amber-400 px-8 py-4 text-sm font-extrabold uppercase tracking-wider text-black transition-all shadow-xl shadow-amber-500/20 hover:shadow-amber-500/30 hover:scale-[1.02]"
-                >
-                  <Scissors className="mr-2 h-4 w-4 stroke-[2.5]" />
-                  <span>Secure Your Chair</span>
-                  <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
-                </Link>
-
-                <Link
-                  href="/shop"
-                  className="group inline-flex items-center justify-center rounded-xl border-2 border-white/80 hover:border-white bg-transparent hover:bg-white px-8 py-4 text-sm font-extrabold uppercase tracking-wider text-white hover:text-black transition-all hover:scale-[1.02]"
-                >
-                  <ShoppingBag className="mr-2 h-4 w-4" />
-                  <span>Enter Drop Room</span>
-                </Link>
-              </div>
-
-              {/* Trust Metric Strip */}
-              <div className="grid grid-cols-3 gap-4 pt-6 border-t border-zinc-900/90 text-left">
-                <div>
-                  <div className="font-display text-2xl sm:text-3xl font-bold text-white">0 MIN</div>
-                  <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-500 mt-0.5">
-                    Member Queue Wait
-                  </div>
-                </div>
-                <div>
-                  <div className="font-display text-2xl sm:text-3xl font-bold text-white">280 GSM</div>
-                  <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-500 mt-0.5">
-                    Heavyweight Garments
-                  </div>
-                </div>
-                <div>
-                  <div className="font-display text-2xl sm:text-3xl font-bold text-amber-400">100%</div>
-                  <div className="text-[11px] font-mono uppercase tracking-wider text-zinc-500 mt-0.5">
-                    Cape Town Handcrafted
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: High-Impact Editorial Imagery Grid */}
-            <div className="lg:col-span-5 relative">
-              <div className="relative mx-auto max-w-md lg:max-w-none">
-                {/* Main Hero Card */}
-                <div className="relative rounded-3xl border border-zinc-800 bg-zinc-950/80 p-3 shadow-2xl backdrop-blur group">
-                  <div className="relative aspect-[4/5] sm:aspect-square w-full overflow-hidden rounded-2xl bg-zinc-900">
-                    <Image
-                      src="/images/barber-hero.png"
-                      alt="Ace of Fyt Barbershop Cape Town"
-                      fill
-                      className="object-cover object-center brightness-95 contrast-105 transition-transform duration-700 group-hover:scale-105"
-                      priority
-                    />
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-black/20" />
-
-                    {/* Badge Overlay */}
-                    <div className="absolute top-4 left-4 inline-flex items-center space-x-1.5 rounded-full bg-black/70 backdrop-blur border border-zinc-700/80 px-3 py-1 text-[10px] font-mono uppercase tracking-wider text-white">
-                      <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-ping" />
-                      <span>CHAIR 01 // LIVE IN CPT</span>
-                    </div>
-
-                    <div className="absolute bottom-4 left-4 right-4 text-left">
-                      <span className="text-[11px] font-mono tracking-widest uppercase text-amber-400 font-bold">
-                        Ace of Fyt Grooming
-                      </span>
-                      <h3 className="font-display text-xl font-bold text-white mt-0.5">
-                        Architectural Lineup & Hot Towel Finish
-                      </h3>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Floating Micro-Badge */}
-                <div className="absolute -bottom-6 -left-6 hidden sm:flex items-center space-x-3 rounded-2xl border border-amber-500/30 bg-zinc-900/95 p-3.5 shadow-2xl backdrop-blur">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-black">
-                    <Flame className="h-5 w-5 fill-black" />
-                  </div>
-                  <div className="text-left">
-                    <p className="text-xs font-bold text-white">Dissafyt Garment Lab</p>
-                    <p className="text-[11px] text-zinc-400 font-mono">Batch 01 Released in CPT</p>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 2. INFINITE MARQUEE TICKER TAPE */}
-      <div className="relative w-full overflow-hidden bg-amber-500 py-3.5 -rotate-1 shadow-lg shadow-amber-500/10">
-        <div className="animate-marquee flex items-center whitespace-nowrap">
-          {[...marqueeItems, ...marqueeItems, ...marqueeItems].map((item, idx) => (
-            <div key={idx} className="flex items-center mx-6">
-              <span className="text-xs sm:text-sm font-black tracking-widest uppercase text-black font-display">
-                {item}
+        {/* Section Header */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-zinc-900 pb-4 relative z-10">
+          <div className="space-y-1.5">
+            <div className="flex items-center space-x-2">
+              <span className="h-2 w-2 rounded-full bg-amber-400 animate-pulse" />
+              <span className="text-[10px] sm:text-[11px] font-mono tracking-widest uppercase font-bold text-amber-400">
+                ACE OF FYT // MASTER GROOMING STUDIO &bull; CAPE TOWN
               </span>
-              <span className="mx-6 text-black/50 text-xs font-black">★</span>
+              <span className="hidden md:inline-block text-[10px] font-mono text-zinc-500">
+                1 Norwalk Way, Bernadino Heights
+              </span>
             </div>
-          ))}
-        </div>
-      </div>
-
-      {/* 3. TWO PILLARS BENTO SHOWCASE */}
-      <section className="container mx-auto max-w-7xl px-4 sm:px-6">
-        <div className="text-center max-w-2xl mx-auto mb-12 space-y-2">
-          <span className="text-[11px] font-mono uppercase tracking-widest text-amber-400 font-bold">
-            THE DUAL PILLARS
-          </span>
-          <h2 className="font-display text-3xl sm:text-5xl font-black uppercase text-white tracking-tight">
-            Crafted for the Exclusive
-          </h2>
-          <p className="text-sm sm:text-base text-zinc-400">
-            Engineered at the intersection of artisanal South African grooming and high-density streetwear.
-          </p>
+            <h1 className="font-display text-3xl sm:text-5xl font-black uppercase tracking-tight text-white leading-none">
+              The Sharpest Cut in Cape Town
+            </h1>
+          </div>
+          <Link
+            href="/book"
+            className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg shadow-amber-500/10 shrink-0"
+          >
+            <Scissors className="w-3.5 h-3.5" />
+            <span>Book Appointment</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-          {/* Pillar 1: Ace of Fyt Barbershop */}
-          <div className="group relative rounded-3xl border border-zinc-800 hover:border-amber-500/50 bg-gradient-to-b from-zinc-900/70 to-zinc-950 p-8 sm:p-10 transition-all duration-300 flex flex-col justify-between overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-amber-500/5 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="space-y-6 relative z-10">
-              <div className="flex items-center justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
-                  <Scissors className="h-6 w-6 stroke-[2]" />
-                </div>
-                <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 border border-zinc-800 rounded-full px-3 py-1 bg-black/40">
-                  PILLAR 01 // CPT GROOMING
-                </span>
-              </div>
-
-              <div>
-                <h3 className="font-display text-2xl sm:text-3xl font-extrabold uppercase text-white tracking-tight">
-                  Ace of Fyt Barbershop
-                </h3>
-                <p className="text-sm text-zinc-400 mt-2 leading-relaxed">
-                  Precision skin fades, architectural beard sculpts, and steamed essential-oil hot towels.
-                  Zero queue waiting times with real-time chair reservations in Cape Town.
-                </p>
-              </div>
-
-              <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-900">
-                <Image
-                  src="/images/barber-tools.png"
-                  alt="Barber Tools & Craft"
-                  fill
-                  className="object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                <div className="absolute bottom-3 left-3 text-[11px] font-mono text-amber-400">
-                  FLAGSHIP STUDIO // CHAIRS 01-04
-                </div>
-              </div>
-
-              {/* Perks List */}
-              <ul className="space-y-2 text-xs text-zinc-300 border-t border-zinc-800/80 pt-4">
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                  <span>The Executive Combo: Hot towel, razor sculpt, scalp therapy</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                  <span>Guaranteed slot start time &bull; VIP lounge espresso bar</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                  <span>Integrated monthly subscriptions powered by PayFast</span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-zinc-800/80 relative z-10">
-              <Link
-                href="/book"
-                className="w-full inline-flex items-center justify-between rounded-xl bg-zinc-900 hover:bg-amber-500 hover:text-black border border-zinc-700 hover:border-amber-400 px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-white transition-all"
-              >
-                <span>Reserve Chair at Cape Town Flagship</span>
-                <ArrowRight className="h-4 w-4 ml-2" />
+        {/* The Two Service Carousels / Rows */}
+        <div className="flex-1 flex flex-col justify-around py-4 space-y-6 relative z-10">
+          {/* ROW 1: Normal Haircut Services (4 Options) */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-mono font-bold uppercase tracking-wider text-amber-300/90 flex items-center gap-1.5">
+                <Scissors className="w-3.5 h-3.5 text-amber-400" />
+                <span>Single Chair Sessions &bull; Standard Cuts</span>
+              </span>
+              <Link href="/book" className="text-[11px] font-mono text-zinc-500 hover:text-amber-400 transition-colors">
+                View all grooming &rarr;
               </Link>
             </div>
-          </div>
 
-          {/* Pillar 2: Dissafyt Streetwear Lab */}
-          <div className="group relative rounded-3xl border border-zinc-800 hover:border-white/50 bg-gradient-to-b from-zinc-900/70 to-zinc-950 p-8 sm:p-10 transition-all duration-300 flex flex-col justify-between overflow-hidden">
-            <div className="absolute top-0 right-0 w-64 h-64 bg-zinc-500/5 rounded-full blur-3xl pointer-events-none" />
-
-            <div className="space-y-6 relative z-10">
-              <div className="flex items-center justify-between">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-white/10 border border-white/20 text-white">
-                  <ShoppingBag className="h-6 w-6 stroke-[2]" />
-                </div>
-                <span className="text-[10px] font-mono uppercase tracking-widest text-zinc-400 border border-zinc-800 rounded-full px-3 py-1 bg-black/40">
-                  PILLAR 02 // GARMENT LAB
-                </span>
-              </div>
-
-              <div>
-                <h3 className="font-display text-2xl sm:text-3xl font-extrabold uppercase text-white tracking-tight">
-                  Dissafyt Garment Lab
-                </h3>
-                <p className="text-sm text-zinc-400 mt-2 leading-relaxed">
-                  Heavyweight textiles meeting high-definition direct-to-garment prints. Limited batch capsules
-                  cut from 280GSM French terry and custom-distressed silhouettes.
-                </p>
-              </div>
-
-              <div className="relative aspect-[16/9] w-full rounded-2xl overflow-hidden border border-zinc-800 bg-zinc-900">
-                <Image
-                  src="/images/hero-collaboration.png"
-                  alt="Dissafyt Streetwear Capsule"
-                  fill
-                  className="object-cover transition-transform duration-500 group-hover:scale-105"
-                />
-                <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
-                <div className="absolute bottom-3 left-3 text-[11px] font-mono text-white">
-                  BATCH 01 // 280GSM HEAVYWEIGHT
-                </div>
-              </div>
-
-              {/* Perks List */}
-              <ul className="space-y-2 text-xs text-zinc-300 border-t border-zinc-800/80 pt-4">
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-white flex-shrink-0" />
-                  <span>280GSM ultra-dense luxury French terry & ring-spun cotton</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-white flex-shrink-0" />
-                  <span>Direct-to-garment DTG print clarity that never cracks</span>
-                </li>
-                <li className="flex items-center space-x-2">
-                  <CheckCircle2 className="h-4 w-4 text-white flex-shrink-0" />
-                  <span>Express Courier Guy delivery across South Africa</span>
-                </li>
-              </ul>
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-zinc-800/80 relative z-10">
-              <Link
-                href="/shop"
-                className="w-full inline-flex items-center justify-between rounded-xl bg-zinc-900 hover:bg-white hover:text-black border border-zinc-700 hover:border-white px-6 py-3.5 text-xs font-bold uppercase tracking-wider text-white transition-all"
-              >
-                <span>Enter Streetwear Drop Room</span>
-                <ArrowRight className="h-4 w-4 ml-2" />
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* 4. THE SIGNATURE SERVICES MENU */}
-      <section className="container mx-auto max-w-7xl px-4 sm:px-6">
-        <div className="rounded-3xl border border-zinc-900 bg-zinc-950 p-8 sm:p-12">
-          <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-8 border-b border-zinc-900">
-            <div className="space-y-2 max-w-xl">
-              <span className="text-[11px] font-mono uppercase tracking-widest text-amber-400 font-bold">
-                CAPE TOWN FLAGSHIP MENU
-              </span>
-              <h2 className="font-display text-3xl sm:text-4xl font-black uppercase text-white">
-                Master Barber Services
-              </h2>
-              <p className="text-xs sm:text-sm text-zinc-400">
-                Crafted for gentlemen who demand razor perfection. Included with our VIP monthly memberships or available via instant chair booking.
-              </p>
-            </div>
-            <Link
-              href="/book"
-              className="inline-flex items-center text-xs font-bold uppercase tracking-widest text-amber-400 hover:text-amber-300"
-            >
-              <span>View Full Booking Schedule</span>
-              <ArrowRight className="ml-1.5 h-4 w-4" />
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 pt-8">
-            {displayServices.map((service, index) => {
-              const isHighlight = index === 0;
-              return (
+            {/* 4 Cards Track (Desktop 4-col, mobile horizontal scroll carousel) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 overflow-x-auto pb-1">
+              {normalCuts.map((cut) => (
                 <div
-                  key={service.id}
-                  className={`rounded-2xl p-6 space-y-4 relative ${
-                    isHighlight
-                      ? 'border border-amber-500/30 bg-amber-500/5'
-                      : 'border border-zinc-800 bg-zinc-900/50'
+                  key={cut.id}
+                  className={`group rounded-2xl p-4 flex flex-col justify-between transition-all duration-300 border relative ${
+                    cut.featured
+                      ? 'border-amber-500/50 bg-gradient-to-b from-amber-500/10 to-zinc-950 shadow-lg shadow-amber-500/5'
+                      : 'border-zinc-800 bg-zinc-950/80 hover:border-zinc-700'
                   }`}
                 >
-                  {isHighlight && (
-                    <div className="absolute top-4 right-4 rounded-full bg-amber-500/20 px-2.5 py-0.5 text-[10px] font-bold text-amber-300 border border-amber-500/30 font-mono">
-                      FLAGSHIP SIGNATURE
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-amber-400 font-bold">
+                        {cut.tag}
+                      </span>
+                      <span className="text-[10px] font-mono text-zinc-400 flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-zinc-500" />
+                        {cut.duration}
+                      </span>
                     </div>
-                  )}
-                  <div>
-                    <h4 className="font-display text-xl font-extrabold text-white">{service.name}</h4>
-                    <p className="text-xs text-zinc-400 mt-1 line-clamp-2">
-                      {service.description || `${service.duration_minutes || 30} min session with precision razor finishing.`}
+
+                    <h3 className="font-display text-base font-bold text-white group-hover:text-amber-400 transition-colors">
+                      {cut.name}
+                    </h3>
+                    <p className="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed">
+                      {cut.description}
                     </p>
                   </div>
-                  <div
-                    className={`flex items-baseline space-x-2 pt-2 border-t ${
-                      isHighlight ? 'border-amber-500/20' : 'border-zinc-800'
-                    }`}
-                  >
-                    <span
-                      className={`text-2xl font-black font-display ${
-                        isHighlight ? 'text-amber-400' : 'text-white'
-                      }`}
+
+                  <div className="pt-3 mt-3 border-t border-zinc-900 flex items-center justify-between">
+                    <div>
+                      <div className="text-[9px] font-mono text-zinc-500 uppercase">Chair Fee</div>
+                      <div className="font-mono font-black text-lg text-amber-400 leading-none">
+                        R {cut.price.toFixed(2)}
+                      </div>
+                    </div>
+                    <Link
+                      href={cut.href}
+                      className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-amber-500 hover:text-black text-white text-xs font-bold transition-all border border-zinc-800 hover:border-amber-400 flex items-center gap-1"
                     >
-                      R {Number(service.price).toFixed(0)}
-                    </span>
-                    <span className="text-xs text-zinc-400">
-                      / {service.duration_minutes || 30} min chair session
-                    </span>
+                      <span>Reserve</span>
+                      <ChevronRight className="w-3 h-3" />
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ROW 2: Monthly Recurring Memberships (4 Options) */}
+          <div className="space-y-2.5">
+            <div className="flex items-center justify-between text-xs">
+              <span className="font-mono font-bold uppercase tracking-wider text-amber-300/90 flex items-center gap-1.5">
+                <Crown className="w-3.5 h-3.5 text-amber-400" />
+                <span>Monthly Recurring Memberships &bull; The VIP Guild</span>
+              </span>
+              <span className="text-[10px] font-mono text-zinc-500">
+                Cancel or pause anytime &bull; PayFast recurring
+              </span>
+            </div>
+
+            {/* 4 Cards Track (Desktop 4-col, mobile horizontal scroll carousel) */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5 overflow-x-auto pb-1">
+              {membershipOptions.map((mem) => (
+                <div
+                  key={mem.id}
+                  className={`group rounded-2xl p-4 flex flex-col justify-between transition-all duration-300 border relative ${
+                    mem.featured
+                      ? 'border-amber-500 bg-gradient-to-b from-amber-500/15 via-zinc-900/90 to-zinc-950 shadow-xl shadow-amber-500/10'
+                      : 'border-zinc-800 bg-zinc-950/80 hover:border-zinc-700'
+                  }`}
+                >
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-[9px] font-mono uppercase tracking-wider px-2 py-0.5 rounded bg-zinc-900 border border-zinc-800 text-amber-400 font-bold">
+                        {mem.tag}
+                      </span>
+                      <span className="text-[10px] font-mono text-emerald-400">Zero Wait Queue</span>
+                    </div>
+
+                    <h3 className="font-display text-base font-bold text-white group-hover:text-amber-400 transition-colors">
+                      {mem.name}
+                    </h3>
+
+                    <div className="text-[11px] font-semibold text-amber-300/90 flex items-center gap-1">
+                      <Check className="w-3 h-3 text-amber-400 shrink-0" />
+                      <span className="line-clamp-1">{mem.perk}</span>
+                    </div>
+
+                    <p className="text-[11px] text-zinc-400 line-clamp-2 leading-relaxed">
+                      {mem.details}
+                    </p>
+                  </div>
+
+                  <div className="pt-3 mt-3 border-t border-zinc-900 flex items-center justify-between">
+                    <div>
+                      <div className="text-[9px] font-mono text-zinc-500 uppercase">Monthly Dues</div>
+                      <div className="font-mono font-black text-lg text-white leading-none">
+                        R {mem.price.toFixed(0)}
+                        <span className="text-xs font-normal text-zinc-400">{mem.period}</span>
+                      </div>
+                    </div>
+                    <Link
+                      href="/book"
+                      className="px-3 py-1.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-extrabold transition-all shadow-md shadow-amber-500/10"
+                    >
+                      Join Club
+                    </Link>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom Trust Ticker Strip */}
+        <div className="grid grid-cols-3 gap-4 pt-3 border-t border-zinc-900 text-center relative z-10 text-xs font-mono text-zinc-400">
+          <div><strong className="text-white font-bold">0 MIN</strong> Queue Delays</div>
+          <div><strong className="text-white font-bold">100%</strong> Razor Precision</div>
+          <div><strong className="text-amber-400 font-bold">VIP</strong> Saturday Chairs</div>
+        </div>
+      </section>
+
+      {/* ============================================================== */}
+      {/* 2. THE FOUNDER'S BUILDOUT CAPITAL BANNER (12 CUTS FOR R1,200)  */}
+      {/* ============================================================== */}
+      <FounderPassBanner />
+
+      {/* ============================================================== */}
+      {/* 3. SECTION 2: THE STREETWEAR DROP ROOM (80-90vh - 4x1 GRID)   */}
+      {/* ============================================================== */}
+      <section className="relative min-h-[85vh] lg:h-[88vh] flex flex-col justify-between container mx-auto max-w-7xl px-4 sm:px-6 pt-6 sm:pt-8 pb-4">
+        {/* Ambient Orange Glow */}
+        <div className="absolute top-1/3 right-1/4 w-[500px] h-[300px] bg-orange-600/10 blur-[130px] rounded-full pointer-events-none" />
+
+        {/* Section Header */}
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-zinc-900 pb-4 relative z-10">
+          <div className="space-y-1.5">
+            <div className="flex items-center space-x-2">
+              <span className="h-2 w-2 rounded-full bg-orange-500 animate-pulse" />
+              <span className="text-[10px] sm:text-[11px] font-mono tracking-widest uppercase font-bold text-orange-400">
+                DISSAFYT GARMENT LAB // 280GSM HEAVYWEIGHT
+              </span>
+              <span className="hidden md:inline-block text-[10px] font-mono text-zinc-500">
+                Pre-order Milestone Drops &bull; 50% Upfront Deposit
+              </span>
+            </div>
+            <h2 className="font-display text-3xl sm:text-5xl font-black uppercase tracking-tight text-white leading-none">
+              The Streetwear Drop Room
+            </h2>
+          </div>
+          <Link
+            href="/shop"
+            className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl border border-zinc-700 hover:border-white bg-zinc-900 hover:bg-white text-white hover:text-black font-extrabold text-xs uppercase tracking-wider transition-all shrink-0"
+          >
+            <ShoppingBag className="w-3.5 h-3.5" />
+            <span>Enter Full Drop Room</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
+
+        {/* 4x1 GRID OF CLOTHES */}
+        <div className="flex-1 py-4 flex items-center relative z-10">
+          <div className="w-full grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
+            {displayProducts.map((garment) => {
+              const target = garment.preorder_target || 50;
+              const claimed = garment.preorder_claimed_count || 0;
+              const pct = Math.min(100, Math.round((claimed / target) * 100));
+              const remaining = Math.max(0, target - claimed);
+              const depositPct = garment.preorder_deposit_pct || 50;
+              const depositAmount = (garment.base_price * depositPct) / 100;
+              const productUrl = `/shop/${garment.slug || garment.id}`;
+
+              return (
+                <div
+                  key={garment.id}
+                  className="group rounded-2xl border border-zinc-800 hover:border-amber-500/50 bg-zinc-950 p-4 flex flex-col justify-between transition-all duration-300 shadow-xl"
+                >
+                  <div>
+                    {/* Garment Image Container */}
+                    <Link href={productUrl} className="block relative aspect-[4/5] rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 mb-3.5">
+                      {garment.images && garment.images.length > 0 ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={garment.images[0]}
+                          alt={garment.name}
+                          className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105"
+                        />
+                      ) : (
+                        <div className="h-full w-full flex items-center justify-center text-zinc-600">
+                          <ShoppingBag className="w-8 h-8" />
+                        </div>
+                      )}
+
+                      {/* Drop Badge */}
+                      <span className="absolute top-2.5 left-2.5 rounded-full bg-amber-500 text-black px-2 py-0.5 text-[9px] font-mono font-black uppercase tracking-wider flex items-center gap-1 shadow-md">
+                        <span className="h-1.5 w-1.5 rounded-full bg-black animate-ping" />
+                        PRE-ORDER DROP
+                      </span>
+                      <span className="absolute top-2.5 right-2.5 rounded-full bg-black/80 backdrop-blur px-2 py-0.5 text-[9px] font-mono text-zinc-300 border border-zinc-700">
+                        280GSM
+                      </span>
+                    </Link>
+
+                    {/* Title & Description */}
+                    <Link href={productUrl} className="block">
+                      <h3 className="font-display text-sm sm:text-base font-bold text-white group-hover:text-amber-400 transition-colors line-clamp-1">
+                        {garment.name}
+                      </h3>
+                    </Link>
+                    <p className="text-[11px] text-zinc-400 line-clamp-2 mt-1 leading-relaxed">
+                      {garment.description || 'Authentic heavyweight streetwear crafted in Cape Town.'}
+                    </p>
+
+                    {/* Live Drop Progress Bar */}
+                    <div className="mt-3 p-2 rounded-xl bg-zinc-900/80 border border-zinc-800 space-y-1">
+                      <div className="flex justify-between items-center text-[10px] font-mono">
+                        <span className="text-amber-400 font-bold">
+                          {claimed}/{target} Claimed
+                        </span>
+                        <span className="text-zinc-400">
+                          {remaining === 0 ? (
+                            <strong className="text-emerald-400">Locked</strong>
+                          ) : (
+                            <strong className="text-amber-300">{remaining} left</strong>
+                          )}
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full bg-black rounded-full overflow-hidden border border-zinc-800">
+                        <div
+                          className="h-full bg-gradient-to-r from-amber-500 to-orange-500 rounded-full"
+                          style={{ width: `${Math.max(6, pct)}%` }}
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Financial Breakdown & CTA */}
+                  <div className="pt-3 mt-3 border-t border-zinc-900 space-y-2">
+                    <div className="flex items-baseline justify-between text-xs font-mono">
+                      <span className="text-zinc-400">Full Price:</span>
+                      <span className="font-bold text-white">R {Number(garment.base_price).toFixed(2)}</span>
+                    </div>
+
+                    <div className="flex items-baseline justify-between text-xs font-mono bg-amber-500/10 border border-amber-500/20 px-2 py-1 rounded-lg">
+                      <span className="text-amber-400 font-bold">Deposit Today ({depositPct}%):</span>
+                      <span className="font-extrabold text-amber-300">R {depositAmount.toFixed(2)}</span>
+                    </div>
+
+                    <Link
+                      href={productUrl}
+                      className="w-full py-2.5 px-3 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider text-center block transition-all shadow-md shadow-amber-500/10"
+                    >
+                      Pre-order Piece &rarr;
+                    </Link>
                   </div>
                 </div>
               );
             })}
           </div>
         </div>
+
+        {/* Garment Lab Spec Highlights */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-3 border-t border-zinc-900 text-xs font-mono text-zinc-400 relative z-10">
+          <div className="flex items-center gap-2">
+            <Layers className="w-3.5 h-3.5 text-amber-500" />
+            <span>280GSM French Terry</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+            <span>DTF Permanent Fidelity</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <Truck className="w-3.5 h-3.5 text-amber-500" />
+            <span>Courier Guy Door-to-Door</span>
+          </div>
+          <div className="flex items-center gap-2">
+            <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />
+            <span>PayFast ZAR Protection</span>
+          </div>
+        </div>
       </section>
 
-      {/* 5. VIP MONTHLY MEMBERSHIPS SECTION */}
+      {/* ============================================================== */}
+      {/* 4. CAPE TOWN FLAGSHIP LOCATION & FREQUENTLY ASKED QUESTIONS   */}
+      {/* ============================================================== */}
       <section className="container mx-auto max-w-7xl px-4 sm:px-6">
-        <SubscriptionCarousel
-          title="ACE OF FYT GUILD MEMBERSHIPS"
-          subtitle="Cape Town's most exclusive recurring haircut club. Guaranteed chair times, zero queue delays, and VIP priority on Dissafyt streetwear drops. Powered by PayFast recurring billing."
-        />
-      </section>
-
-      {/* 6. CAPE TOWN FLAGSHIP LOCATION & HOURS */}
-      <section className="container mx-auto max-w-7xl px-4 sm:px-6">
-        <div className="rounded-3xl border border-zinc-800 bg-gradient-to-r from-zinc-950 via-zinc-900 to-zinc-950 p-8 sm:p-12">
+        <div className="rounded-3xl border border-zinc-800 bg-gradient-to-r from-zinc-950 via-zinc-900 to-zinc-950 p-6 sm:p-10">
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
-            <div className="lg:col-span-7 space-y-4">
+            <div className="lg:col-span-7 space-y-3">
               <div className="inline-flex items-center space-x-2 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs text-emerald-400 font-mono">
                 <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-                <span>OPEN TUE – SUN &bull; {(flagship.city || 'Cape Town').toUpperCase()}, SOUTH AFRICA</span>
+                <span>OPEN TUE – SUN &bull; CAPE TOWN FLAGSHIP</span>
               </div>
 
-              <h2 className="font-display text-3xl sm:text-4xl font-black uppercase text-white">
+              <h2 className="font-display text-2xl sm:text-4xl font-black uppercase text-white">
                 {flagship.name}
               </h2>
 
-              <p className="text-sm text-zinc-400 max-w-lg">
-                Conveniently located at {flagship.address}. Experience the cutting-edge fusion of high-precision grooming, garment prototyping, and specialty espresso.
+              <p className="text-xs sm:text-sm text-zinc-400 max-w-lg leading-relaxed">
+                Experience our dual-pillar culture house at {flagship.address}. Master chair reservations, custom garment fittings, and zero-queue service.
               </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-4 text-xs font-mono">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2 text-xs font-mono">
                 <div className="space-y-1">
-                  <span className="text-zinc-500 uppercase">Hours</span>
+                  <span className="text-zinc-500 uppercase">Operating Hours</span>
                   <p className="text-white font-semibold">{flagship.operating_hours_display}</p>
                 </div>
                 <div className="space-y-1">
-                  <span className="text-zinc-500 uppercase">Flagship Location</span>
-                  <p className="text-white font-semibold">{flagship.name}</p>
-                  <p className="text-zinc-300">{flagship.address}</p>
-                  <p className="text-zinc-400">{flagship.city}, {flagship.province}</p>
-                  <p className="text-amber-400">SAST (UTC+2) &bull; {flagship.phone || '+27 818082570'}</p>
+                  <span className="text-zinc-500 uppercase">Contact & Support</span>
+                  <p className="text-amber-400 font-semibold">{flagship.phone || '+27 818082570'}</p>
+                  <p className="text-zinc-400">letstalk@dissafyt.com</p>
                 </div>
               </div>
             </div>
 
-            <div className="lg:col-span-5 flex flex-col sm:flex-row lg:flex-col gap-4">
+            <div className="lg:col-span-5 flex flex-col sm:flex-row lg:flex-col gap-3">
               <Link
                 href="/book"
-                className="w-full text-center rounded-xl bg-amber-500 hover:bg-amber-400 px-6 py-4 text-xs font-black uppercase tracking-wider text-black shadow-lg shadow-amber-500/10 transition-all hover:scale-[1.02] active:scale-95"
+                className="w-full text-center rounded-xl bg-amber-500 hover:bg-amber-400 px-6 py-3.5 text-xs font-black uppercase tracking-wider text-black shadow-lg shadow-amber-500/10 transition-all hover:scale-[1.02]"
               >
-                Book Chair at {flagship.name}
+                Book Chair at Flagship Studio
               </Link>
               <Link
                 href="/shop"
-                className="w-full text-center rounded-xl border border-zinc-700 hover:border-zinc-500 bg-zinc-900 px-6 py-4 text-xs font-black uppercase tracking-wider text-zinc-200 transition-all hover:scale-[1.02] active:scale-95"
+                className="w-full text-center rounded-xl border border-zinc-700 hover:border-zinc-500 bg-zinc-900 px-6 py-3.5 text-xs font-black uppercase tracking-wider text-zinc-200 transition-all hover:scale-[1.02]"
               >
                 Explore Streetwear Catalog
               </Link>
@@ -487,7 +567,7 @@ export default async function HomePage() {
         </div>
       </section>
 
-      {/* 7. EXPANDABLE FAQ SECTION */}
+      {/* 5. FAQ ACCORDION */}
       <section className="container mx-auto max-w-7xl px-4 sm:px-6">
         <FaqAccordion />
       </section>
