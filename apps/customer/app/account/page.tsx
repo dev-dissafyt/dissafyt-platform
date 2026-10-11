@@ -119,6 +119,7 @@ export default function AccountPage() {
   const [isChangePlanOpen, setIsChangePlanOpen] = useState(false);
   const [isCancelSubOpen, setIsCancelSubOpen] = useState(false);
   const [subActionLoading, setSubActionLoading] = useState(false);
+  const [syncingSub, setSyncingSub] = useState(false);
   const [selectedChangePlanCode, setSelectedChangePlanCode] = useState<string | null>(null);
 
   // Notification Preferences
@@ -403,6 +404,34 @@ export default function AccountPage() {
       alert('Network error while changing membership plan.');
     } finally {
       setSubActionLoading(false);
+    }
+  }
+
+  async function handleSyncSubscription() {
+    if (!token) return;
+    setSyncingSub(true);
+    setStatusMsg(null);
+    try {
+      const res = await fetch('/api/subscriptions/sync', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.message || data.error || 'Failed to sync subscription');
+      }
+
+      setSubscription(data.subscription || null);
+      setSubscriptionQuota(data.quota || null);
+      setStatusMsg(data.message || 'Subscription successfully synchronized with latest billing cycle!');
+    } catch (e: any) {
+      console.error('Subscription sync error:', e);
+      setStatusMsg(e.message || 'Error syncing subscription with PayFast');
+    } finally {
+      setSyncingSub(false);
     }
   }
 
@@ -1220,6 +1249,18 @@ export default function AccountPage() {
                   >
                     Change Plan
                   </Button>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleSyncSubscription}
+                    disabled={syncingSub}
+                    className="border-zinc-700 hover:border-zinc-500 bg-zinc-900 text-zinc-300 text-[11px] h-7 px-2.5 flex items-center gap-1.5"
+                    title="Synchronize status with PayFast"
+                  >
+                    <RefreshCw className={`h-3 w-3 ${syncingSub ? 'animate-spin text-amber-400' : 'text-zinc-400'}`} />
+                    <span>{syncingSub ? 'Syncing...' : 'Sync'}</span>
+                  </Button>
                   {subscription.status === 'active' ? (
                     <Button
                       type="button"
@@ -1252,11 +1293,24 @@ export default function AccountPage() {
                   Save on regular haircut sessions, skip the queue with priority booking, and unlock exclusive streetwear drop pricing.
                 </p>
               </div>
-              <Link href="/book#memberships" className="block">
-                <Button size="sm" className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-8 shadow-md shadow-amber-500/10">
-                  Explore Memberships (From R100/mo)
+              <div className="space-y-2">
+                <Link href="/book#memberships" className="block">
+                  <Button size="sm" className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-8 shadow-md shadow-amber-500/10">
+                    Explore Memberships (From R100/mo)
+                  </Button>
+                </Link>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={handleSyncSubscription}
+                  disabled={syncingSub}
+                  className="w-full border-zinc-800 hover:border-zinc-700 bg-zinc-900/40 text-zinc-400 hover:text-zinc-200 text-xs h-8 flex items-center justify-center gap-2"
+                >
+                  <RefreshCw className={`h-3.5 w-3.5 ${syncingSub ? 'animate-spin text-amber-400' : 'text-zinc-400'}`} />
+                  <span>{syncingSub ? 'Checking PayFast Billing...' : 'Already Subscribed? Sync with PayFast'}</span>
                 </Button>
-              </Link>
+              </div>
             </Card>
           )}
 

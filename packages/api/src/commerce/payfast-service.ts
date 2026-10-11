@@ -205,14 +205,54 @@ export class PayfastService {
   }
 
   /**
+   * Performs a server-to-server query validation against PayFast's /eng/query/validate endpoint.
+   * Serves as an authoritative verification fallback if local MD5 calculation encounters
+   * URL encoding or parameter ordering discrepancies.
+   */
+  static async validateServerConfirmation(payload: PayfastNotifyPayload): Promise<boolean> {
+    try {
+      const isSandbox = (process.env.PAYFAST_ENVIRONMENT || '').includes('sandbox');
+      const validateHost = isSandbox ? 'https://sandbox.payfast.co.za' : 'https://www.payfast.co.za';
+      const url = `${validateHost}/eng/query/validate`;
+
+      const params = new URLSearchParams();
+      for (const [key, value] of Object.entries(payload)) {
+        if (value !== undefined && value !== null && key !== 'signature') {
+          params.append(key, String(value));
+        }
+      }
+
+      const res = await fetch(url, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: params.toString(),
+      });
+
+      if (!res.ok) {
+        return false;
+      }
+
+      const text = await res.text();
+      return text.trim() === 'VALID';
+    } catch (err) {
+      console.warn('PayFast server query validation error:', err);
+      return false;
+    }
+  }
+
+  /**
    * Processes verified ITN webhook notification, updating payment and order records in PostgreSQL.
    */
   static async handleWebhook(payload: PayfastNotifyPayload): Promise<{ success: boolean; message: string; payment?: Payment }> {
-    // 1. Strictly verify signature with configured secret passphrase (no empty-passphrase bypass)
-    const isValid = this.validateSignature(payload, this.passphrase);
+    // 1. Strictly verify signature with configured secret passphrase, with server confirmation fallback
+    let isValid = this.validateSignature(payload, this.passphrase);
+    if (!isValid) {
+      console.warn('Local PayFast ITN signature check failed; attempting server confirmation query...');
+      isValid = await this.validateServerConfirmation(payload);
+    }
 
     if (!isValid) {
-      console.warn('PayFast ITN signature mismatch for payload:', payload);
+      console.warn('PayFast ITN signature mismatch and server validation rejected payload:', payload);
       return { success: false, message: 'Invalid PayFast signature' };
     }
 
@@ -225,7 +265,68 @@ export class PayfastService {
     const isBooking = payload.custom_str3 === 'booking';
     const relatedType = isSubscription ? 'subscription' : isBooking ? 'booking' : 'order';
 
-    // If userId not provided in custom_str2, lookup profile by email_address or fallback to official guest
+    let resolvedSub: any = null;
+
+    // Multi-vector subscription identification
+    if (isSubscription) {
+      // Vector A: Match by payfast_token
+      if (payload.token) {
+        const { data: subByToken } = await admin
+          .from('subscriptions')
+          .select('*')
+          .eq('payfast_token', payload.token)
+          .maybeSingle();
+
+        if (subByToken) {
+          resolvedSub = subByToken;
+          userId = subByToken.user_id;
+        }
+      }
+
+      // Vector B: Match by user_id if valid
+      if (!resolvedSub && userId && userId !== '00000000-0000-0000-0000-000000000000' && userId !== 'guest-user') {
+        const { data: subByUser } = await admin
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        if (subByUser) {
+          resolvedSub = subByUser;
+        }
+      }
+
+      // Vector C: Match by customer email address
+      if (!resolvedSub && payload.email_address) {
+        const { data: profile } = await admin
+          .from('profiles')
+          .select('id')
+          .eq('email', payload.email_address)
+          .maybeSingle();
+
+        if (profile?.id) {
+          userId = profile.id;
+          const { data: subByEmail } = await admin
+            .from('subscriptions')
+            .select('*')
+            .eq('user_id', profile.id)
+            .order('created_at', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          if (subByEmail) {
+            resolvedSub = subByEmail;
+          }
+        }
+      }
+    }
+
+    // If userId not provided, lookup profile by email_address or fallback to resolved subscription's user_id
+    if ((!userId || userId === '00000000-0000-0000-0000-000000000000' || userId === 'guest-user') && resolvedSub?.user_id) {
+      userId = resolvedSub.user_id;
+    }
     if ((!userId || userId === '00000000-0000-0000-0000-000000000000' || userId === 'guest-user') && payload.email_address) {
       try {
         const { data: profile } = await admin
@@ -359,43 +460,45 @@ export class PayfastService {
         }
 
         // 4. Activate or renew barbershop subscription if subscription payment
-        if (isSubscription && userId && userId !== GUEST_USER_ID) {
-          const planCode = payload.custom_str1 || 'twice';
+        if (isSubscription) {
+          const planCode = payload.custom_str1 || resolvedSub?.plan_code || 'twice';
           const planNames: Record<string, string> = {
             solo: 'The Solo Membership',
             twice: 'The Regular Membership',
             executive: 'The Executive Membership',
             'father-son': 'The Executive Membership',
           };
-          const planName = planNames[planCode] || payload.item_name || 'Barbershop Membership';
+          const planName = planNames[planCode] || payload.item_name || resolvedSub?.plan_name || 'Barbershop Membership';
 
           const startDate = new Date();
           const endDate = new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
 
           try {
-            // Check for existing active subscription to update rather than creating duplicates
-            const { data: existingSub } = await admin
-              .from('subscriptions')
-              .select('id')
-              .eq('user_id', userId)
-              .maybeSingle();
-
-            if (existingSub) {
+            if (resolvedSub) {
               await admin
                 .from('subscriptions')
                 .update({
                   plan_code: planCode,
                   plan_name: planName,
-                  price: amount,
+                  price: amount || resolvedSub.price,
                   status: 'active',
                   current_period_start: startDate.toISOString(),
                   current_period_end: endDate.toISOString(),
-                  payfast_token: payload.token || payload.pf_payment_id || null,
+                  payfast_token: payload.token || resolvedSub.payfast_token || payload.pf_payment_id || null,
                   updated_at: new Date().toISOString(),
                 })
-                .eq('id', existingSub.id);
-            } else {
-              await admin.from('subscriptions').insert({
+                .eq('id', resolvedSub.id);
+
+              if (paymentRecord?.id) {
+                await admin
+                  .from('payments')
+                  .update({ related_id: resolvedSub.id, user_id: resolvedSub.user_id })
+                  .eq('id', paymentRecord.id);
+              }
+
+              console.log(`Successfully renewed subscription ${resolvedSub.id} for user ${resolvedSub.user_id} through ${endDate.toISOString()}`);
+            } else if (userId && userId !== GUEST_USER_ID) {
+              const { data: createdSub } = await admin.from('subscriptions').insert({
                 user_id: userId,
                 plan_code: planCode,
                 plan_name: planName,
@@ -404,7 +507,16 @@ export class PayfastService {
                 current_period_start: startDate.toISOString(),
                 current_period_end: endDate.toISOString(),
                 payfast_token: payload.token || payload.pf_payment_id || null,
-              });
+              }).select().single();
+
+              if (paymentRecord?.id && createdSub?.id) {
+                await admin
+                  .from('payments')
+                  .update({ related_id: createdSub.id })
+                  .eq('id', paymentRecord.id);
+              }
+
+              console.log(`Successfully created new subscription for user ${userId}`);
             }
           } catch (subErr) {
             console.error('Failed to create/update subscription in table:', subErr);

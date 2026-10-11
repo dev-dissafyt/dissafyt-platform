@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { PayfastService } from '@dissafyt/api';
+import { PayfastService, getCanonicalSiteUrl } from '@dissafyt/api';
 import { getSupabaseAdminClient } from '@dissafyt/database';
 
 export const dynamic = 'force-dynamic';
@@ -13,8 +13,7 @@ export async function POST(request: NextRequest) {
     const body = await request.json();
     const { booking_id, order_id, amount, item_name, customer_name, customer_email, customer_phone } = body;
 
-    const isProd = process.env.NODE_ENV === 'production';
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || (isProd ? 'https://dissafyt.com' : 'http://localhost:3000');
+    const siteUrl = getCanonicalSiteUrl();
     const merchantId = process.env.PAYFAST_MERCHANT_ID || process.env.NEXT_PUBLIC_PAYFAST_MERCHANT_ID || '17675995';
 
     let resolvedAmount = Number(amount || 0);

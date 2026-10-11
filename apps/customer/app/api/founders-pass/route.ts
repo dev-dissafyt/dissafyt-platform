@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdminClient } from '@dissafyt/database';
-import { FounderPassService, PayfastService, AuditService } from '@dissafyt/api';
+import { FounderPassService, PayfastService, AuditService, getCanonicalSiteUrl } from '@dissafyt/api';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -94,10 +94,7 @@ export async function POST(request: NextRequest) {
 
     // 3. Handle PayFast Live Payment payload if customer selected 'pay_now'
     if (pledgeType === 'pay_now') {
-      const siteUrl =
-        process.env.NEXT_PUBLIC_SITE_URL ||
-        process.env.NEXT_PUBLIC_APP_URL ||
-        'https://dissafyt.com';
+      const siteUrl = getCanonicalSiteUrl();
 
       const merchantId = process.env.PAYFAST_MERCHANT_ID || '10000100';
       const merchantKey = process.env.PAYFAST_MERCHANT_KEY || '46f0cd694581a';

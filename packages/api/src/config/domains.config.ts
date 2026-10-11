@@ -140,3 +140,26 @@ export function resolvePlatformApp(
   // 4. Default to customer storefront
   return PLATFORM_APPS.customer;
 }
+
+/**
+ * Returns the canonical public URL of the application.
+ * In production/Vercel, strictly returns 'https://www.dissafyt.com' to prevent
+ * 308 Permanent Redirects when payment gateways (like PayFast) deliver webhooks.
+ */
+export function getCanonicalSiteUrl(): string {
+  const envUrl = process.env.NEXT_PUBLIC_SITE_URL;
+  if (envUrl && (envUrl.includes('localhost') || envUrl.includes('127.0.0.1'))) {
+    return envUrl;
+  }
+  if (process.env.NODE_ENV === 'production' || process.env.VERCEL) {
+    return 'https://www.dissafyt.com';
+  }
+  if (envUrl) {
+    // If someone provided https://dissafyt.com without www, normalize to www.dissafyt.com
+    if (envUrl.trim() === 'https://dissafyt.com' || envUrl.trim() === 'http://dissafyt.com') {
+      return 'https://www.dissafyt.com';
+    }
+    return envUrl;
+  }
+  return 'http://localhost:3000';
+}

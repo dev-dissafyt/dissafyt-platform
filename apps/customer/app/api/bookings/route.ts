@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AuthService, BarbershopService, AdminBarbershopService, PayfastService } from '@dissafyt/api';
+import { AuthService, BarbershopService, AdminBarbershopService, PayfastService, getCanonicalSiteUrl } from '@dissafyt/api';
 import { getSupabaseAdminClient } from '@dissafyt/database';
 import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 
@@ -159,9 +159,7 @@ export async function POST(request: NextRequest) {
     // If customer selected PayFast and appointment requires upfront payment, generate PayFast form redirect
     let payfast: any = null;
     if (payment_choice === 'payfast' && result.booking.status === 'pending' && Number(result.booking.total_amount) > 0) {
-      const isProd = process.env.NODE_ENV === 'production';
-      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL 
-        || (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : isProd ? 'https://dissafyt.com' : 'http://localhost:3000');
+      const siteUrl = getCanonicalSiteUrl();
       const merchantId = process.env.PAYFAST_MERCHANT_ID || process.env.NEXT_PUBLIC_PAYFAST_MERCHANT_ID || '17675995';
 
       const admin = getSupabaseAdminClient();

@@ -14,9 +14,10 @@ export async function POST(request: NextRequest) {
 
     const contentType = request.headers.get('content-type') || '';
     if (contentType.includes('application/x-www-form-urlencoded')) {
-      const formData = await request.formData();
-      formData.forEach((value, key) => {
-        payload[key] = value.toString();
+      const text = await request.text();
+      const params = new URLSearchParams(text);
+      params.forEach((value, key) => {
+        payload[key] = value;
       });
     } else {
       payload = await request.json();
