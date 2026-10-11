@@ -1,5 +1,6 @@
 import { getSupabaseAdminClient, BarberService, Booking, BookingWithDetails, Staff, BookingStatus, BarbershopLocation } from '@dissafyt/database';
 import { AuditService } from '../audit/audit-service';
+import { EmailService } from '../notifications/email-service';
 
 export const SAST_TIMEZONE = 'Africa/Johannesburg';
 export const SAST_OFFSET = '+02:00';
@@ -899,6 +900,51 @@ export class BarbershopService {
 
     if (!bookingResult.location_id) {
       bookingResult.location_id = resolvedLocationId;
+    }
+
+    // 4. Dispatch Studio Booking Confirmation email
+    try {
+      const { data: customerProfile } = await admin
+        .from('profiles')
+        .select('email, full_name')
+        .eq('id', input.customer_id)
+        .maybeSingle();
+
+      const { data: serviceItem } = await admin
+        .from('services')
+        .select('name')
+        .eq('id', input.service_id)
+        .maybeSingle();
+
+      let staffName = 'Bernie';
+      if (assignedStaffId) {
+        const { data: staffMember } = await admin
+          .from('staff')
+          .select('display_name')
+          .eq('id', assignedStaffId)
+          .maybeSingle();
+        if (staffMember?.display_name) {
+          staffName = staffMember.display_name;
+        }
+      }
+
+      if (customerProfile?.email) {
+        await EmailService.sendBookingConfirmation({
+          bookingId: bookingResult.id,
+          customerName: customerProfile.full_name || 'Client',
+          customerEmail: customerProfile.email,
+          serviceName: serviceItem?.name || 'Studio Haircut',
+          staffName,
+          startTime: bookingResult.start_time,
+          locationName: 'Dissafyt Studio - Bernie',
+          locationAddress: '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570',
+          totalAmount: Number(bookingResult.total_amount || 0),
+          paymentStatus: bookingResult.payment_status || 'pending',
+          bookingUrl: `https://dissafyt.com/account/bookings?id=${bookingResult.id}`,
+        });
+      }
+    } catch (mailErr) {
+      console.warn('[BarbershopService] Warning: Failed to send booking confirmation email:', mailErr);
     }
 
     return { success: true, booking: bookingResult };

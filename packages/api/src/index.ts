@@ -15,4 +15,4 @@ export * from './studio/studio-service';
 export * from './studio/brand-service';
 export * from './whatsapp';
 export * from './config/domains.config';
-
+export * from './notifications/email-service';

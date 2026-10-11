@@ -2,6 +2,7 @@ import { getSupabaseAdminClient, Order, OrderItem, OrderStatus } from '@dissafyt
 import { StudioService } from '../studio/studio-service';
 import { BrandService } from '../studio/brand-service';
 import { AuditService } from '../audit/audit-service';
+import { EmailService } from '../notifications/email-service';
 
 export interface ShippingAddress {
   recipient_name: string;
@@ -378,6 +379,47 @@ export class OrderService {
       }
     }
 
+    // 4. Dispatch Sovereign Order Confirmation & Digital Receipt via EmailService
+    try {
+      let recipientEmail = (order.shipping_address as any)?.recipient_email;
+      let recipientName = (order.shipping_address as any)?.recipient_name || 'Valued Collector';
+
+      if (!recipientEmail && order.user_id && order.user_id !== '00000000-0000-0000-0000-000000000000') {
+        const { data: userProfile } = await admin
+          .from('profiles')
+          .select('email, full_name')
+          .eq('id', order.user_id)
+          .maybeSingle();
+        if (userProfile?.email) {
+          recipientEmail = userProfile.email;
+          if (userProfile.full_name) recipientName = userProfile.full_name;
+        }
+      }
+
+      if (recipientEmail) {
+        const emailItems = (order.order_items || []).map((i: any) => ({
+          name: i.product_name,
+          quantity: i.quantity,
+          price: Number(i.unit_price),
+          total: Number(i.total_price),
+        }));
+
+        await EmailService.sendOrderConfirmation({
+          orderNumber: order.order_number,
+          customerName: recipientName,
+          customerEmail: recipientEmail,
+          items: emailItems,
+          subtotal: Number(order.subtotal || 0),
+          shippingCost: Math.max(0, Number(order.total) - Number(order.subtotal || 0)),
+          total: Number(order.total),
+          shippingAddress: order.shipping_address as any,
+          trackingUrl: `https://dissafyt.com/account/orders?order_id=${order.id}`,
+        });
+      }
+    } catch (mailErr) {
+      console.warn('[OrderService] Warning: Failed to dispatch order confirmation email:', mailErr);
+    }
+
     return { success: true };
   }
 
@@ -504,6 +546,28 @@ export class OrderService {
       });
     } catch (auditErr) {
       console.warn('Failed to record order status audit log:', auditErr);
+    }
+
+    // 4. Dispatch shipping update notification if status transitioned to shipped
+    if (status === 'shipped') {
+      try {
+        const recipientEmail = (order.shipping_address as any)?.recipient_email;
+        const recipientName = (order.shipping_address as any)?.recipient_name || 'Customer';
+        const trackingNum = (order as any).tracking_number || (order as any).waybill_number || `TCG-${order.order_number}`;
+
+        if (recipientEmail) {
+          await EmailService.sendShippingUpdate({
+            orderNumber: order.order_number,
+            customerName: recipientName,
+            customerEmail: recipientEmail,
+            courierName: 'The Courier Guy',
+            trackingNumber: trackingNum,
+            destinationCity: (order.shipping_address as any)?.city || 'your door',
+          });
+        }
+      } catch (shipErr) {
+        console.warn('[OrderService] Warning: Failed to send shipping update email:', shipErr);
+      }
     }
 
     return { success: true };
