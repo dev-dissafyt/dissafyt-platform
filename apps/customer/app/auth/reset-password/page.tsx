@@ -5,8 +5,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import Image from 'next/image';
 import { getSupabaseBrowserClient } from '@dissafyt/database';
-import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from '@dissafyt/ui';
-import { ShieldCheck, CheckCircle2, Lock, ArrowRight } from 'lucide-react';
+import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Label } from '@dissafyt/ui';
+import { ShieldCheck, CheckCircle2, AlertTriangle, ArrowRight, KeyRound } from 'lucide-react';
 import { PasswordInput } from '../../components/password-input';
 
 function ResetPasswordForm() {
@@ -14,28 +14,129 @@ function ResetPasswordForm() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(true);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [isInvalidLink, setIsInvalidLink] = useState(false);
   const [success, setSuccess] = useState(false);
   const [sessionReady, setSessionReady] = useState(false);
 
   useEffect(() => {
-    const supabase = getSupabaseBrowserClient();
+    let mounted = true;
 
-    // Check if user has active session from recovery token
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      if (session) {
-        setSessionReady(true);
-      }
-    });
+    async function initializeRecoverySession() {
+      try {
+        const supabase = getSupabaseBrowserClient();
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
-        setSessionReady(true);
+        // 1. Inspect URL Hash (#error=... or #access_token=...)
+        if (typeof window !== 'undefined' && window.location.hash) {
+          const hashString = window.location.hash.substring(1);
+          const hashParams = new URLSearchParams(hashString);
+
+          // Check if Supabase passed an error in the hash fragment
+          const hashError = hashParams.get('error') || hashParams.get('error_description');
+          if (hashError) {
+            const description = hashParams.get('error_description') || hashError;
+            const decoded = decodeURIComponent(description.replace(/\+/g, ' '));
+            if (mounted) {
+              setErrorMsg(
+                decoded.toLowerCase().includes('expired')
+                  ? 'This password reset link has expired. For your security, reset links are single-use and valid for 60 minutes.'
+                  : decoded
+              );
+              setIsInvalidLink(true);
+              setCheckingAuth(false);
+            }
+            return;
+          }
+
+          // Check for direct recovery access_token in hash fragment
+          const accessToken = hashParams.get('access_token');
+          const refreshToken = hashParams.get('refresh_token');
+          if (accessToken && refreshToken) {
+            const { data, error: setSessionErr } = await supabase.auth.setSession({
+              access_token: accessToken,
+              refresh_token: refreshToken,
+            });
+
+            if (!setSessionErr && data.session) {
+              if (mounted) {
+                setSessionReady(true);
+                setCheckingAuth(false);
+              }
+              return;
+            }
+          }
+        }
+
+        // 2. Inspect URL Search Params (?code=... for PKCE flow)
+        if (typeof window !== 'undefined' && window.location.search) {
+          const searchParams = new URLSearchParams(window.location.search);
+          const code = searchParams.get('code');
+          const searchError = searchParams.get('error_description') || searchParams.get('error');
+
+          if (searchError) {
+            if (mounted) {
+              setErrorMsg(decodeURIComponent(searchError.replace(/\+/g, ' ')));
+              setIsInvalidLink(true);
+              setCheckingAuth(false);
+            }
+            return;
+          }
+
+          if (code) {
+            const { data, error: exchangeErr } = await supabase.auth.exchangeCodeForSession(code);
+            if (!exchangeErr && data.session) {
+              if (mounted) {
+                setSessionReady(true);
+                setCheckingAuth(false);
+              }
+              return;
+            }
+          }
+        }
+
+        // 3. Fallback check for existing active session
+        const { data: { session } } = await supabase.auth.getSession();
+        if (session) {
+          if (mounted) {
+            setSessionReady(true);
+            setCheckingAuth(false);
+          }
+          return;
+        }
+
+        // 4. Listen for auth state transitions (PASSWORD_RECOVERY event)
+        const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+          if (event === 'PASSWORD_RECOVERY' || (event === 'SIGNED_IN' && session)) {
+            if (mounted) {
+              setSessionReady(true);
+              setCheckingAuth(false);
+            }
+          }
+        });
+
+        // Grace period before marking link as unauthenticated
+        setTimeout(() => {
+          if (mounted) {
+            setCheckingAuth(false);
+          }
+        }, 1200);
+
+        return () => {
+          subscription.unsubscribe();
+        };
+      } catch (err: any) {
+        console.warn('[ResetPassword] Session resolution exception:', err);
+        if (mounted) {
+          setCheckingAuth(false);
+        }
       }
-    });
+    }
+
+    initializeRecoverySession();
 
     return () => {
-      subscription.unsubscribe();
+      mounted = false;
     };
   }, []);
 
@@ -71,14 +172,20 @@ function ResetPasswordForm() {
         router.push('/account');
       }, 2000);
     } catch (err: unknown) {
-      setErrorMsg(err instanceof Error ? err.message : 'Failed to update password. Your reset link may have expired.');
+      const msg = err instanceof Error ? err.message : 'Failed to update password.';
+      if (msg.toLowerCase().includes('session') || msg.toLowerCase().includes('login') || msg.toLowerCase().includes('expired')) {
+        setErrorMsg('Your security token has expired or is invalid. Please request a fresh password reset email.');
+        setIsInvalidLink(true);
+      } else {
+        setErrorMsg(msg);
+      }
     } finally {
       setLoading(false);
     }
   }
 
   return (
-    <Card className="w-full max-w-md border-zinc-800 bg-zinc-900/80 backdrop-blur-xl shadow-2xl">
+    <Card className="w-full max-w-md border-zinc-800 bg-zinc-900/90 backdrop-blur-xl shadow-2xl">
       <CardHeader className="space-y-3 text-center flex flex-col items-center">
         <Link href="/" className="inline-block mb-1">
           <Image
@@ -90,19 +197,42 @@ function ResetPasswordForm() {
             priority
           />
         </Link>
-        <CardTitle className="text-2xl font-bold text-white">Create New Password</CardTitle>
+        <CardTitle className="text-2xl font-bold text-white tracking-wide">
+          {success ? 'Password Reset Successful' : isInvalidLink ? 'Link Expired' : 'Create New Password'}
+        </CardTitle>
         <CardDescription className="text-zinc-400">
-          Enter a secure new password for your Dissafyt account.
+          {success
+            ? 'Your credentials have been securely updated.'
+            : isInvalidLink
+            ? 'This recovery link is no longer valid.'
+            : 'Enter a strong new password for your Dissafyt profile.'}
         </CardDescription>
       </CardHeader>
-      <CardContent>
-        {errorMsg && (
-          <div className="mb-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-400">
-            {errorMsg}
-          </div>
-        )}
 
-        {success ? (
+      <CardContent>
+        {checkingAuth ? (
+          <div className="py-8 text-center space-y-3">
+            <div className="h-6 w-6 border-2 border-amber-500 border-t-transparent rounded-full animate-spin mx-auto" />
+            <div className="text-xs text-zinc-400 font-mono">Verifying cryptographic token...</div>
+          </div>
+        ) : isInvalidLink ? (
+          <div className="space-y-5 text-center py-2">
+            <div className="mx-auto flex h-12 w-12 items-center justify-center rounded-2xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+              <AlertTriangle className="h-6 w-6" />
+            </div>
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 p-3 text-xs text-amber-300 text-left leading-relaxed">
+              {errorMsg || 'The password reset link has expired or has already been used.'}
+            </div>
+            <p className="text-xs text-zinc-400">
+              For your account protection, reset links are single-use and expire within 60 minutes.
+            </p>
+            <Link href="/auth/forgot-password" className="block">
+              <Button className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider py-2.5">
+                Request Fresh Reset Link <ArrowRight className="ml-1.5 h-3.5 w-3.5" />
+              </Button>
+            </Link>
+          </div>
+        ) : success ? (
           <div className="space-y-6 text-center py-4">
             <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-2xl bg-emerald-500/10 border border-emerald-500/30 text-emerald-400">
               <CheckCircle2 className="h-7 w-7" />
@@ -115,13 +245,19 @@ function ResetPasswordForm() {
             </div>
             <Button
               onClick={() => router.push('/account')}
-              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs"
+              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs uppercase tracking-wider"
             >
               Continue to Account
             </Button>
           </div>
         ) : (
           <form onSubmit={handlePasswordUpdate} className="space-y-4">
+            {errorMsg && (
+              <div className="rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-xs text-red-400">
+                {errorMsg}
+              </div>
+            )}
+
             <div className="space-y-2">
               <Label htmlFor="new-password">New Password</Label>
               <PasswordInput
@@ -149,12 +285,12 @@ function ResetPasswordForm() {
             <Button
               type="submit"
               disabled={loading}
-              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-semibold text-sm py-2.5 transition shadow-lg shadow-amber-500/20"
+              className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs uppercase tracking-wider py-2.5 transition shadow-lg shadow-amber-500/20"
             >
               {loading ? (
                 <span className="flex items-center justify-center">
                   <span className="h-4 w-4 border-2 border-black border-t-transparent rounded-full animate-spin mr-2" />
-                  Updating Password...
+                  Updating Credentials...
                 </span>
               ) : (
                 'Set New Password'

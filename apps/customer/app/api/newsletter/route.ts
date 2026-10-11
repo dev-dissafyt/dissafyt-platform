@@ -96,3 +96,47 @@ export async function GET(request: NextRequest) {
     );
   }
 }
+
+/**
+ * PATCH /api/newsletter
+ * Unsubscribe or update preference for an email address.
+ */
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json().catch(() => ({}));
+    const rawEmail = typeof body.email === 'string' ? body.email.trim() : '';
+
+    if (!rawEmail || !EMAIL_REGEX.test(rawEmail)) {
+      return NextResponse.json(
+        { error: 'Please provide a valid email address.' },
+        { status: 400 }
+      );
+    }
+
+    const email = rawEmail.toLowerCase();
+    const admin = getSupabaseAdminClient();
+
+    const { error } = await admin
+      .from('newsletter_subscribers')
+      .update({
+        status: 'unsubscribed',
+        updated_at: new Date().toISOString(),
+      })
+      .eq('email', email);
+
+    if (error) {
+      console.warn('Newsletter unsubscribe warning:', error);
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'You have been successfully unsubscribed from Dissafyt communications.',
+    });
+  } catch (err: any) {
+    console.error('Newsletter unsubscribe error:', err);
+    return NextResponse.json(
+      { error: err.message || 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

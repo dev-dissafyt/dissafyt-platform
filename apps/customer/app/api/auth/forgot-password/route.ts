@@ -18,10 +18,10 @@ export async function POST(req: NextRequest) {
 
     const cleanEmail = email.toLowerCase().trim();
 
-    // 1. Resolve baseUrl / origin for redirect
-    const host = req.headers.get('host') || 'www.dissafyt.com';
-    const proto = host.includes('localhost') ? 'http' : 'https';
-    const origin = `${proto}://${host}`;
+    // 1. Resolve baseUrl / origin for redirect (canonical https://dissafyt.com in production)
+    const host = req.headers.get('host') || 'dissafyt.com';
+    const isLocal = host.includes('localhost');
+    const origin = isLocal ? `http://${host}` : 'https://dissafyt.com';
     const redirectTo = `${origin}/auth/reset-password`;
 
     // 2. Generate secure recovery link via Supabase Admin (bypasses Supabase SMTP 504 issues)

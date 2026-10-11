@@ -218,7 +218,7 @@ export class EmailService {
                 1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570
               </div>
               <div style="border-top:1px solid #1c1917;padding-top:12px;font-size:11px;color:#71717a;">
-                Direct inquiries or replies route to <a href="mailto:letstalk@dissafyt.com" style="color:#ff5500;text-decoration:none;font-weight:600;">letstalk@dissafyt.com</a>
+                Direct inquiries or replies route to <a href="mailto:letstalk@dissafyt.com" style="color:#ff5500;text-decoration:none;font-weight:600;">letstalk@dissafyt.com</a> &bull; <a href="https://dissafyt.com/unsubscribe" style="color:#71717a;text-decoration:underline;">Unsubscribe</a>
                 <br/>
                 &copy; ${new Date().getFullYear()} Dissafyt Platform. All rights reserved.
               </div>
