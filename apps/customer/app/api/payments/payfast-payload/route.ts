@@ -21,6 +21,9 @@ export async function POST(request: NextRequest) {
     let resolvedItemName = item_name || 'Dissafyt Studio Payment';
     let relatedId = booking_id || order_id || `pm-${Date.now()}`;
     let relatedType = booking_id ? 'booking' : 'order';
+    let resolvedCustomerName = customer_name;
+    let resolvedCustomerEmail = customer_email;
+    let resolvedCustomerPhone = customer_phone;
 
     // If booking_id provided, fetch exact details from database
     if (booking_id) {
@@ -38,13 +41,34 @@ export async function POST(request: NextRequest) {
         resolvedAmount = Number(booking.total_amount || booking.service?.price || resolvedAmount);
         resolvedItemName = `Ace of Fyt: ${booking.service?.name || 'Haircut'}`;
       }
+    } else if (order_id) {
+      const admin = getSupabaseAdminClient();
+      const { data: order } = await admin
+        .from('orders')
+        .select('*')
+        .eq('id', order_id)
+        .maybeSingle();
+
+      if (order) {
+        const balanceDue = Number(order.balance_due || 0);
+        if (order.deposit_status === 'deposit_paid' && balanceDue > 0) {
+          resolvedAmount = balanceDue;
+          resolvedItemName = `Dissafyt Pre-Order Balance #${order.order_number}`;
+        } else {
+          resolvedAmount = Number(order.total || resolvedAmount);
+          resolvedItemName = `Dissafyt Order #${order.order_number}`;
+        }
+        if (order.customer_name) resolvedCustomerName = order.customer_name;
+        if (order.customer_email) resolvedCustomerEmail = order.customer_email;
+        if (order.customer_phone) resolvedCustomerPhone = order.customer_phone;
+      }
     }
 
     if (resolvedAmount <= 0) {
       return NextResponse.json({ error: 'Valid payment amount is required' }, { status: 400 });
     }
 
-    const nameParts = (customer_name || 'Customer').trim().split(' ');
+    const nameParts = (resolvedCustomerName || 'Customer').trim().split(' ');
     const firstName = nameParts[0] || 'Customer';
     const lastName = nameParts.slice(1).join(' ') || '';
 
@@ -58,8 +82,8 @@ export async function POST(request: NextRequest) {
       notify_url: `${siteUrl}/api/payments/payfast-notify`,
       name_first: firstName,
       ...(lastName ? { name_last: lastName } : {}),
-      email_address: customer_email || 'client@dissafyt.com',
-      ...(customer_phone ? { cell_number: customer_phone } : {}),
+      email_address: resolvedCustomerEmail || 'client@dissafyt.com',
+      ...(resolvedCustomerPhone ? { cell_number: resolvedCustomerPhone } : {}),
       m_payment_id: relatedId,
       amount: resolvedAmount.toFixed(2),
       item_name: resolvedItemName,

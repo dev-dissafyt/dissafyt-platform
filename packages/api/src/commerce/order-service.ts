@@ -312,6 +312,21 @@ export class OrderService {
 
     // Authoritative payment amount verification
     const balanceDue = Number(order.balance_due || 0);
+
+    // If order already has deposit paid, this incoming payment settles the outstanding balance online
+    if (order.deposit_status === 'deposit_paid') {
+      if (amountPaid >= balanceDue - 0.05) {
+        return await this.settleOrderBalance({
+          orderId,
+          amountPaid,
+          paymentMethod: 'payfast_online',
+          notes: `Remaining balance settled online via PayFast (${paymentRef || 'PF_ONLINE'})`,
+        });
+      } else {
+        return { success: false, error: `Balance underpaid: received R${amountPaid}, required R${balanceDue}` };
+      }
+    }
+
     const isMilestoneDeposit = balanceDue > 0;
     const expectedAmount = isMilestoneDeposit
       ? Number(order.total) - balanceDue
