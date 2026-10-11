@@ -175,22 +175,22 @@ export class EmailService {
             <td style="background-color:#ff5500;background:linear-gradient(90deg,#ff5500,#ff8800);height:4px;font-size:0;line-height:0;">&nbsp;</td>
           </tr>
 
-          <!-- Brand Header -->
+          <!-- Brand Header with Official Logo -->
           <tr>
-            <td style="padding:32px 32px 24px;border-bottom:1px solid #1f1f23;text-align:left;">
+            <td style="padding:28px 32px 22px;border-bottom:1px solid #1f1f23;text-align:left;">
               <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
                 <tr>
-                  <td>
-                    <div style="font-size:22px;font-weight:900;letter-spacing:4px;color:#ffffff;line-height:1;margin:0;">
-                      DISSAFYT
-                    </div>
-                    <div style="font-size:11px;font-weight:700;letter-spacing:2px;color:#ff5500;margin-top:6px;text-transform:uppercase;">
+                  <td style="vertical-align:middle;">
+                    <a href="https://dissafyt.com" style="text-decoration:none;display:inline-block;" target="_blank">
+                      <img src="https://dissafyt.com/logo.png" alt="DISSAFYT" width="140" style="display:block;max-width:140px;height:auto;border:0;outline:none;text-decoration:none;" />
+                    </a>
+                    <div style="font-size:10px;font-weight:700;letter-spacing:2px;color:#ff5500;margin-top:6px;text-transform:uppercase;">
                       Sovereign Concierge
                     </div>
                   </td>
-                  <td align="right">
-                    <span style="display:inline-block;padding:4px 10px;background-color:#1c1917;border:1px solid #292524;border-radius:999px;font-size:11px;color:#a8a29e;font-family:monospace;letter-spacing:0.5px;">
-                      CAPE TOWN
+                  <td align="right" style="vertical-align:middle;">
+                    <span style="display:inline-block;padding:5px 12px;background-color:#1c1917;border:1px solid #292524;border-radius:999px;font-size:10px;color:#a8a29e;font-family:monospace;letter-spacing:1px;text-transform:uppercase;">
+                      Cape Town &bull; ZA
                     </span>
                   </td>
                 </tr>
@@ -208,6 +208,9 @@ export class EmailService {
           <!-- Sovereign Footer -->
           <tr>
             <td style="padding:28px 32px;background-color:#0c0a09;border-top:1px solid #1f1f23;text-align:center;color:#71717a;font-size:12px;line-height:1.6;">
+              <div style="margin-bottom:12px;">
+                <img src="https://dissafyt.com/logo.png" alt="DISSAFYT" width="70" style="display:inline-block;max-width:70px;height:auto;opacity:0.4;" />
+              </div>
               <div style="color:#d4d4d8;font-weight:600;margin-bottom:4px;">
                 Dissafyt Studio &bull; Cape Town Flagship
               </div>
