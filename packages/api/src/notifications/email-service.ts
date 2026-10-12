@@ -84,6 +84,15 @@ export interface BatchUnlockedPaymentPayload {
   paymentUrl: string;
 }
 
+export interface SurveyVoucherEmailPayload {
+  customerName?: string | null;
+  customerEmail: string;
+  voucherCode: string;
+  discountAmount: number;
+  storefrontUrl?: string;
+}
+
+
 export interface AbandonedCartPayload {
   customerName: string;
   customerEmail: string;
@@ -1112,4 +1121,69 @@ export class EmailService {
       tags: [{ name: 'category', value: 'batch_unlocked_payment' }],
     });
   }
+
+  /**
+   * Dispatched when a prospect completes the pricing survey, delivering their exclusive
+   * R20 discount voucher code (e.g. firstbuy26) and VIP drop priority confirmation.
+   */
+  static async sendSurveyVoucherNotice(payload: SurveyVoucherEmailPayload) {
+    const code = payload.voucherCode || 'firstbuy26';
+    const amount = payload.discountAmount || 20;
+    const storeUrl = payload.storefrontUrl || 'https://www.dissafyt.com/shop';
+
+    const content = `
+      <div style="text-align:center;padding:10px 0 20px 0;">
+        <span style="display:inline-block;padding:6px 16px;border-radius:999px;background-color:rgba(245,158,11,0.15);border:1px solid rgba(245,158,11,0.3);color:#f59e0b;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;">
+          &#10004; PRICING ADVISORY CONFIRMED &bull; VIP ACCESS UNLOCKED
+        </span>
+        <h2 style="font-size:24px;font-weight:900;color:#ffffff;margin:16px 0 8px 0;letter-spacing:-0.5px;">
+          Thank You for Shaping Dissafyt
+        </h2>
+        <p style="font-size:14px;color:#a1a1aa;margin:0 auto;max-width:440px;line-height:1.5;">
+          Hey ${payload.customerName || 'there'}, your pricing votes have been recorded! As promised, here is your exclusive discount voucher for our upcoming collection.
+        </p>
+      </div>
+
+      <!-- Voucher Code Card -->
+      <div style="background-color:#18181b;border:2px dashed #f59e0b;border-radius:12px;padding:24px;margin-bottom:24px;text-align:center;">
+        <div style="color:#71717a;font-size:12px;text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:6px;">
+          Your Exclusive Promo Voucher
+        </div>
+        <div style="font-size:32px;font-weight:900;font-family:monospace;letter-spacing:3px;margin-bottom:8px;color:#f59e0b;">
+          ${code}
+        </div>
+        <div style="color:#22c55e;font-size:14px;font-weight:700;">
+          R ${amount}.00 OFF YOUR ORDER
+        </div>
+        <div style="color:#a1a1aa;font-size:11px;margin-top:8px;">
+          Apply code <strong style="color:#ffffff;">${code}</strong> at checkout. Valid across all streetwear drops and blanks.
+        </div>
+      </div>
+
+      <!-- VIP Perk Callout -->
+      <div style="background-color:#0c0a09;border:1px solid #1f1f23;border-radius:8px;padding:16px 20px;margin-bottom:24px;font-size:12px;color:#d4d4d8;line-height:1.6;">
+        <p style="margin:0 0 8px 0;">
+          <strong style="color:#ffffff;">Priority VIP Drop List:</strong> You have been added to our inner circle list. When Batch 01 production drops, you will receive first access before the public release sells out.
+        </p>
+        <p style="margin:0;color:#71717a;">
+          Crafted with 280-300 GSM heavyweight French terry and fleece, engineered right here in Cape Town.
+        </p>
+      </div>
+
+      <!-- Action Button -->
+      <div style="text-align:center;padding:10px 0 20px 0;">
+        <a href="${storeUrl}" style="background-color:#f59e0b;color:#09090b;text-decoration:none;padding:16px 36px;border-radius:8px;font-weight:900;font-size:14px;letter-spacing:1px;text-transform:uppercase;display:inline-block;box-shadow:0 6px 20px rgba(245,158,11,0.3);">
+          Explore Drop Room &rarr;
+        </a>
+      </div>
+    `;
+
+    return this.send({
+      to: payload.customerEmail,
+      subject: `Your R${amount} Voucher: ${code} + Priority VIP Access // Dissafyt Garment Lab`,
+      html: this.renderShell(content, `Thank you for completing our pricing survey! Here is your R${amount} voucher code: ${code}.`),
+      tags: [{ name: 'category', value: 'survey_voucher' }],
+    });
+  }
 }
+

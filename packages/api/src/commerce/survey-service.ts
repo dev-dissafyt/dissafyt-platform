@@ -6,6 +6,8 @@ import {
   SurveyTierType,
 } from '@dissafyt/database';
 import { AuditService } from '../audit/audit-service';
+import { EmailService } from '../notifications/email-service';
+
 
 export interface CalculatedSurveyTiers {
   cost: number;
@@ -264,11 +266,26 @@ export class SurveyService {
       throw new Error(votesError.message || 'Failed to record votes.');
     }
 
+    // 4. Dispatch R20 voucher email with promo code 'firstbuy26' if email is provided
+    if (input.respondent_email && input.respondent_email.includes('@')) {
+      try {
+        await EmailService.sendSurveyVoucherNotice({
+          customerName: input.respondent_name,
+          customerEmail: input.respondent_email,
+          voucherCode: 'firstbuy26',
+          discountAmount: 20,
+        });
+      } catch (emailErr) {
+        console.error('[SurveyService] Failed to send survey voucher email:', emailErr);
+      }
+    }
+
     return {
       success: true,
       responseId,
     };
   }
+
 
   /**
    * Retrieves comprehensive survey feedback analytics and product insights for the admin dashboard.

@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { items, shippingAddress, fulfillmentChoice, collectionLocationId } = body;
+    const { items, shippingAddress, fulfillmentChoice, collectionLocationId, promo_code, discount_amount } = body;
 
     if (!items || !items.length || !shippingAddress) {
       return NextResponse.json({ error: 'Items and shippingAddress are required' }, { status: 400 });
@@ -90,6 +90,8 @@ export async function POST(request: NextRequest) {
       shipping_address: shippingAddress,
       fulfillment_choice: fulfillmentChoice || 'courier',
       collection_location_id: collectionLocationId || 'loc-cpt-flagship',
+      promo_code: promo_code || null,
+      discount_amount: discount_amount || null,
     });
 
     if (!result.success || !result.order) {

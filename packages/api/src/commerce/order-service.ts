@@ -36,6 +36,8 @@ export interface CreateOrderInput {
   payment_method?: string;
   fulfillment_choice?: 'courier' | 'studio_collection';
   collection_location_id?: string;
+  promo_code?: string | null;
+  discount_amount?: number | null;
 }
 
 export interface OrderWithItems extends Order {
@@ -217,7 +219,18 @@ export class OrderService {
 
       const fulfillmentChoice = input.fulfillment_choice === 'studio_collection' ? 'studio_collection' : 'courier';
       const shippingCost = fulfillmentChoice === 'studio_collection' ? 0 : (input.shipping_cost || 0);
-      const orderTotal = orderSubtotal + shippingCost;
+
+      // Validate promo code and calculate discount
+      let discountAmount = 0;
+      const normalizedPromo = (input.promo_code || '').trim().toLowerCase();
+      if (normalizedPromo === 'firstbuy26') {
+        discountAmount = 20.00; // Survey completion voucher: R20.00 OFF
+      } else if (input.discount_amount && Number(input.discount_amount) > 0) {
+        discountAmount = Number(input.discount_amount);
+      }
+
+      const grossTotal = orderSubtotal + shippingCost;
+      const orderTotal = Math.max(0, grossTotal - discountAmount);
 
       const isPurePreorder = hasPreorder && orderDepositTotal === 0;
       const initialStatus = isPurePreorder ? 'preorder_reserved' : 'pending_payment';
@@ -225,6 +238,11 @@ export class OrderService {
       // 2. Insert into orders table with valid user_id
       const orderNumber = this.generateOrderNumber();
       let order: any = null;
+
+      const enrichedShippingAddress = {
+        ...input.shipping_address,
+        ...(normalizedPromo ? { promo_code: normalizedPromo, discount_amount: discountAmount } : {}),
+      };
 
       try {
         const { data: dbOrder, error: orderErr } = await admin
@@ -236,14 +254,14 @@ export class OrderService {
             subtotal: orderSubtotal,
             total: orderTotal,
             deposit_paid: 0.00,
-            balance_due: isPurePreorder ? orderTotal : orderBalanceTotal,
+            balance_due: isPurePreorder ? orderTotal : Math.max(0, orderBalanceTotal - (orderDepositTotal === 0 ? discountAmount : 0)),
             deposit_status: 'none',
             fulfillment_choice: fulfillmentChoice,
             collection_location_id: input.collection_location_id || 'loc-cpt-flagship',
             customer_email: recipientEmail || null,
             customer_phone: input.customer_phone || input.shipping_address?.recipient_phone || null,
             customer_name: input.customer_name || input.shipping_address?.recipient_name || null,
-            shipping_address: input.shipping_address,
+            shipping_address: enrichedShippingAddress,
           })
           .select()
           .single();

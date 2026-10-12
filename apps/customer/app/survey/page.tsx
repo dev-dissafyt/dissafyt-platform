@@ -41,6 +41,7 @@ export default function PricingSurveyPage() {
   const [submitted, setSubmitted] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedVoucher, setCopiedVoucher] = useState(false);
 
   // Form State
   const [respondentName, setRespondentName] = useState('');
@@ -167,6 +168,14 @@ export default function PricingSurveyPage() {
     }
   }
 
+  function copyVoucherCode() {
+    if (typeof window !== 'undefined') {
+      navigator.clipboard.writeText('firstbuy26');
+      setCopiedVoucher(true);
+      setTimeout(() => setCopiedVoucher(false), 2500);
+    }
+  }
+
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100 selection:bg-amber-500 selection:text-black">
       {/* Top Bar */}
@@ -206,9 +215,9 @@ export default function PricingSurveyPage() {
             <Sparkles className="h-5 w-5 text-amber-400 flex-shrink-0 mt-0.5" />
             <div className="text-xs text-stone-300 leading-relaxed">
               <strong className="text-amber-300 font-semibold block mb-0.5">
-                Priority VIP Access + R100 Voucher
+                Priority VIP Access + R20 Voucher
               </strong>
-              Submitting your honest feedback guarantees early access before the public drop sells out, plus an exclusive R100 promo code sent to your email.
+              Submitting your honest feedback guarantees early access before the public drop sells out, plus an exclusive R20 discount voucher (<code className="text-amber-400 font-mono font-bold">firstbuy26</code>) sent to your email.
             </div>
           </div>
         </div>
@@ -225,6 +234,57 @@ export default function PricingSurveyPage() {
               </h2>
               <p className="text-stone-300 text-sm leading-relaxed">
                 Thank you for voting on our upcoming catalogue. Your responses have been added to our pricing advisory ledger to determine the official release prices.
+              </p>
+            </div>
+
+            {/* Exclusive Promo Voucher Card */}
+            <div className="max-w-md mx-auto p-5 sm:p-6 rounded-2xl border-2 border-dashed border-amber-500/70 bg-stone-950/90 space-y-4 shadow-2xl text-left">
+              <div className="flex items-center justify-between text-xs font-mono">
+                <span className="text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
+                  <Sparkles className="h-4 w-4" /> Exclusive Reward Voucher
+                </span>
+                <span className="bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 px-2 py-0.5 rounded font-bold">
+                  R 20.00 OFF
+                </span>
+              </div>
+
+              <div className="py-3 text-center bg-black/80 rounded-xl border border-stone-800">
+                <div className="text-[10px] uppercase font-mono tracking-widest text-stone-500 mb-1">PROMO CODE</div>
+                <div className="text-2xl sm:text-3xl font-black font-mono tracking-widest text-amber-400 select-all">
+                  firstbuy26
+                </div>
+              </div>
+
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={copyVoucherCode}
+                  className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold uppercase tracking-wider transition-colors shadow-lg shadow-amber-500/10"
+                >
+                  {copiedVoucher ? (
+                    <>
+                      <Check className="h-4 w-4" /> Copied firstbuy26!
+                    </>
+                  ) : (
+                    <>
+                      <Copy className="h-4 w-4" /> Copy Promo Code
+                    </>
+                  )}
+                </button>
+                <Link
+                  href="/checkout?promo=firstbuy26"
+                  className="inline-flex items-center justify-center gap-1 px-4 py-2.5 rounded-lg border border-amber-500/40 text-amber-300 hover:text-white hover:bg-amber-500/10 text-xs font-semibold transition-colors"
+                >
+                  Redeem &rarr;
+                </Link>
+              </div>
+
+              <p className="text-[11px] text-stone-400 text-center leading-relaxed">
+                {respondentEmail ? (
+                  <>We have dispatched your voucher to <strong className="text-stone-200">{respondentEmail}</strong>.</>
+                ) : (
+                  <>Apply code <strong className="text-white">firstbuy26</strong> during checkout for R20.00 off.</>
+                )}
               </p>
             </div>
 
@@ -449,10 +509,10 @@ export default function PricingSurveyPage() {
               <div className="space-y-1">
                 <h3 className="text-lg sm:text-xl font-bold uppercase tracking-tight text-white flex items-center gap-2">
                   <Sparkles className="h-5 w-5 text-amber-400" />
-                  Claim Priority VIP Access & R100 Voucher
+                  Claim Priority VIP Access & R20 Voucher
                 </h3>
                 <p className="text-xs text-stone-400 leading-relaxed">
-                  Enter your details below to receive your confirmation, early drop access link, and exclusive voucher code.
+                  Enter your details below to receive your confirmation, early drop access link, and your R20 discount voucher (<span className="text-amber-400 font-mono font-bold">firstbuy26</span>).
                 </p>
               </div>
 

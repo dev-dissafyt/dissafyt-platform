@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input, Label } from '@dissafyt/ui';
-import { ShoppingBag, ArrowLeft, Trash2, ShieldCheck, Truck, Lock, Plus, Minus, Store, PackageCheck, Clock, UserCheck } from 'lucide-react';
+import { ShoppingBag, ArrowLeft, Trash2, ShieldCheck, Truck, Lock, Plus, Minus, Store, PackageCheck, Clock, UserCheck, Tag, CheckCircle2, X } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@dissafyt/database';
 import { useCart } from '../context/cart-context';
 
@@ -39,13 +39,60 @@ export default function CheckoutPage() {
   const [province, setProvince] = useState('Western Cape');
   const [postalCode, setPostalCode] = useState('');
 
+  // Promo / Voucher State (e.g. firstbuy26)
+  const [promoCodeInput, setPromoCodeInput] = useState('');
+  const [appliedPromoCode, setAppliedPromoCode] = useState<string | null>(null);
+  const [promoDiscount, setPromoDiscount] = useState<number>(0);
+  const [promoError, setPromoError] = useState<string | null>(null);
+  const [promoSuccessMsg, setPromoSuccessMsg] = useState<string | null>(null);
+
   // Frictionless Pre-Order Accumulation & Payable Calculations
   const hasPreorderItems = cart.some((i) => i.isPreorder);
   const inStockItems = cart.filter((i) => !i.isPreorder);
   const preorderItems = cart.filter((i) => i.isPreorder);
-  const totalPayableToday = inStockItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  const inStockSubtotal = inStockItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  const totalPayableToday = Math.max(0, inStockSubtotal - promoDiscount);
   const preorderReservationValue = preorderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
   const isPurePreorder = hasPreorderItems && inStockItems.length === 0;
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const code = params.get('promo');
+      if (code && code.trim().toLowerCase() === 'firstbuy26') {
+        setPromoCodeInput('firstbuy26');
+        setAppliedPromoCode('firstbuy26');
+        setPromoDiscount(20);
+        setPromoSuccessMsg('R20 voucher applied! (firstbuy26)');
+      }
+    }
+  }, []);
+
+  function handleApplyPromo(e?: React.FormEvent) {
+    if (e) e.preventDefault();
+    setPromoError(null);
+    setPromoSuccessMsg(null);
+    const trimmed = promoCodeInput.trim().toLowerCase();
+    if (!trimmed) return;
+
+    if (trimmed === 'firstbuy26') {
+      setAppliedPromoCode('firstbuy26');
+      setPromoDiscount(20);
+      setPromoSuccessMsg('R20 voucher applied! (firstbuy26)');
+    } else {
+      setPromoError('Invalid promo code. Please check and try again.');
+      setAppliedPromoCode(null);
+      setPromoDiscount(0);
+    }
+  }
+
+  function handleRemovePromo() {
+    setAppliedPromoCode(null);
+    setPromoDiscount(0);
+    setPromoCodeInput('');
+    setPromoSuccessMsg(null);
+    setPromoError(null);
+  }
 
   useEffect(() => {
     // Prefill profile if user logged in
@@ -107,6 +154,8 @@ export default function CheckoutPage() {
         })),
         fulfillmentChoice,
         collectionLocationId: 'loc-cpt-flagship',
+        promo_code: appliedPromoCode,
+        discount_amount: promoDiscount,
         shippingAddress: {
           recipient_name: recipientName,
           recipient_phone: recipientPhone,
@@ -552,6 +601,66 @@ export default function CheckoutPage() {
                 ))}
               </div>
 
+              {/* Promo Code Input / Applied Badge */}
+              <div className="border-t border-zinc-800 pt-4">
+                <div className="text-xs font-medium text-zinc-300 mb-2 flex items-center gap-1.5">
+                  <Tag className="h-3.5 w-3.5 text-amber-400" /> Have a survey or promo voucher?
+                </div>
+                {appliedPromoCode ? (
+                  <div className="flex items-center justify-between p-2.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 text-xs">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle2 className="h-4 w-4 text-emerald-400 flex-shrink-0" />
+                      <div>
+                        <div className="font-mono font-bold text-emerald-300 uppercase">{appliedPromoCode}</div>
+                        <div className="text-[11px] text-zinc-400">R {promoDiscount.toFixed(2)} voucher discount applied</div>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleRemovePromo}
+                      className="p-1 text-zinc-400 hover:text-red-400 transition-colors"
+                      title="Remove voucher"
+                    >
+                      <X className="h-4 w-4" />
+                    </button>
+                  </div>
+                ) : (
+                  <div className="space-y-1.5">
+                    <div className="flex gap-2">
+                      <Input
+                        value={promoCodeInput}
+                        onChange={(e) => {
+                          setPromoCodeInput(e.target.value);
+                          if (promoError) setPromoError(null);
+                        }}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            handleApplyPromo();
+                          }
+                        }}
+                        placeholder="e.g. firstbuy26"
+                        className="h-9 text-xs bg-zinc-950 border-zinc-800 uppercase font-mono"
+                      />
+                      <Button
+                        type="button"
+                        onClick={handleApplyPromo}
+                        variant="outline"
+                        className="h-9 px-3 text-xs border-zinc-700 bg-zinc-800 hover:bg-zinc-700 text-white font-semibold"
+                      >
+                        Apply
+                      </Button>
+                    </div>
+                    {promoError && (
+                      <p className="text-[11px] text-red-400">{promoError}</p>
+                    )}
+                    {promoSuccessMsg && (
+                      <p className="text-[11px] text-emerald-400">{promoSuccessMsg}</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
               <div className="border-t border-zinc-800 pt-4 space-y-2">
                 <div className="flex justify-between text-sm text-zinc-400">
                   <span>Total Garment Value</span>
@@ -577,6 +686,13 @@ export default function CheckoutPage() {
                     {fulfillmentChoice === 'studio_collection' ? 'Free Studio Pickup' : 'Door-to-door Courier'}
                   </span>
                 </div>
+
+                {promoDiscount > 0 && (
+                  <div className="flex justify-between text-sm text-emerald-400 font-medium">
+                    <span>Voucher Discount ({appliedPromoCode})</span>
+                    <span className="font-mono">- R {promoDiscount.toFixed(2)}</span>
+                  </div>
+                )}
 
                 <div className="flex justify-between text-base font-bold text-white pt-2 border-t border-zinc-800">
                   <span>Due Today (ZAR)</span>
