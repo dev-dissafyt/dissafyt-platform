@@ -1611,20 +1611,57 @@ export default function AdminCommercePage() {
         </Card>
       )}
 
-      {/* Edit Product Modal Form */}
+      {/* Edit Product Right Drawer Menu */}
       {editingProduct && (
-        <Card className="border-amber-500/50 bg-stone-900/95 p-6 border shadow-2xl">
-          <CardHeader className="p-0 mb-6">
-            <CardTitle className="text-xl text-white flex items-center">
-              <Pencil className="mr-2 h-5 w-5 text-amber-500" />
-              Edit Product: {editingProduct.name}
-            </CardTitle>
-            <CardDescription>
-              Updates to pricing, category, and inventory are tracked in the database audit log.
-            </CardDescription>
-          </CardHeader>
+        <div className="fixed inset-0 z-50 overflow-hidden">
+          {/* Backdrop */}
+          <div
+            className="fixed inset-0 bg-black/75 backdrop-blur-sm transition-opacity animate-in fade-in duration-200"
+            onClick={() => setEditingProduct(null)}
+            aria-hidden="true"
+          />
 
-          <form onSubmit={handleSaveEditedProduct} className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="fixed inset-y-0 right-0 flex max-w-full pl-6 sm:pl-12">
+            <div className="w-screen max-w-2xl bg-stone-900 border-l border-amber-500/30 shadow-2xl flex flex-col h-full animate-in slide-in-from-right duration-300">
+              {/* Drawer Sticky Header */}
+              <div className="flex items-center justify-between px-6 py-4 border-b border-stone-800 bg-stone-900/95 backdrop-blur-sm sticky top-0 z-20 shrink-0">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 rounded-lg bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                    <Pencil className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold text-white flex items-center gap-2">
+                      Edit Product
+                    </h2>
+                    <p className="text-xs text-stone-400 truncate max-w-xs sm:max-w-md">
+                      {editingProduct.name}
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setEditingProduct(null)}
+                  className="text-stone-400 hover:text-white hover:bg-stone-800 h-8 w-8 p-0 rounded-lg"
+                  title="Close editor"
+                >
+                  <X className="h-5 w-5" />
+                  <span className="sr-only">Close</span>
+                </Button>
+              </div>
+
+              {/* Form wrapping scrollable content & sticky footer */}
+              <form onSubmit={handleSaveEditedProduct} className="flex flex-col flex-1 min-h-0">
+                {/* Scrollable Form Body */}
+                <div className="flex-1 overflow-y-auto p-6 space-y-5">
+                  <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-xl">
+                    <p className="text-xs text-amber-300/90 leading-relaxed">
+                      Updates to pricing, category, cost margins, and inventory are tracked in the database audit log.
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div className="space-y-1">
               <Label>Product Name</Label>
               <Input
@@ -2227,20 +2264,36 @@ export default function AdminCommercePage() {
               )}
             </div>
 
-            <div className="md:col-span-2 flex justify-end space-x-3 pt-4 border-t border-stone-800">
-              <Button type="button" variant="ghost" onClick={() => setEditingProduct(null)}>
-                Cancel
-              </Button>
-              <Button
-                type="submit"
-                disabled={editSubmitting}
-                className="bg-amber-500 hover:bg-amber-400 text-black font-semibold"
-              >
-                {editSubmitting ? 'Saving Changes...' : 'Save Changes'}
-              </Button>
+                  </div>
+                </div>
+
+                {/* Sticky Action Footer */}
+                <div className="bg-stone-900/95 backdrop-blur-sm px-6 py-4 border-t border-stone-800 flex items-center justify-between z-20 shrink-0">
+                  <span className="text-[11px] text-stone-500 hidden sm:inline">
+                    Changes sync across the catalog and feeds.
+                  </span>
+                  <div className="flex items-center space-x-3 ml-auto">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={() => setEditingProduct(null)}
+                      className="text-stone-400 hover:text-white"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      type="submit"
+                      disabled={editSubmitting}
+                      className="bg-amber-500 hover:bg-amber-400 text-black font-semibold shadow-lg shadow-amber-500/10"
+                    >
+                      {editSubmitting ? 'Saving Changes...' : 'Save Changes'}
+                    </Button>
+                  </div>
+                </div>
+              </form>
             </div>
-          </form>
-        </Card>
+          </div>
+        </div>
       )}
 
 
