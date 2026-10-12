@@ -105,7 +105,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         pathname.startsWith('/commerce/orders'),
     },
     {
-      name: 'Barbershop',
+      name: 'Bookings',
       href: `${basePrefix}/barbershop`,
       icon: Scissors,
       isActive:

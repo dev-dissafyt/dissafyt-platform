@@ -87,7 +87,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               }`}
             >
               <Scissors className="h-4 w-4 text-amber-500" />
-              <span>Barbershop</span>
+              <span>Bookings</span>
             </Link>
             <Link
               href="/finance"

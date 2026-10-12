@@ -168,7 +168,6 @@ function PosLoginContent() {
                 type="button"
                 onClick={() => {
                   setEmail('curtislee@dissafyt.com');
-                  setPassword('DissafytAdmin2026!');
                 }}
                 className="text-left p-2 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-amber-500/50 transition-colors flex items-center gap-2 group cursor-pointer"
               >
@@ -185,7 +184,6 @@ function PosLoginContent() {
                 type="button"
                 onClick={() => {
                   setEmail('dissafyt@gmail.com');
-                  setPassword('Wat07081');
                 }}
                 className="text-left p-2 rounded-xl bg-zinc-950 border border-zinc-800 hover:border-rose-500/50 transition-colors flex items-center gap-2 group cursor-pointer"
               >

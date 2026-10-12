@@ -48,6 +48,7 @@ interface BarberProfile {
   id: string;
   user_id?: string | null;
   display_name: string;
+  specialty?: 'barber' | 'nail_tech' | 'beautician' | string;
   bio?: string | null;
   phone?: string | null;
   avatar_url?: string | null;
@@ -65,8 +66,16 @@ interface BarberProfile {
   bank_account_number?: string | null;
   bank_account_type?: string | null;
   bank_branch_code?: string | null;
+  bank_account_hash?: string | null;
+  has_station_pin?: boolean;
   pos_terminal_id?: string | null;
 }
+
+const SPECIALTY_LABELS: Record<string, string> = {
+  barber: 'Barber',
+  nail_tech: 'Nail Technician',
+  beautician: 'Beautician',
+};
 
 interface DashboardSummary {
   totalBookings: number;
@@ -91,6 +100,8 @@ export default function BarberPortalPage() {
   const [bankAccNum, setBankAccNum] = useState('');
   const [bankAccType, setBankAccType] = useState('cheque');
   const [bankBranch, setBankBranch] = useState('');
+  const [stationPin, setStationPin] = useState('');
+  const [newStationPin, setNewStationPin] = useState('');
   const [savingSettings, setSavingSettings] = useState(false);
   const [activeTab, setActiveTab] = useState<'appointments' | 'payouts'>('appointments');
 
@@ -107,7 +118,8 @@ export default function BarberPortalPage() {
 
       const res = await fetch('/api/barber/dashboard', { headers });
       if (!res.ok) {
-        throw new Error('Failed to load barber profile');
+        const errData = await res.json().catch(() => ({}));
+        throw new Error(errData.error || 'Failed to load specialist profile');
       }
 
       const data = await res.json();
@@ -122,10 +134,12 @@ export default function BarberPortalPage() {
         setBankAccNum(data.barber.bank_account_number || '');
         setBankAccType(data.barber.bank_account_type || 'cheque');
         setBankBranch(data.barber.bank_branch_code || '');
+        setStationPin('');
+        setNewStationPin('');
       }
     } catch (err: any) {
       console.error(err);
-      setStatusMsg({ type: 'error', text: err.message || 'Could not load barber dashboard' });
+      setStatusMsg({ type: 'error', text: err.message || 'Could not load specialist dashboard' });
     } finally {
       setLoading(false);
     }
@@ -142,9 +156,16 @@ export default function BarberPortalPage() {
     setStatusMsg(null);
 
     try {
+      const supabase = getSupabaseBrowserClient();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
       const res = await fetch('/api/barber/dashboard', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers,
         body: JSON.stringify({
           staff_id: barber.id,
           payfast_merchant_id: payfastId,
@@ -152,13 +173,18 @@ export default function BarberPortalPage() {
           bank_account_number: bankAccNum,
           bank_account_type: bankAccType,
           bank_branch_code: bankBranch,
+          station_pin: stationPin || undefined,
+          new_station_pin: newStationPin || undefined,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to update settings');
 
-      setStatusMsg({ type: 'success', text: 'Payout settings and banking details updated successfully.' });
+      setStatusMsg({
+        type: 'success',
+        text: 'Payout settings encrypted (AES-256-GCM) and SHA-256 integrity hash updated.',
+      });
       loadDashboard();
     } catch (err: any) {
       setStatusMsg({ type: 'error', text: err.message || 'Error saving payout settings' });
@@ -166,6 +192,8 @@ export default function BarberPortalPage() {
       setSavingSettings(false);
     }
   }
+
+  const specialtyLabel = SPECIALTY_LABELS[barber?.specialty || 'barber'] || 'Specialist';
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100 font-sans pb-24">
@@ -177,12 +205,15 @@ export default function BarberPortalPage() {
               <Scissors className="h-5 w-5" />
             </div>
             <div>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center flex-wrap gap-2">
                 <h1 className="text-lg font-bold text-white tracking-wide">
-                  {barber?.display_name || 'Master Barber'} &bull; Station Portal
+                  {barber?.display_name || 'Studio Specialist'} &bull; Station Portal
                 </h1>
-                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase tracking-wider">
-                  Live Cashflow
+                <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-stone-800 text-stone-200 border border-stone-700 uppercase tracking-wider">
+                  {specialtyLabel}
+                </span>
+                <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30 uppercase tracking-wider">
+                  <ShieldCheck className="h-3 w-3" /> Vault Encrypted
                 </span>
               </div>
               <p className="text-xs text-stone-400 flex items-center gap-1.5 mt-0.5">
@@ -197,7 +228,7 @@ export default function BarberPortalPage() {
             <div className="hidden md:flex flex-col text-right">
               <span className="text-[11px] text-stone-400 uppercase tracking-wider font-mono">Platform Split</span>
               <span className="text-xs font-bold text-amber-400">
-                15% Platform &bull; 85% Barber Net
+                15% Platform &bull; 85% Specialist Net
               </span>
             </div>
             <Button
@@ -447,12 +478,18 @@ export default function BarberPortalPage() {
             <div className="lg:col-span-8 space-y-6">
               <Card className="bg-stone-900/50 border-stone-800 shadow-xl">
                 <CardHeader>
-                  <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
-                    <CreditCard className="h-5 w-5 text-amber-500" />
-                    Payout & Banking Preferences
-                  </CardTitle>
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
+                      <CreditCard className="h-5 w-5 text-amber-500" />
+                      Payout & Banking Preferences
+                    </CardTitle>
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 px-2.5 py-0.5 text-[10px] font-mono text-emerald-400">
+                      <ShieldCheck className="h-3.5 w-3.5" />
+                      AES-256-GCM + SHA-256 Hashed
+                    </span>
+                  </div>
                   <p className="text-xs text-stone-400">
-                    Set up your PayFast merchant account or direct bank details to receive your 85% cut earnings automatically.
+                    Set up your PayFast merchant account or direct bank details to receive your 85% earnings automatically. Account numbers are encrypted at rest and verified via SHA-256 hash.
                   </p>
                 </CardHeader>
                 <CardContent>
@@ -482,14 +519,21 @@ export default function BarberPortalPage() {
 
                     {/* Direct EFT Banking Details */}
                     <div className="space-y-4 pt-2">
-                      <div className="border-b border-stone-800 pb-2">
-                        <Label className="text-sm font-bold text-white flex items-center gap-2">
-                          <Landmark className="h-4 w-4 text-stone-400" />
-                          South African Banking Details (Direct EFT Alternative)
-                        </Label>
-                        <p className="text-xs text-stone-400">
-                          Used for scheduled weekly bank transfers if not using PayFast wallet.
-                        </p>
+                      <div className="border-b border-stone-800 pb-2 flex flex-wrap items-center justify-between gap-2">
+                        <div>
+                          <Label className="text-sm font-bold text-white flex items-center gap-2">
+                            <Landmark className="h-4 w-4 text-stone-400" />
+                            South African Banking Details (Direct EFT Alternative)
+                          </Label>
+                          <p className="text-xs text-stone-400">
+                            Used for scheduled weekly bank transfers if not using PayFast wallet.
+                          </p>
+                        </div>
+                        {barber?.bank_account_hash && (
+                          <div className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2.5 py-1 rounded">
+                            SHA-256: {barber.bank_account_hash.slice(0, 22)}...
+                          </div>
+                        )}
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -524,11 +568,11 @@ export default function BarberPortalPage() {
 
                         <div className="space-y-1.5">
                           <Label htmlFor="accNum" className="text-xs text-stone-300">
-                            Account Number
+                            Account Number (Masked / Encrypted)
                           </Label>
                           <Input
                             id="accNum"
-                            placeholder="Account Number"
+                            placeholder="Enter new account number to replace"
                             value={bankAccNum}
                             onChange={(e) => setBankAccNum(e.target.value)}
                             className="bg-stone-950 border-stone-800 text-white text-xs font-mono"
@@ -550,13 +594,59 @@ export default function BarberPortalPage() {
                       </div>
                     </div>
 
+                    {/* Station Security PIN (Salted Scrypt Hash) */}
+                    <div className="rounded-xl border border-stone-800 bg-stone-950/60 p-4 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <Label className="text-xs font-bold text-white flex items-center gap-2">
+                          <ShieldCheck className="h-4 w-4 text-emerald-400" />
+                          Station Security PIN Protection (Salted Scrypt Hash)
+                        </Label>
+                        <span className="text-[10px] font-mono text-stone-400">
+                          {barber?.has_station_pin ? 'PIN Active' : 'No PIN Set'}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-stone-400">
+                        Protect your banking & payout changes on shared studio stations with a hashed personal security PIN.
+                      </p>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {barber?.has_station_pin && (
+                          <div className="space-y-1">
+                            <Label htmlFor="stationPin" className="text-[11px] text-stone-300">
+                              Current Station PIN (Required to save changes)
+                            </Label>
+                            <Input
+                              id="stationPin"
+                              type="password"
+                              placeholder="Enter current PIN"
+                              value={stationPin}
+                              onChange={(e) => setStationPin(e.target.value)}
+                              className="bg-stone-900 border-stone-800 text-white text-xs font-mono"
+                            />
+                          </div>
+                        )}
+                        <div className="space-y-1">
+                          <Label htmlFor="newStationPin" className="text-[11px] text-stone-300">
+                            {barber?.has_station_pin ? 'New Station PIN (Optional)' : 'Set Station Security PIN (4+ digits)'}
+                          </Label>
+                          <Input
+                            id="newStationPin"
+                            type="password"
+                            placeholder="••••"
+                            value={newStationPin}
+                            onChange={(e) => setNewStationPin(e.target.value)}
+                            className="bg-stone-900 border-stone-800 text-white text-xs font-mono"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
                     <div className="pt-4 border-t border-stone-800 flex justify-end">
                       <Button
                         type="submit"
                         disabled={savingSettings}
                         className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs px-6 h-10 shadow-lg shadow-amber-500/20"
                       >
-                        {savingSettings ? 'Saving...' : 'Save Payout Details'}
+                        {savingSettings ? 'Encrypting & Saving...' : 'Save Encrypted Payout Details'}
                       </Button>
                     </div>
                   </form>

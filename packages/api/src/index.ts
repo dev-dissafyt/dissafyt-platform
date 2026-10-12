@@ -18,4 +18,5 @@ export * from './whatsapp';
 export * from './config/domains.config';
 export * from './notifications/email-service';
 export * from './commerce/survey-service';
+export * from './security/staff-vault';
 

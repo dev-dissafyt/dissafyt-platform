@@ -217,10 +217,13 @@ export interface BarberService {
   created_at: string;
 }
 
+export type StaffSpecialty = 'barber' | 'nail_tech' | 'beautician';
+
 export interface Staff {
   id: string;
   user_id?: string | null;
   display_name: string;
+  specialty?: StaffSpecialty | string | null;
   bio?: string | null;
   phone?: string | null;
   avatar_url?: string | null;
@@ -233,6 +236,8 @@ export interface Staff {
   bank_account_number?: string | null;
   bank_account_type?: string | null;
   bank_branch_code?: string | null;
+  bank_account_hash?: string | null;
+  has_station_pin?: boolean;
   pos_terminal_id?: string | null;
   is_active: boolean;
   created_at: string;

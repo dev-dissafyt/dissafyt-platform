@@ -1,6 +1,7 @@
 import { getSupabaseAdminClient, BarberService, Booking, BookingWithDetails, Staff, BookingStatus, BarbershopLocation } from '@dissafyt/database';
 import { AuditService } from '../audit/audit-service';
 import { EmailService } from '../notifications/email-service';
+import { StaffVaultService } from '../security/staff-vault';
 
 export const SAST_TIMEZONE = 'Africa/Johannesburg';
 export const SAST_OFFSET = '+02:00';
@@ -342,11 +343,13 @@ export class BarbershopService {
           .order('display_name', { ascending: true });
         if (fbData) {
           const locations = await BarbershopService.listLocations();
-          return fbData.map((member: any) => ({
-            ...member,
-            location_id: member.location_id || 'loc-cpt-flagship',
-            location: locations.find((l) => l.id === (member.location_id || 'loc-cpt-flagship')) || locations[0],
-          })) as Staff[];
+          return fbData.map((member: any) =>
+            StaffVaultService.sanitizePublicStaff({
+              ...member,
+              location_id: member.location_id || 'loc-cpt-flagship',
+              location: locations.find((l) => l.id === (member.location_id || 'loc-cpt-flagship')) || locations[0],
+            })
+          ) as Staff[];
         }
       }
       console.error('Error fetching active staff:', error);
@@ -354,11 +357,13 @@ export class BarbershopService {
     }
 
     const locations = await BarbershopService.listLocations();
-    return data.map((member: any) => ({
-      ...member,
-      location_id: member.location_id || 'loc-cpt-flagship',
-      location: locations.find((l) => l.id === (member.location_id || 'loc-cpt-flagship')) || locations[0],
-    })) as Staff[];
+    return data.map((member: any) =>
+      StaffVaultService.sanitizePublicStaff({
+        ...member,
+        location_id: member.location_id || 'loc-cpt-flagship',
+        location: locations.find((l) => l.id === (member.location_id || 'loc-cpt-flagship')) || locations[0],
+      })
+    ) as Staff[];
   }
 
   /**

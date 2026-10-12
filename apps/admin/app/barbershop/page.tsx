@@ -32,8 +32,15 @@ import {
   MapPin,
   Building2,
   Pencil,
+  ShieldCheck,
 } from 'lucide-react';
 import { adminFetch } from '../../lib/operator';
+
+const SPECIALTY_LABELS: Record<string, string> = {
+  barber: 'Barber',
+  nail_tech: 'Nail Technician',
+  beautician: 'Beautician',
+};
 
 interface Service {
   id: string;
@@ -49,6 +56,7 @@ interface Service {
 interface StaffMember {
   id: string;
   display_name: string;
+  specialty?: 'barber' | 'nail_tech' | 'beautician' | string;
   bio?: string | null;
   phone?: string | null;
   location_id?: string | null;
@@ -60,6 +68,8 @@ interface StaffMember {
   bank_account_number?: string | null;
   bank_account_type?: string | null;
   bank_branch_code?: string | null;
+  bank_account_hash?: string | null;
+  has_station_pin?: boolean;
   pos_terminal_id?: string | null;
   created_at: string;
 }
@@ -118,6 +128,7 @@ export default function AdminBarbershopPage() {
   const [loadingStaff, setLoadingStaff] = useState(false);
   const [showAddStaffModal, setShowAddStaffModal] = useState(false);
   const [staffDisplayName, setStaffDisplayName] = useState('');
+  const [staffSpecialty, setStaffSpecialty] = useState<'barber' | 'nail_tech' | 'beautician'>('barber');
   const [staffBio, setStaffBio] = useState('');
   const [staffPhone, setStaffPhone] = useState('');
   const [staffLocationId, setStaffLocationId] = useState('loc-cpt-flagship');
@@ -128,6 +139,7 @@ export default function AdminBarbershopPage() {
   const [staffBankAccountNum, setStaffBankAccountNum] = useState('');
   const [staffBankAccountType, setStaffBankAccountType] = useState('cheque');
   const [staffBankBranchCode, setStaffBankBranchCode] = useState('');
+  const [staffStationPin, setStaffStationPin] = useState('');
   const [staffSubmitting, setStaffSubmitting] = useState(false);
 
   // --- TAB 3: SERVICES STATE ---
@@ -158,6 +170,7 @@ export default function AdminBarbershopPage() {
   // 1. Staff Edit State
   const [editingStaff, setEditingStaff] = useState<StaffMember | null>(null);
   const [editStaffName, setEditStaffName] = useState('');
+  const [editStaffSpecialty, setEditStaffSpecialty] = useState<'barber' | 'nail_tech' | 'beautician'>('barber');
   const [editStaffBio, setEditStaffBio] = useState('');
   const [editStaffPhone, setEditStaffPhone] = useState('');
   const [editStaffLocationId, setEditStaffLocationId] = useState('loc-cpt-flagship');
@@ -169,6 +182,7 @@ export default function AdminBarbershopPage() {
   const [editStaffBankAccountNum, setEditStaffBankAccountNum] = useState('');
   const [editStaffBankAccountType, setEditStaffBankAccountType] = useState('cheque');
   const [editStaffBankBranchCode, setEditStaffBankBranchCode] = useState('');
+  const [editStaffStationPin, setEditStaffStationPin] = useState('');
   const [editStaffSubmitting, setEditStaffSubmitting] = useState(false);
 
   // 2. Service Edit State
@@ -351,6 +365,7 @@ export default function AdminBarbershopPage() {
   function openEditStaffModal(staff: StaffMember) {
     setEditingStaff(staff);
     setEditStaffName(staff.display_name);
+    setEditStaffSpecialty((staff.specialty as any) || 'barber');
     setEditStaffBio(staff.bio || '');
     setEditStaffPhone(staff.phone || '');
     setEditStaffLocationId(staff.location_id || 'loc-cpt-flagship');
@@ -362,6 +377,7 @@ export default function AdminBarbershopPage() {
     setEditStaffBankAccountNum(staff.bank_account_number || '');
     setEditStaffBankAccountType(staff.bank_account_type || 'cheque');
     setEditStaffBankBranchCode(staff.bank_branch_code || '');
+    setEditStaffStationPin('');
   }
 
   async function handleSaveEditedStaff(e: React.FormEvent) {
@@ -375,6 +391,7 @@ export default function AdminBarbershopPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           display_name: editStaffName,
+          specialty: editStaffSpecialty,
           bio: editStaffBio,
           phone: editStaffPhone,
           location_id: editStaffLocationId,
@@ -386,18 +403,21 @@ export default function AdminBarbershopPage() {
           bank_account_number: editStaffBankAccountNum.trim() || null,
           bank_account_type: editStaffBankAccountType,
           bank_branch_code: editStaffBankBranchCode.trim() || null,
+          station_pin: editStaffStationPin.trim() || undefined,
         }),
       });
       if (res.ok) {
-        setStatusMsg(`Barber "${editStaffName}" updated successfully & logged to audit trail.`);
+        setStatusMsg(
+          `Specialist "${editStaffName}" updated, banking encrypted (AES-256-GCM) & logged to audit trail.`
+        );
         setEditingStaff(null);
         loadStaff();
       } else {
         const data = await res.json();
-        setStatusMsg(data.error || 'Failed to update barber');
+        setStatusMsg(data.error || 'Failed to update specialist');
       }
     } catch {
-      setStatusMsg('Network error while updating barber.');
+      setStatusMsg('Network error while updating specialist.');
     } finally {
       setEditStaffSubmitting(false);
     }
@@ -414,6 +434,7 @@ export default function AdminBarbershopPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           display_name: staffDisplayName,
+          specialty: staffSpecialty,
           bio: staffBio,
           phone: staffPhone,
           location_id: staffLocationId,
@@ -425,12 +446,16 @@ export default function AdminBarbershopPage() {
           bank_account_number: staffBankAccountNum.trim() || null,
           bank_account_type: staffBankAccountType,
           bank_branch_code: staffBankBranchCode.trim() || null,
+          station_pin: staffStationPin.trim() || undefined,
         }),
       });
 
       if (res.ok) {
-        setStatusMsg(`Barber ${staffDisplayName} added successfully & logged to audit trail!`);
+        setStatusMsg(
+          `Specialist ${staffDisplayName} (${SPECIALTY_LABELS[staffSpecialty]}) added with AES-256-GCM encrypted vault!`
+        );
         setStaffDisplayName('');
+        setStaffSpecialty('barber');
         setStaffBio('');
         setStaffPhone('');
         setStaffLocationId('loc-cpt-flagship');
@@ -441,14 +466,15 @@ export default function AdminBarbershopPage() {
         setStaffBankAccountNum('');
         setStaffBankAccountType('cheque');
         setStaffBankBranchCode('');
+        setStaffStationPin('');
         setShowAddStaffModal(false);
         loadStaff();
       } else {
         const err = await res.json();
-        setStatusMsg(`Failed to add barber: ${err.error}`);
+        setStatusMsg(`Failed to add specialist: ${err.error}`);
       }
     } catch {
-      setStatusMsg('Network error while adding barber.');
+      setStatusMsg('Network error while adding specialist.');
     } finally {
       setStaffSubmitting(false);
     }
@@ -698,7 +724,7 @@ export default function AdminBarbershopPage() {
           <div className="flex flex-wrap items-center gap-3">
             <h1 className="text-3xl font-bold text-white flex items-center">
               <Scissors className="mr-3 h-8 w-8 text-amber-500" />
-              Ace of Fyt Barbershop Operations
+              Bookings & Studio Operations
             </h1>
             <div className="flex items-center space-x-1.5 text-xs text-stone-300 bg-stone-900 border border-stone-800 px-3 py-1.5 rounded-lg shadow-inner">
               <MapPin className="h-4 w-4 text-amber-500" />
@@ -707,9 +733,13 @@ export default function AdminBarbershopPage() {
                 Flagship
               </span>
             </div>
+            <div className="flex items-center space-x-1.5 text-[11px] text-emerald-400 bg-emerald-950/30 border border-emerald-500/30 px-2.5 py-1 rounded-lg font-mono">
+              <ShieldCheck className="h-3.5 w-3.5" />
+              <span>Vault Encrypted (AES-256-GCM + SHA-256)</span>
+            </div>
           </div>
           <p className="text-sm text-stone-400 mt-1">
-            Real-time appointment schedule, barber staff management, studio locations, and grooming services.
+            Real-time appointment schedule, specialist management (Barbers, Nail Technicians & Beauticians), encrypted payout vault, and studio locations.
           </p>
         </div>
 
@@ -734,7 +764,7 @@ export default function AdminBarbershopPage() {
               onClick={() => setShowAddStaffModal(true)}
               className="bg-amber-500 hover:bg-amber-400 text-black font-semibold"
             >
-              <Plus className="mr-2 h-4 w-4" /> Add Barber
+              <Plus className="mr-2 h-4 w-4" /> Add Specialist
             </Button>
           )}
 
@@ -790,7 +820,7 @@ export default function AdminBarbershopPage() {
               : 'border-transparent text-stone-400 hover:text-stone-200'
           }`}
         >
-          <Users className="mr-2 h-4 w-4" /> Barbers & Staff ({staffList.length})
+          <Users className="mr-2 h-4 w-4" /> Specialists & Staff ({staffList.length})
         </button>
 
         <button
@@ -1163,7 +1193,7 @@ export default function AdminBarbershopPage() {
       )}
 
       {/* ========================================================================= */}
-      {/* TAB 2: BARBERS & STAFF MANAGEMENT */}
+      {/* TAB 2: SPECIALISTS & STAFF MANAGEMENT */}
       {/* ========================================================================= */}
       {activeTab === 'staff' && (
         <div className="space-y-6">
@@ -1171,21 +1201,36 @@ export default function AdminBarbershopPage() {
           {showAddStaffModal && (
             <Card className="border-stone-700 bg-stone-900/95 p-6 shadow-2xl">
               <CardHeader className="p-0 mb-4">
-                <CardTitle className="text-xl text-white">Add Master Barber / Staff Member</CardTitle>
+                <CardTitle className="text-xl text-white">Add Specialist / Staff Member</CardTitle>
                 <CardDescription>
-                  Register a barber to accept client bookings on the customer booking calendar.
+                  Register a Barber, Nail Technician, or Beautician to accept client bookings. Banking & payout details are encrypted with AES-256-GCM and verified with SHA-256 hashing.
                 </CardDescription>
               </CardHeader>
 
               <form onSubmit={handleCreateStaff} className="space-y-4">
-                <div className="space-y-1">
-                  <Label>Barber Display Name</Label>
-                  <Input
-                    value={staffDisplayName}
-                    onChange={(e) => setStaffDisplayName(e.target.value)}
-                    placeholder="e.g. Ace (Lead Barber) or Tyler Fade Master"
-                    required
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Specialist Display Name</Label>
+                    <Input
+                      value={staffDisplayName}
+                      onChange={(e) => setStaffDisplayName(e.target.value)}
+                      placeholder="e.g. Ace (Lead Barber) or Chloe (Nail Tech)"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label>Specialty / Role</Label>
+                    <select
+                      value={staffSpecialty}
+                      onChange={(e) => setStaffSpecialty(e.target.value as any)}
+                      className="w-full h-10 rounded-md border border-stone-800 bg-stone-950 px-3 text-sm text-white focus:border-amber-500 focus:outline-none"
+                    >
+                      <option value="barber">Barber</option>
+                      <option value="nail_tech">Nail Technician</option>
+                      <option value="beautician">Beautician</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="space-y-1">
@@ -1193,32 +1238,34 @@ export default function AdminBarbershopPage() {
                   <Input
                     value={staffBio}
                     onChange={(e) => setStaffBio(e.target.value)}
-                    placeholder="e.g. Hot towel specialist, razor lineups, scissor styling"
+                    placeholder="e.g. Gel & acrylic nails, facial aesthetics, or precision skin fades"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label>Direct Phone Number</Label>
-                  <Input
-                    value={staffPhone}
-                    onChange={(e) => setStaffPhone(e.target.value)}
-                    placeholder="e.g. +27 82 123 4567"
-                  />
-                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Direct Phone Number</Label>
+                    <Input
+                      value={staffPhone}
+                      onChange={(e) => setStaffPhone(e.target.value)}
+                      placeholder="e.g. +27 82 123 4567"
+                    />
+                  </div>
 
-                <div className="space-y-1">
-                  <Label>Studio / Station Location</Label>
-                  <select
-                    value={staffLocationId}
-                    onChange={(e) => setStaffLocationId(e.target.value)}
-                    className="w-full h-10 rounded-md border border-stone-800 bg-stone-950 px-3 text-sm text-white focus:border-amber-500 focus:outline-none"
-                  >
-                    {locations.map((loc) => (
-                      <option key={loc.id} value={loc.id}>
-                        {loc.name} {loc.is_flagship ? '(Flagship)' : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-1">
+                    <Label>Studio / Station Location</Label>
+                    <select
+                      value={staffLocationId}
+                      onChange={(e) => setStaffLocationId(e.target.value)}
+                      className="w-full h-10 rounded-md border border-stone-800 bg-stone-950 px-3 text-sm text-white focus:border-amber-500 focus:outline-none"
+                    >
+                      {locations.map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                          {loc.name} {loc.is_flagship ? '(Flagship)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-stone-800">
@@ -1233,7 +1280,7 @@ export default function AdminBarbershopPage() {
                       placeholder="15"
                     />
                     <span className="text-[10px] text-stone-500">
-                      Platform fee % ({100 - (Number(staffCommissionSplit) || 15)}% barber payout)
+                      Platform fee % ({100 - (Number(staffCommissionSplit) || 15)}% specialist payout)
                     </span>
                   </div>
                   <div className="space-y-1">
@@ -1243,7 +1290,7 @@ export default function AdminBarbershopPage() {
                       onChange={(e) => setStaffPayfastId(e.target.value)}
                       placeholder="e.g. 10024921"
                     />
-                    <span className="text-[10px] text-stone-500">For PayFast-to-PayFast split</span>
+                    <span className="text-[10px] text-stone-500">Encrypted at rest (AES-256-GCM)</span>
                   </div>
                   <div className="space-y-1">
                     <Label>Station POS Terminal ID</Label>
@@ -1252,13 +1299,18 @@ export default function AdminBarbershopPage() {
                       onChange={(e) => setStaffPosTerminalId(e.target.value)}
                       placeholder="e.g. Yoco-Station-1"
                     />
-                    <span className="text-[10px] text-stone-500">Assigned chair card machine</span>
+                    <span className="text-[10px] text-stone-500">Assigned station card machine</span>
                   </div>
                 </div>
 
                 <div className="space-y-2 pt-2 border-t border-stone-800">
-                  <Label className="text-stone-300 font-semibold text-xs">Direct EFT Banking Details (Payouts)</Label>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-stone-300 font-semibold text-xs flex items-center gap-1.5">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                      Direct EFT Banking & Station PIN Vault (AES-256-GCM + SHA-256 / Scrypt)
+                    </Label>
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                     <div className="space-y-1">
                       <Label className="text-[11px] text-stone-400">Bank Name</Label>
                       <Input
@@ -1272,7 +1324,7 @@ export default function AdminBarbershopPage() {
                       <Input
                         value={staffBankAccountNum}
                         onChange={(e) => setStaffBankAccountNum(e.target.value)}
-                        placeholder="e.g. 62800000000"
+                        placeholder="Encrypted on save"
                       />
                     </div>
                     <div className="space-y-1">
@@ -1295,6 +1347,15 @@ export default function AdminBarbershopPage() {
                         placeholder="e.g. 250655"
                       />
                     </div>
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-emerald-400">Station Security PIN</Label>
+                      <Input
+                        type="password"
+                        value={staffStationPin}
+                        onChange={(e) => setStaffStationPin(e.target.value)}
+                        placeholder="4+ digits (Hashed)"
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1312,7 +1373,7 @@ export default function AdminBarbershopPage() {
                     disabled={staffSubmitting}
                     className="bg-amber-500 hover:bg-amber-400 text-black font-semibold"
                   >
-                    {staffSubmitting ? 'Saving...' : 'Add Barber'}
+                    {staffSubmitting ? 'Encrypting & Saving...' : 'Add Specialist'}
                   </Button>
                 </div>
               </form>
@@ -1325,22 +1386,37 @@ export default function AdminBarbershopPage() {
               <CardHeader className="p-0 mb-4">
                 <CardTitle className="text-xl text-white flex items-center">
                   <Pencil className="mr-2 h-5 w-5 text-amber-500" />
-                  Edit Barber: {editingStaff.display_name}
+                  Edit Specialist: {editingStaff.display_name}
                 </CardTitle>
                 <CardDescription>
-                  Update barber information or availability. Changes are logged to the database audit trail.
+                  Update specialist role, availability, or encrypted banking details. Changes are logged to the audit trail with SHA-256 verification.
                 </CardDescription>
               </CardHeader>
 
               <form onSubmit={handleSaveEditedStaff} className="space-y-4">
-                <div className="space-y-1">
-                  <Label>Barber Display Name</Label>
-                  <Input
-                    value={editStaffName}
-                    onChange={(e) => setEditStaffName(e.target.value)}
-                    placeholder="e.g. Ace (Lead Barber)"
-                    required
-                  />
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Specialist Display Name</Label>
+                    <Input
+                      value={editStaffName}
+                      onChange={(e) => setEditStaffName(e.target.value)}
+                      placeholder="e.g. Ace (Lead Barber)"
+                      required
+                    />
+                  </div>
+
+                  <div className="space-y-1">
+                    <Label>Specialty / Role</Label>
+                    <select
+                      value={editStaffSpecialty}
+                      onChange={(e) => setEditStaffSpecialty(e.target.value as any)}
+                      className="w-full h-10 rounded-md border border-stone-800 bg-stone-950 px-3 text-sm text-white focus:border-amber-500 focus:outline-none"
+                    >
+                      <option value="barber">Barber</option>
+                      <option value="nail_tech">Nail Technician</option>
+                      <option value="beautician">Beautician</option>
+                    </select>
+                  </div>
                 </div>
 
                 <div className="space-y-1">
@@ -1348,32 +1424,34 @@ export default function AdminBarbershopPage() {
                   <Input
                     value={editStaffBio}
                     onChange={(e) => setEditStaffBio(e.target.value)}
-                    placeholder="e.g. Hot towel specialist, razor lineups"
+                    placeholder="e.g. Hot towel specialist, gel manicure, or facial aesthetics"
                   />
                 </div>
 
-                <div className="space-y-1">
-                  <Label>Direct Phone Number</Label>
-                  <Input
-                    value={editStaffPhone}
-                    onChange={(e) => setEditStaffPhone(e.target.value)}
-                    placeholder="+27 82 123 4567"
-                  />
-                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Direct Phone Number</Label>
+                    <Input
+                      value={editStaffPhone}
+                      onChange={(e) => setEditStaffPhone(e.target.value)}
+                      placeholder="+27 82 123 4567"
+                    />
+                  </div>
 
-                <div className="space-y-1">
-                  <Label>Studio / Station Location</Label>
-                  <select
-                    value={editStaffLocationId}
-                    onChange={(e) => setEditStaffLocationId(e.target.value)}
-                    className="w-full h-10 rounded-md border border-stone-800 bg-stone-950 px-3 text-sm text-white focus:border-amber-500 focus:outline-none"
-                  >
-                    {locations.map((loc) => (
-                      <option key={loc.id} value={loc.id}>
-                        {loc.name} {loc.is_flagship ? '(Flagship)' : ''}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="space-y-1">
+                    <Label>Studio / Station Location</Label>
+                    <select
+                      value={editStaffLocationId}
+                      onChange={(e) => setEditStaffLocationId(e.target.value)}
+                      className="w-full h-10 rounded-md border border-stone-800 bg-stone-950 px-3 text-sm text-white focus:border-amber-500 focus:outline-none"
+                    >
+                      {locations.map((loc) => (
+                        <option key={loc.id} value={loc.id}>
+                          {loc.name} {loc.is_flagship ? '(Flagship)' : ''}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </div>
 
                 <div className="space-y-1">
@@ -1412,7 +1490,7 @@ export default function AdminBarbershopPage() {
                       placeholder="15"
                     />
                     <span className="text-[10px] text-stone-500">
-                      Platform fee % ({100 - (Number(editStaffCommissionSplit) || 15)}% barber payout)
+                      Platform fee % ({100 - (Number(editStaffCommissionSplit) || 15)}% specialist payout)
                     </span>
                   </div>
                   <div className="space-y-1">
@@ -1422,7 +1500,7 @@ export default function AdminBarbershopPage() {
                       onChange={(e) => setEditStaffPayfastId(e.target.value)}
                       placeholder="e.g. 10024921"
                     />
-                    <span className="text-[10px] text-stone-500">For PayFast-to-PayFast split</span>
+                    <span className="text-[10px] text-stone-500">Encrypted at rest (AES-256-GCM)</span>
                   </div>
                   <div className="space-y-1">
                     <Label>Station POS Terminal ID</Label>
@@ -1431,13 +1509,23 @@ export default function AdminBarbershopPage() {
                       onChange={(e) => setEditStaffPosTerminalId(e.target.value)}
                       placeholder="e.g. Yoco-Station-1"
                     />
-                    <span className="text-[10px] text-stone-500">Assigned chair card machine</span>
+                    <span className="text-[10px] text-stone-500">Assigned station card machine</span>
                   </div>
                 </div>
 
                 <div className="space-y-2 pt-2 border-t border-stone-800">
-                  <Label className="text-stone-300 font-semibold text-xs">Direct EFT Banking Details (Payouts)</Label>
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <Label className="text-stone-300 font-semibold text-xs flex items-center gap-1.5">
+                      <ShieldCheck className="h-3.5 w-3.5 text-emerald-400" />
+                      Direct EFT Banking & Station PIN Vault (AES-256-GCM + SHA-256 / Scrypt)
+                    </Label>
+                    {editingStaff.bank_account_hash && (
+                      <span className="text-[10px] font-mono text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2 py-0.5 rounded">
+                        SHA-256: {editingStaff.bank_account_hash.slice(0, 20)}...
+                      </span>
+                    )}
+                  </div>
+                  <div className="grid grid-cols-1 md:grid-cols-5 gap-3">
                     <div className="space-y-1">
                       <Label className="text-[11px] text-stone-400">Bank Name</Label>
                       <Input
@@ -1447,11 +1535,11 @@ export default function AdminBarbershopPage() {
                       />
                     </div>
                     <div className="space-y-1">
-                      <Label className="text-[11px] text-stone-400">Account Number</Label>
+                      <Label className="text-[11px] text-stone-400">Account Number (Masked)</Label>
                       <Input
                         value={editStaffBankAccountNum}
                         onChange={(e) => setEditStaffBankAccountNum(e.target.value)}
-                        placeholder="e.g. 62800000000"
+                        placeholder="Enter new to replace"
                       />
                     </div>
                     <div className="space-y-1">
@@ -1474,6 +1562,17 @@ export default function AdminBarbershopPage() {
                         placeholder="e.g. 250655"
                       />
                     </div>
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-emerald-400">
+                        {editingStaff.has_station_pin ? 'Reset Station PIN' : 'Set Station PIN'}
+                      </Label>
+                      <Input
+                        type="password"
+                        value={editStaffStationPin}
+                        onChange={(e) => setEditStaffStationPin(e.target.value)}
+                        placeholder={editingStaff.has_station_pin ? 'Leave blank to keep' : '4+ digits'}
+                      />
+                    </div>
                   </div>
                 </div>
 
@@ -1491,7 +1590,7 @@ export default function AdminBarbershopPage() {
                     disabled={editStaffSubmitting}
                     className="bg-amber-500 hover:bg-amber-400 text-black font-semibold"
                   >
-                    {editStaffSubmitting ? 'Saving Changes...' : 'Save Changes'}
+                    {editStaffSubmitting ? 'Encrypting & Saving...' : 'Save Changes'}
                   </Button>
                 </div>
               </form>
@@ -1500,110 +1599,128 @@ export default function AdminBarbershopPage() {
 
           {/* Staff List Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {staffList.map((staff) => (
-              <Card
-                key={staff.id}
-                className={`border bg-stone-900/60 p-6 flex flex-col justify-between ${
-                  staff.is_active ? 'border-stone-800' : 'border-rose-900/50 opacity-60'
-                }`}
-              >
-                <div className="space-y-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-3">
-                      <div className="flex h-12 w-12 items-center justify-center rounded-full bg-stone-800 text-white font-bold text-base">
-                        {staff.display_name.charAt(0)}
+            {staffList.map((staff) => {
+              const roleLabel = SPECIALTY_LABELS[staff.specialty || 'barber'] || 'Barber';
+              return (
+                <Card
+                  key={staff.id}
+                  className={`border bg-stone-900/60 p-6 flex flex-col justify-between ${
+                    staff.is_active ? 'border-stone-800' : 'border-rose-900/50 opacity-60'
+                  }`}
+                >
+                  <div className="space-y-3">
+                    <div className="flex items-start justify-between">
+                      <div className="flex items-center space-x-3">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-full bg-stone-800 text-white font-bold text-base">
+                          {staff.display_name.charAt(0)}
+                        </div>
+                        <div>
+                          <div className="flex items-center flex-wrap gap-1.5">
+                            <h3 className="text-base font-bold text-white">{staff.display_name}</h3>
+                            <span className="rounded bg-stone-800 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-amber-300 border border-stone-700">
+                              {roleLabel}
+                            </span>
+                          </div>
+                          <span
+                            className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full mt-1 ${
+                              staff.is_active
+                                ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                            }`}
+                          >
+                            {staff.is_active ? 'Accepting Bookings' : 'Unavailable'}
+                          </span>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-base font-bold text-white">{staff.display_name}</h3>
-                        <span
-                          className={`inline-flex items-center text-[10px] font-semibold px-2 py-0.5 rounded-full ${
-                            staff.is_active
-                              ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                              : 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                          }`}
-                        >
-                          {staff.is_active ? 'Accepting Bookings' : 'Unavailable'}
+                    </div>
+
+                    <p className="text-xs text-stone-400">{staff.bio || `${roleLabel} at Dissafyt Studio`}</p>
+
+                    <div className="text-[11px] text-stone-500 border-t border-stone-800/80 pt-3 space-y-1.5">
+                      {staff.phone && (
+                        <div className="flex items-center text-stone-300">
+                          <Phone className="h-3 w-3 mr-1 text-amber-500" />
+                          <span>{staff.phone}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center text-stone-300">
+                        <MapPin className="h-3 w-3 mr-1 text-amber-500" />
+                        <span>
+                          Stationed:{' '}
+                          {staff.location?.name ||
+                            locations.find((l) => l.id === staff.location_id)?.name ||
+                            'Dissafyt Studio, Cape Town (Flagship)'}
                         </span>
                       </div>
+                      <div>Standard Hours: Mon-Fri 09:00 - 18:00, Sat 09:00 - 17:00</div>
+                    </div>
+
+                    <div className="flex flex-wrap gap-1.5 pt-2 border-t border-stone-800/80">
+                      <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/20">
+                        {100 - (staff.commission_split_pct ?? 15)}% Payout ({staff.commission_split_pct ?? 15}% Platform)
+                      </span>
+                      {staff.payfast_merchant_id && (
+                        <span className="rounded bg-stone-800 px-2 py-0.5 text-[10px] font-mono text-stone-300 border border-stone-700">
+                          PayFast: {staff.payfast_merchant_id}
+                        </span>
+                      )}
+                      {staff.pos_terminal_id && (
+                        <span className="rounded bg-stone-800 px-2 py-0.5 text-[10px] font-mono text-amber-300 border border-amber-500/30">
+                          POS: {staff.pos_terminal_id}
+                        </span>
+                      )}
+                      {staff.bank_name && (
+                        <span className="rounded bg-stone-800 px-2 py-0.5 text-[10px] text-stone-400 border border-stone-700">
+                          EFT: {staff.bank_name} {staff.bank_account_number || '••••'}
+                        </span>
+                      )}
+                      {staff.bank_account_hash && (
+                        <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono text-emerald-400 border border-emerald-500/20">
+                          <ShieldCheck className="h-3 w-3" /> AES-256 + SHA-256
+                        </span>
+                      )}
+                      {staff.has_station_pin && (
+                        <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-0.5 text-[10px] font-mono text-emerald-400 border border-emerald-500/20">
+                          PIN Hashed
+                        </span>
+                      )}
                     </div>
                   </div>
 
-                  <p className="text-xs text-stone-400">{staff.bio || 'Master Barber at Ace of Fyt'}</p>
-
-                  <div className="text-[11px] text-stone-500 border-t border-stone-800/80 pt-3 space-y-1.5">
-                    {staff.phone && (
-                      <div className="flex items-center text-stone-300">
-                        <Phone className="h-3 w-3 mr-1 text-amber-500" />
-                        <span>{staff.phone}</span>
-                      </div>
-                    )}
-                    <div className="flex items-center text-stone-300">
-                      <MapPin className="h-3 w-3 mr-1 text-amber-500" />
-                      <span>
-                        Stationed:{' '}
-                        {staff.location?.name ||
-                          locations.find((l) => l.id === staff.location_id)?.name ||
-                          'Dissafyt Studio, Cape Town (Flagship)'}
-                      </span>
+                  <div className="mt-6 pt-4 border-t border-stone-800 flex items-center justify-between">
+                    <div className="flex items-center space-x-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleToggleStaffStatus(staff)}
+                        className="text-xs border-stone-700 text-stone-300"
+                      >
+                        {staff.is_active ? 'Set Inactive' : 'Set Active'}
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => openEditStaffModal(staff)}
+                        className="text-xs border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
+                        title="Edit Specialist Details"
+                      >
+                        <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                      </Button>
                     </div>
-                    <div>Standard Hours: Mon-Fri 09:00 - 18:00, Sat 09:00 - 17:00</div>
-                  </div>
 
-                  <div className="flex flex-wrap gap-1.5 pt-2 border-t border-stone-800/80">
-                    <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/20">
-                      {100 - (staff.commission_split_pct ?? 15)}% Barber Payout ({staff.commission_split_pct ?? 15}% Platform)
-                    </span>
-                    {staff.payfast_merchant_id && (
-                      <span className="rounded bg-stone-800 px-2 py-0.5 text-[10px] font-mono text-stone-300 border border-stone-700">
-                        PayFast: {staff.payfast_merchant_id}
-                      </span>
-                    )}
-                    {staff.pos_terminal_id && (
-                      <span className="rounded bg-stone-800 px-2 py-0.5 text-[10px] font-mono text-amber-300 border border-amber-500/30">
-                        POS: {staff.pos_terminal_id}
-                      </span>
-                    )}
-                    {staff.bank_name && (
-                      <span className="rounded bg-stone-800 px-2 py-0.5 text-[10px] text-stone-400 border border-stone-700">
-                        EFT: {staff.bank_name} ••••{staff.bank_account_number?.slice(-4) || '****'}
-                      </span>
-                    )}
-                  </div>
-                </div>
-
-                <div className="mt-6 pt-4 border-t border-stone-800 flex items-center justify-between">
-                  <div className="flex items-center space-x-2">
                     <Button
-                      variant="outline"
+                      variant="ghost"
                       size="sm"
-                      onClick={() => handleToggleStaffStatus(staff)}
-                      className="text-xs border-stone-700 text-stone-300"
+                      onClick={() => handleDeleteStaff(staff.id)}
+                      className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
+                      title="Delete Specialist"
                     >
-                      {staff.is_active ? 'Set Inactive' : 'Set Active'}
-                    </Button>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => openEditStaffModal(staff)}
-                      className="text-xs border-amber-500/30 text-amber-400 hover:bg-amber-500/10"
-                      title="Edit Barber Details"
-                    >
-                      <Pencil className="h-3.5 w-3.5 mr-1" /> Edit
+                      <Trash2 className="h-4 w-4" />
                     </Button>
                   </div>
-
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => handleDeleteStaff(staff.id)}
-                    className="text-xs text-rose-400 hover:text-rose-300 hover:bg-rose-500/10"
-                    title="Delete Barber"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </Button>
-                </div>
-              </Card>
-            ))}
+                </Card>
+              );
+            })}
           </div>
         </div>
       )}

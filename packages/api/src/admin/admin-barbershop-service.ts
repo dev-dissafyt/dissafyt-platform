@@ -1,6 +1,7 @@
 import { getSupabaseAdminClient, BarberService } from '@dissafyt/database';
 import { AuditService } from '../audit/audit-service';
 import { BarbershopService } from '../barbershop/barbershop-service';
+import { StaffVaultService } from '../security/staff-vault';
 
 export interface CreateServiceInput {
   name: string;
@@ -231,11 +232,11 @@ export class AdminBarbershopService {
           return fbData.map((member: any) => {
             const locId = member.location_id || 'loc-cpt-flagship';
             const loc = locations.find((l) => l.id === locId) || locations[0] || null;
-            return {
+            return StaffVaultService.formatStaffForAuthorizedView({
               ...member,
               location_id: locId,
               location: loc,
-            };
+            });
           });
         }
       }
@@ -247,20 +248,22 @@ export class AdminBarbershopService {
     return data.map((member: any) => {
       const locId = member.location_id || 'loc-cpt-flagship';
       const loc = locations.find((l) => l.id === locId) || locations[0] || null;
-      return {
+      return StaffVaultService.formatStaffForAuthorizedView({
         ...member,
         location_id: locId,
         location: loc,
-      };
+      });
     });
   }
 
   /**
-   * Creates a new staff/barber member with invisible audit logging and graceful schema fallback.
+   * Creates a new specialist (barber / nail tech / beautician) with AES-256-GCM encryption,
+   * SHA-256 account hashing, scrypt PIN hashing, and invisible audit logging.
    */
   static async createStaff(
     input: {
       display_name: string;
+      specialty?: string;
       bio?: string;
       phone?: string;
       avatar_url?: string;
@@ -274,6 +277,7 @@ export class AdminBarbershopService {
       bank_account_number?: string | null;
       bank_account_type?: string | null;
       bank_branch_code?: string | null;
+      station_pin?: string | null;
       pos_terminal_id?: string | null;
     },
     actor?: { email?: string; role?: string }
@@ -282,6 +286,7 @@ export class AdminBarbershopService {
     const resolvedLocationId = input.location_id || 'loc-cpt-flagship';
     const payload: any = {
       display_name: input.display_name,
+      specialty: input.specialty || 'barber',
       bio: input.bio || '',
       user_id: input.user_id || null,
       is_active: input.is_active !== undefined ? input.is_active : true,
@@ -291,11 +296,21 @@ export class AdminBarbershopService {
     if (input.avatar_url) payload.avatar_url = input.avatar_url;
     if (input.working_hours) payload.working_hours = input.working_hours;
     if (input.commission_split_pct !== undefined) payload.commission_split_pct = Number(input.commission_split_pct);
-    if (input.payfast_merchant_id !== undefined) payload.payfast_merchant_id = input.payfast_merchant_id || null;
+    if (input.payfast_merchant_id !== undefined) {
+      payload.payfast_merchant_id = StaffVaultService.encryptField(input.payfast_merchant_id);
+    }
     if (input.bank_name !== undefined) payload.bank_name = input.bank_name || null;
-    if (input.bank_account_number !== undefined) payload.bank_account_number = input.bank_account_number || null;
+    if (input.bank_account_number !== undefined && !StaffVaultService.isMaskedValue(input.bank_account_number)) {
+      payload.bank_account_number = StaffVaultService.encryptField(input.bank_account_number);
+      payload.bank_account_hash = StaffVaultService.hashBankAccount(input.bank_account_number);
+    }
     if (input.bank_account_type !== undefined) payload.bank_account_type = input.bank_account_type || 'cheque';
-    if (input.bank_branch_code !== undefined) payload.bank_branch_code = input.bank_branch_code || null;
+    if (input.bank_branch_code !== undefined) {
+      payload.bank_branch_code = StaffVaultService.encryptField(input.bank_branch_code);
+    }
+    if (input.station_pin && input.station_pin.trim()) {
+      payload.station_pin_hash = StaffVaultService.hashStationPin(input.station_pin);
+    }
     if (input.pos_terminal_id !== undefined) payload.pos_terminal_id = input.pos_terminal_id || null;
 
     let createdStaff: any = null;
@@ -308,6 +323,7 @@ export class AdminBarbershopService {
     if (error) {
       if (error.code === 'PGRST204' || error.message?.includes('column') || error.message?.includes('schema cache')) {
         console.warn('Staff create fallback: stripping pending columns from payload:', error.message);
+        delete payload.specialty;
         delete payload.phone;
         delete payload.avatar_url;
         delete payload.working_hours;
@@ -318,6 +334,8 @@ export class AdminBarbershopService {
         delete payload.bank_account_number;
         delete payload.bank_account_type;
         delete payload.bank_branch_code;
+        delete payload.bank_account_hash;
+        delete payload.station_pin_hash;
         delete payload.pos_terminal_id;
 
         const { data: fbData, error: fbError } = await admin
@@ -331,17 +349,12 @@ export class AdminBarbershopService {
         }
         createdStaff = {
           ...fbData,
+          specialty: input.specialty || 'barber',
           phone: input.phone || null,
           avatar_url: input.avatar_url || null,
           working_hours: input.working_hours || null,
           location_id: resolvedLocationId,
           commission_split_pct: input.commission_split_pct || 15,
-          payfast_merchant_id: input.payfast_merchant_id || null,
-          bank_name: input.bank_name || null,
-          bank_account_number: input.bank_account_number || null,
-          bank_account_type: input.bank_account_type || 'cheque',
-          bank_branch_code: input.bank_branch_code || null,
-          pos_terminal_id: input.pos_terminal_id || null,
         };
       } else {
         return { success: false, error: error.message };
@@ -354,7 +367,9 @@ export class AdminBarbershopService {
       createdStaff.location_id = resolvedLocationId;
     }
 
-    // Invisible Audit Trail
+    const safeStaffView = StaffVaultService.formatStaffForAuthorizedView(createdStaff);
+
+    // Invisible Audit Trail (stores masked/hashed financial fields, never raw bank account numbers)
     await AuditService.recordLog({
       actor_email: actor?.email || 'admin@dissafyt.com',
       actor_role: actor?.role || 'admin',
@@ -362,19 +377,21 @@ export class AdminBarbershopService {
       entity_type: 'staff',
       entity_id: createdStaff.id,
       entity_name: createdStaff.display_name,
-      changes: createdStaff,
+      changes: safeStaffView,
     });
 
-    return { success: true, staff: createdStaff };
+    return { success: true, staff: safeStaffView };
   }
 
   /**
-   * Updates an existing staff/barber member with invisible audit logging and graceful schema fallback.
+   * Updates an existing specialist (barber / nail tech / beautician) with AES-256-GCM encryption,
+   * SHA-256 account hashing, scrypt PIN hashing, and invisible audit logging.
    */
   static async updateStaff(
     id: string,
     input: {
       display_name?: string;
+      specialty?: string;
       bio?: string;
       phone?: string;
       avatar_url?: string;
@@ -388,6 +405,7 @@ export class AdminBarbershopService {
       bank_account_number?: string | null;
       bank_account_type?: string | null;
       bank_branch_code?: string | null;
+      station_pin?: string | null;
       pos_terminal_id?: string | null;
     },
     actor?: { email?: string; role?: string }
@@ -395,7 +413,35 @@ export class AdminBarbershopService {
     const admin = getSupabaseAdminClient();
     try {
       const { data: beforeData } = await admin.from('staff').select('*').eq('id', id).single();
-      const payload: any = { ...input };
+      const payload: any = {};
+
+      if (input.display_name !== undefined) payload.display_name = input.display_name;
+      if (input.specialty !== undefined) payload.specialty = input.specialty || 'barber';
+      if (input.bio !== undefined) payload.bio = input.bio;
+      if (input.phone !== undefined) payload.phone = input.phone;
+      if (input.avatar_url !== undefined) payload.avatar_url = input.avatar_url;
+      if (input.working_hours !== undefined) payload.working_hours = input.working_hours;
+      if (input.is_active !== undefined) payload.is_active = input.is_active;
+      if (input.user_id !== undefined) payload.user_id = input.user_id;
+      if (input.location_id !== undefined) payload.location_id = input.location_id;
+      if (input.commission_split_pct !== undefined) payload.commission_split_pct = Number(input.commission_split_pct);
+      if (input.payfast_merchant_id !== undefined) {
+        payload.payfast_merchant_id = StaffVaultService.encryptField(input.payfast_merchant_id);
+      }
+      if (input.bank_name !== undefined) payload.bank_name = input.bank_name;
+      if (input.bank_account_type !== undefined) payload.bank_account_type = input.bank_account_type;
+      if (input.bank_account_number !== undefined && !StaffVaultService.isMaskedValue(input.bank_account_number)) {
+        payload.bank_account_number = StaffVaultService.encryptField(input.bank_account_number);
+        payload.bank_account_hash = StaffVaultService.hashBankAccount(input.bank_account_number);
+      }
+      if (input.bank_branch_code !== undefined && !StaffVaultService.isMaskedValue(input.bank_branch_code)) {
+        payload.bank_branch_code = StaffVaultService.encryptField(input.bank_branch_code);
+      }
+      if (input.station_pin && input.station_pin.trim()) {
+        payload.station_pin_hash = StaffVaultService.hashStationPin(input.station_pin);
+      }
+      if (input.pos_terminal_id !== undefined) payload.pos_terminal_id = input.pos_terminal_id;
+
       let updatedStaff: any = null;
 
       const { data, error } = await admin
@@ -406,9 +452,9 @@ export class AdminBarbershopService {
         .single();
 
       if (error) {
-        // Gracefully handle missing columns in schema cache
         if (error.code === 'PGRST204' || error.message?.includes('column') || error.message?.includes('schema cache')) {
           console.warn('Staff update fallback: schema column missing, stripping pending columns:', error.message);
+          delete payload.specialty;
           delete payload.phone;
           delete payload.avatar_url;
           delete payload.working_hours;
@@ -419,6 +465,8 @@ export class AdminBarbershopService {
           delete payload.bank_account_number;
           delete payload.bank_account_type;
           delete payload.bank_branch_code;
+          delete payload.bank_account_hash;
+          delete payload.station_pin_hash;
           delete payload.pos_terminal_id;
 
           const { data: fbData, error: fbError } = await admin
@@ -431,22 +479,7 @@ export class AdminBarbershopService {
           if (fbError || !fbData) {
             return { success: false, error: fbError?.message || 'Failed to update staff' };
           }
-
-          // Return merged object with input fields so caller sees their requested changes
-          updatedStaff = {
-            ...fbData,
-            phone: input.phone !== undefined ? input.phone : beforeData?.phone,
-            avatar_url: input.avatar_url !== undefined ? input.avatar_url : beforeData?.avatar_url,
-            working_hours: input.working_hours !== undefined ? input.working_hours : beforeData?.working_hours,
-            location_id: input.location_id !== undefined ? input.location_id : (beforeData?.location_id || 'loc-cpt-flagship'),
-            commission_split_pct: input.commission_split_pct !== undefined ? input.commission_split_pct : beforeData?.commission_split_pct,
-            payfast_merchant_id: input.payfast_merchant_id !== undefined ? input.payfast_merchant_id : beforeData?.payfast_merchant_id,
-            bank_name: input.bank_name !== undefined ? input.bank_name : beforeData?.bank_name,
-            bank_account_number: input.bank_account_number !== undefined ? input.bank_account_number : beforeData?.bank_account_number,
-            bank_account_type: input.bank_account_type !== undefined ? input.bank_account_type : beforeData?.bank_account_type,
-            bank_branch_code: input.bank_branch_code !== undefined ? input.bank_branch_code : beforeData?.bank_branch_code,
-            pos_terminal_id: input.pos_terminal_id !== undefined ? input.pos_terminal_id : beforeData?.pos_terminal_id,
-          };
+          updatedStaff = fbData;
         } else {
           return { success: false, error: error.message };
         }
@@ -458,7 +491,10 @@ export class AdminBarbershopService {
         updatedStaff.location_id = input.location_id || beforeData?.location_id || 'loc-cpt-flagship';
       }
 
-      // Invisible Audit Trail
+      const safeBefore = beforeData ? StaffVaultService.formatStaffForAuthorizedView(beforeData) : null;
+      const safeAfter = StaffVaultService.formatStaffForAuthorizedView(updatedStaff);
+
+      // Invisible Audit Trail (redacted banking numbers, includes SHA-256 hash)
       await AuditService.recordLog({
         actor_email: actor?.email || 'admin@dissafyt.com',
         actor_role: actor?.role || 'admin',
@@ -467,13 +503,12 @@ export class AdminBarbershopService {
         entity_id: id,
         entity_name: updatedStaff.display_name,
         changes: {
-          before: beforeData,
-          after: updatedStaff,
-          updated_fields: input,
+          before: safeBefore,
+          after: safeAfter,
         },
       });
 
-      return { success: true, staff: updatedStaff };
+      return { success: true, staff: safeAfter };
     } catch (err: any) {
       return { success: false, error: err.message };
     }
