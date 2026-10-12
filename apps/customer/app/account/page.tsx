@@ -26,6 +26,9 @@ import {
   ChevronLeft,
   ChevronRight,
   History,
+  AlertTriangle,
+  Ban,
+  PackageCheck,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -1821,24 +1824,45 @@ export default function AccountPage() {
         </div>
       )}
 
-      {/* TAB 2: APPAREL ORDERS & FULFILLMENT TRACKING */}
+      {/* TAB 2: APPAREL ORDERS & FULFILLMENT TRACKING (Compact Icon List) */}
       {activeTab === 'orders' && (
         <Card className="border-zinc-800 bg-zinc-900/60">
-          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3">
             <div>
               <CardTitle className="text-lg sm:text-xl text-white flex items-center">
                 <ShoppingBag className="mr-2 h-5 w-5 text-amber-500" />
                 Apparel Orders ({orders.length})
               </CardTitle>
               <CardDescription className="text-xs">
-                Dissafyt streetwear purchases and Courier Guy fulfillment tracking
+                Streetwear purchases and live fulfillment status
               </CardDescription>
             </div>
-            <Link href="/shop">
-              <Button variant="outline" size="sm" className="border-zinc-700 text-amber-400 hover:text-amber-300 text-xs h-8">
-                Explore Catalog <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
-              </Button>
-            </Link>
+            <div className="flex items-center gap-3 flex-wrap">
+              {/* Compact Icon Status Key */}
+              <div className="hidden md:flex items-center gap-3 text-[10px] font-mono text-zinc-400 bg-zinc-950/70 border border-zinc-800/80 px-2.5 py-1 rounded-lg">
+                <span className="flex items-center gap-1 text-amber-400">
+                  <AlertTriangle className="h-3 w-3" /> Pending
+                </span>
+                <span className="flex items-center gap-1 text-sky-400">
+                  <Truck className="h-3 w-3" /> In Transit
+                </span>
+                <span className="flex items-center gap-1 text-emerald-400">
+                  <PackageCheck className="h-3 w-3" /> Delivered
+                </span>
+                <span className="flex items-center gap-1 text-rose-400">
+                  <Ban className="h-3 w-3" /> Cancelled
+                </span>
+              </div>
+              <Link href="/shop">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="border-zinc-700 text-amber-400 hover:text-amber-300 text-xs h-8"
+                >
+                  Shop <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+                </Button>
+              </Link>
+            </div>
           </CardHeader>
           <CardContent>
             {orders.length === 0 ? (
@@ -1846,130 +1870,135 @@ export default function AccountPage() {
                 <Package className="mx-auto h-9 w-9 text-zinc-600" />
                 <p>You haven&apos;t placed any clothing orders yet.</p>
                 <Link href="/shop">
-                  <Button size="sm" className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs">
+                  <Button
+                    size="sm"
+                    className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs"
+                  >
                     Browse Latest Streetwear Drops
                   </Button>
                 </Link>
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="max-h-[460px] overflow-y-auto pr-1 space-y-2">
                 {orders.map((order) => {
                   const status = order.status.toLowerCase();
-                  const isPaid =
-                    status === 'paid' ||
-                    status === 'processing' ||
-                    status === 'shipped' ||
-                    status === 'delivered';
-                  const isShipped = status === 'shipped' || status === 'delivered';
-                  const isDelivered = status === 'delivered';
+                  const isCancelled = status === 'cancelled' || status === 'failed';
+                  const isDelivered = status === 'delivered' || status === 'completed';
+                  const isShipped = status === 'shipped' || status === 'in_transit';
+                  const isPaid = status === 'paid' || status === 'processing';
+
+                  const itemsSummary =
+                    order.order_items && order.order_items.length > 0
+                      ? order.order_items
+                          .map((item) => `${item.quantity}x ${item.product_name}`)
+                          .join(', ')
+                      : 'Apparel Order';
 
                   return (
                     <div
                       key={order.id}
-                      className="border border-zinc-800/80 rounded-xl p-4 bg-zinc-950/50 space-y-3.5 flex flex-col justify-between"
+                      className="group flex items-center justify-between gap-3 rounded-xl border border-zinc-800/80 bg-zinc-950/60 hover:border-zinc-700/90 hover:bg-zinc-900/50 px-3.5 py-2.5 transition-all"
                     >
-                      <div className="space-y-3">
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-2.5">
-                          <div>
-                            <span className="font-mono font-bold text-white text-sm">
-                              {order.order_number}
-                            </span>
-                            <span className="text-xs text-zinc-500 ml-2">
-                              {new Date(order.created_at).toLocaleDateString('en-ZA')}
+                      <div className="flex items-center gap-3 min-w-0">
+                        {/* Animated Lottie-Vibe Status Icon Badge */}
+                        {isCancelled ? (
+                          <div
+                            title="Order Cancelled"
+                            className="relative h-10 w-10 rounded-xl bg-rose-500/15 border border-rose-500/30 flex items-center justify-center flex-shrink-0 shadow-inner"
+                          >
+                            <Ban className="h-5 w-5 text-rose-400 transition-transform group-hover:scale-110" />
+                            <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-rose-500" />
+                          </div>
+                        ) : isDelivered ? (
+                          <div
+                            title="Delivered"
+                            className="relative h-10 w-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 shadow-inner"
+                          >
+                            <PackageCheck className="h-5 w-5 text-emerald-400 transition-transform group-hover:scale-110" />
+                            <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400 shadow-sm shadow-emerald-400/60" />
+                          </div>
+                        ) : isShipped ? (
+                          <div
+                            title="Out for Delivery with Courier Guy"
+                            className="relative h-10 w-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center flex-shrink-0 shadow-inner"
+                          >
+                            <Truck
+                              className="h-5 w-5 text-sky-400 animate-bounce"
+                              style={{ animationDuration: '2.2s' }}
+                            />
+                            <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-sky-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-sky-500" />
                             </span>
                           </div>
-                          <div className="flex items-center space-x-2">
+                        ) : isPaid ? (
+                          <div
+                            title="Paid & Preparing Order"
+                            className="relative h-10 w-10 rounded-xl bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center flex-shrink-0 shadow-inner"
+                          >
+                            <CheckCircle2 className="h-5 w-5 text-emerald-400 transition-transform group-hover:scale-110" />
+                            <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-emerald-400" />
+                          </div>
+                        ) : (
+                          <div
+                            title="Pending Payment"
+                            className="relative h-10 w-10 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center flex-shrink-0 shadow-inner"
+                          >
+                            <AlertTriangle className="h-5 w-5 text-amber-400 animate-pulse" />
+                            <span className="absolute -top-0.5 -right-0.5 flex h-2.5 w-2.5">
+                              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75" />
+                              <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500" />
+                            </span>
+                          </div>
+                        )}
+
+                        {/* Compact Order Details */}
+                        <div className="min-w-0 space-y-0.5">
+                          <div className="flex items-center gap-2 flex-wrap">
+                            <span className="font-mono font-bold text-white text-xs sm:text-sm">
+                              {order.order_number}
+                            </span>
+                            <span className="text-[11px] text-zinc-500">
+                              {new Date(order.created_at).toLocaleDateString('en-ZA')}
+                            </span>
                             <span
-                              className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
-                                order.status === 'paid'
+                              className={`rounded-full px-2 py-0.5 text-[9px] font-mono font-semibold uppercase tracking-wider ${
+                                isCancelled
+                                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                                  : isDelivered || isPaid
                                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                  : order.status === 'shipped'
-                                  ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                  : isShipped
+                                  ? 'bg-sky-500/10 text-sky-400 border border-sky-500/20'
                                   : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                               }`}
                             >
                               {order.status.replace('_', ' ')}
                             </span>
-                            <span className="font-mono font-bold text-amber-400 text-sm">
-                              R {Number(order.total).toFixed(2)}
-                            </span>
                           </div>
-                        </div>
 
-                        {/* 4-Step Fulfillment Tracker */}
-                        <div className="py-1">
-                          <div className="grid grid-cols-4 gap-1.5 text-center text-[10px]">
-                            <div className="space-y-1">
-                              <div className="h-1.5 rounded-full bg-amber-500" />
-                              <span className="text-amber-400 font-medium block">Placed</span>
-                            </div>
-                            <div className="space-y-1">
-                              <div
-                                className={`h-1.5 rounded-full ${
-                                  isPaid ? 'bg-emerald-500' : 'bg-zinc-800'
-                                }`}
-                              />
-                              <span
-                                className={`block ${
-                                  isPaid ? 'text-emerald-400 font-medium' : 'text-zinc-500'
-                                }`}
-                              >
-                                Paid
+                          <div className="flex items-center gap-1.5 text-xs text-zinc-300 truncate">
+                            <span className="truncate font-medium">{itemsSummary}</span>
+                            {order.shipping_address?.street_address && (
+                              <span className="hidden sm:inline text-[11px] text-zinc-500 truncate">
+                                &bull; {order.shipping_address.street_address},{' '}
+                                {order.shipping_address.city}
                               </span>
-                            </div>
-                            <div className="space-y-1">
-                              <div
-                                className={`h-1.5 rounded-full ${
-                                  isShipped ? 'bg-blue-500' : 'bg-zinc-800'
-                                }`}
-                              />
-                              <span
-                                className={`block ${
-                                  isShipped ? 'text-blue-400 font-medium' : 'text-zinc-500'
-                                }`}
-                              >
-                                Courier Guy
-                              </span>
-                            </div>
-                            <div className="space-y-1">
-                              <div
-                                className={`h-1.5 rounded-full ${
-                                  isDelivered ? 'bg-emerald-400' : 'bg-zinc-800'
-                                }`}
-                              />
-                              <span
-                                className={`block ${
-                                  isDelivered ? 'text-emerald-300 font-medium' : 'text-zinc-500'
-                                }`}
-                              >
-                                Delivered
-                              </span>
-                            </div>
+                            )}
                           </div>
-                        </div>
-
-                        <div className="text-xs text-zinc-300 space-y-1 bg-zinc-900/50 p-2.5 rounded-lg border border-zinc-800/60">
-                          {order.order_items?.map((item) => (
-                            <div key={item.id} className="flex justify-between">
-                              <span className="truncate pr-2">
-                                {item.quantity}x {item.product_name}
-                              </span>
-                              <span className="font-mono text-zinc-400 flex-shrink-0">
-                                R {Number(item.total_price).toFixed(2)}
-                              </span>
-                            </div>
-                          ))}
                         </div>
                       </div>
 
-                      {order.shipping_address && (
-                        <div className="text-[11px] text-zinc-500 flex items-center pt-2 border-t border-zinc-800/60">
-                          <Truck className="h-3.5 w-3.5 mr-1.5 text-amber-500/80 flex-shrink-0" />
-                          <span className="truncate">
-                            {order.shipping_address.street_address}, {order.shipping_address.city}
-                          </span>
+                      {/* Right Price Column */}
+                      <div className="text-right flex-shrink-0 pl-2">
+                        <div className="font-mono font-bold text-amber-400 text-xs sm:text-sm whitespace-nowrap">
+                          R {Number(order.total).toFixed(2)}
                         </div>
-                      )}
+                        {order.shipping_address?.city && (
+                          <div className="sm:hidden text-[10px] text-zinc-500 truncate max-w-[90px]">
+                            {order.shipping_address.city}
+                          </div>
+                        )}
+                      </div>
                     </div>
                   );
                 })}
