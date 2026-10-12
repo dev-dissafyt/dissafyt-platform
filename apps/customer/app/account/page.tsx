@@ -483,7 +483,8 @@ export default function AccountPage() {
     }
   }
 
-  // Barbershop Appointments View & Calendar State
+  // Active Section Tab & Barbershop Calendar State
+  const [activeTab, setActiveTab] = useState<'barbershop' | 'orders' | 'settings'>('barbershop');
   const [showBookingHistory, setShowBookingHistory] = useState(false);
   const [calendarDate, setCalendarDate] = useState(() => {
     const d = new Date();
@@ -514,7 +515,9 @@ export default function AccountPage() {
         return d.getFullYear() === curYear && d.getMonth() === curMonth;
       });
       if (!hasBookingInCurrent) {
-        const upcoming = bookings.find((b) => new Date(b.start_time) >= new Date() && b.status !== 'cancelled' && b.status !== 'no_show');
+        const upcoming = bookings.find(
+          (b) => new Date(b.start_time) >= new Date() && b.status !== 'cancelled' && b.status !== 'no_show'
+        );
         const target = upcoming || bookings[0];
         if (target?.start_time) {
           const d = new Date(target.start_time);
@@ -580,6 +583,123 @@ export default function AccountPage() {
   const activeHoverDateKey = hoveredDateKey || selectedDateKey;
   const activeHoverBookings = activeHoverDateKey ? bookingsByDate[activeHoverDateKey] || [] : [];
 
+  function renderBookingRow(booking: BookingItem) {
+    const startDate = new Date(booking.start_time);
+    const isPast = startDate < new Date();
+    const isModifiable = (booking.status === 'confirmed' || booking.status === 'pending') && !isPast;
+
+    return (
+      <div
+        key={booking.id}
+        className="border border-zinc-800/80 rounded-xl p-3.5 bg-zinc-950/50 hover:border-zinc-700/80 transition space-y-2.5"
+      >
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-2">
+          <div>
+            <span className="font-bold text-white text-sm">
+              {booking.service?.name || 'Grooming Service'}
+            </span>
+            <span className="text-xs text-zinc-400 ml-2">
+              with {booking.staff?.display_name || 'Master Barber'}
+            </span>
+          </div>
+          <div className="flex items-center space-x-2">
+            <span
+              className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                booking.status === 'confirmed'
+                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                  : booking.status === 'completed'
+                  ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                  : booking.status === 'cancelled'
+                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                  : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+              }`}
+            >
+              {booking.status.replace('_', ' ')}
+            </span>
+            {Number(booking.total_amount) === 0 ||
+            (booking as any).is_subscription_covered ||
+            (booking as any).payment_status === 'membership_covered' ? (
+              <span className="font-bold text-emerald-400 text-[11px] bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
+                Membership (R0)
+              </span>
+            ) : (booking as any).payment_status === 'paid_online' ? (
+              <span className="font-bold text-emerald-400 text-[11px] bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
+                Paid (R {Number(booking.total_amount).toFixed(0)})
+              </span>
+            ) : (booking as any).payment_status === 'paid_in_chair' ? (
+              <span className="font-bold text-emerald-400 text-[11px] bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
+                Paid in Chair (R {Number(booking.total_amount).toFixed(0)})
+              </span>
+            ) : booking.status === 'pending' ? (
+              <span className="font-bold text-yellow-400 text-[11px] bg-yellow-500/10 px-2 py-0.5 rounded border border-yellow-500/20 whitespace-nowrap">
+                Pending (R {Number(booking.total_amount).toFixed(0)})
+              </span>
+            ) : (
+              <span className="font-bold text-amber-400 text-[11px] bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 whitespace-nowrap">
+                Due in Chair (R {Number(booking.total_amount).toFixed(0)})
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center justify-between text-xs text-zinc-400 pt-0.5 gap-2">
+          <div className="flex flex-wrap items-center gap-3">
+            <span className="flex items-center text-zinc-200 font-medium">
+              <Clock className="mr-1.5 h-3.5 w-3.5 text-amber-500" />
+              {startDate.toLocaleDateString('en-ZA', {
+                timeZone: 'Africa/Johannesburg',
+                weekday: 'short',
+                month: 'short',
+                day: 'numeric',
+              })}{' '}
+              at{' '}
+              {startDate.toLocaleTimeString('en-ZA', {
+                timeZone: 'Africa/Johannesburg',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false,
+              })}
+            </span>
+            <span className="flex items-center text-zinc-400">
+              <MapPin className="mr-1 h-3.5 w-3.5 text-amber-500/80" />
+              {booking.location?.name || 'Dissafyt Studio - Bernie'}
+            </span>
+            {booking.service?.duration_minutes && (
+              <span className="text-zinc-500">({booking.service.duration_minutes}m)</span>
+            )}
+          </div>
+
+          {isModifiable && (
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => openRescheduleModal(booking)}
+                className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 text-xs h-7 px-2.5"
+              >
+                <Calendar className="mr-1 h-3 w-3" />
+                Reschedule
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                disabled={cancellingBookingId === booking.id}
+                onClick={() => handleCancelBooking(booking.id)}
+                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs h-7 px-2"
+              >
+                {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel'}
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {booking.notes && (
+          <div className="text-[11px] text-zinc-500 italic">Notes: &ldquo;{booking.notes}&rdquo;</div>
+        )}
+      </div>
+    );
+  }
+
   async function handleLogout() {
     const supabase = getSupabaseBrowserClient();
     await supabase.auth.signOut();
@@ -594,39 +714,257 @@ export default function AccountPage() {
     );
   }
 
+  const userInitials = (fullName || user?.email || 'DF')
+    .split(/[\s@._-]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join('');
+
+  const nextAppointment = upcomingBookings[0] || null;
+  const latestOrder = orders[0] || null;
+
   return (
-    <div className="container mx-auto max-w-5xl px-4 py-12 space-y-8">
-      {/* Profile Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-zinc-800 pb-6">
-        <div>
-          <h1 className="text-3xl font-bold text-white">My Account</h1>
-          <p className="text-sm text-zinc-400">
-            One unified identity across Dissafyt Streetwear and Ace of Fyt Barbershop.
-          </p>
+    <div className="container mx-auto max-w-5xl px-4 py-8 sm:py-10 space-y-6">
+      {/* Unified Identity Overview Hero Banner */}
+      <div className="rounded-2xl border border-zinc-800/90 bg-gradient-to-br from-zinc-900/90 via-zinc-950 to-zinc-950 p-5 sm:p-6 shadow-xl">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div className="flex items-center gap-4">
+            <div className="h-14 w-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-lg font-mono shadow-inner flex-shrink-0">
+              {userInitials || 'DF'}
+            </div>
+            <div className="space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+                  {fullName || 'Dissafyt Member'}
+                </h1>
+                {subscription && (
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase text-amber-300">
+                    <Sparkles className="h-2.5 w-2.5 text-amber-400" />
+                    VIP Guild
+                  </span>
+                )}
+                {user?.roles?.map((role) => (
+                  <span
+                    key={role}
+                    className="rounded-full bg-zinc-800/90 border border-zinc-700/70 px-2 py-0.5 text-[10px] font-mono uppercase text-zinc-300"
+                  >
+                    {role}
+                  </span>
+                ))}
+              </div>
+              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
+                <span>{user?.email}</span>
+                {phone && (
+                  <>
+                    <span className="text-zinc-700">&bull;</span>
+                    <span className="font-mono text-zinc-300">{phone}</span>
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+            <Link href="/book">
+              <Button size="sm" className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-8">
+                <Scissors className="mr-1.5 h-3.5 w-3.5" />
+                Book Cut
+              </Button>
+            </Link>
+            <Link href="/shop">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-zinc-700 text-zinc-200 hover:bg-zinc-800 text-xs h-8"
+              >
+                <ShoppingBag className="mr-1.5 h-3.5 w-3.5 text-amber-400" />
+                Shop
+              </Button>
+            </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleLogout}
+              className="text-zinc-400 hover:text-white hover:bg-zinc-800/80 text-xs h-8 px-2.5"
+            >
+              <LogOut className="mr-1.5 h-3.5 w-3.5" />
+              Sign Out
+            </Button>
+          </div>
         </div>
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={handleLogout}
-          className="border-zinc-700 text-zinc-300 hover:bg-zinc-800 self-start sm:self-auto"
-        >
-          <LogOut className="mr-2 h-4 w-4" />
-          Sign Out
-        </Button>
+
+        {/* 3 Interactive Sync Summary Tiles */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 mt-4 border-t border-zinc-800/80">
+          <button
+            type="button"
+            onClick={() => setActiveTab('barbershop')}
+            className={`text-left rounded-xl p-3 border transition-all ${
+              activeTab === 'barbershop'
+                ? 'bg-amber-500/10 border-amber-500/30'
+                : 'bg-zinc-900/50 border-zinc-800/80 hover:border-zinc-700'
+            }`}
+          >
+            <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+              <span className="font-mono uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="h-3 w-3 text-amber-500" />
+                VIP Chair Pass
+              </span>
+              {subscriptionQuota && (
+                <span className="text-[10px] font-mono text-amber-400 font-bold">
+                  {subscriptionQuota.available_cuts}/{subscriptionQuota.total_cuts} left
+                </span>
+              )}
+            </div>
+            <div className="font-bold text-white text-xs truncate">
+              {subscription
+                ? subscriptionQuota?.plan_name || subscription.plan_name || 'Active VIP Membership'
+                : 'No Active Pass — Explore Plans'}
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => {
+              setActiveTab('barbershop');
+              setShowBookingHistory(false);
+            }}
+            className={`text-left rounded-xl p-3 border transition-all ${
+              activeTab === 'barbershop' && !showBookingHistory
+                ? 'bg-zinc-900/90 border-zinc-700'
+                : 'bg-zinc-900/50 border-zinc-800/80 hover:border-zinc-700'
+            }`}
+          >
+            <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+              <span className="font-mono uppercase tracking-wider flex items-center gap-1.5">
+                <Calendar className="h-3 w-3 text-amber-500" />
+                Next Grooming Cut
+              </span>
+              <span className="text-[10px] font-mono text-zinc-400">
+                {upcomingBookings.length} upcoming
+              </span>
+            </div>
+            <div className="font-bold text-white text-xs truncate">
+              {nextAppointment
+                ? `${new Date(nextAppointment.start_time).toLocaleDateString('en-ZA', {
+                    timeZone: 'Africa/Johannesburg',
+                    weekday: 'short',
+                    day: 'numeric',
+                    month: 'short',
+                  })} • ${new Date(nextAppointment.start_time).toLocaleTimeString('en-ZA', {
+                    timeZone: 'Africa/Johannesburg',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: false,
+                  })}`
+                : 'No upcoming session scheduled'}
+            </div>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveTab('orders')}
+            className={`text-left rounded-xl p-3 border transition-all ${
+              activeTab === 'orders'
+                ? 'bg-amber-500/10 border-amber-500/30'
+                : 'bg-zinc-900/50 border-zinc-800/80 hover:border-zinc-700'
+            }`}
+          >
+            <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
+              <span className="font-mono uppercase tracking-wider flex items-center gap-1.5">
+                <Package className="h-3 w-3 text-amber-500" />
+                Apparel Orders
+              </span>
+              <span className="text-[10px] font-mono text-zinc-400">{orders.length} total</span>
+            </div>
+            <div className="font-bold text-white text-xs truncate">
+              {latestOrder
+                ? `${latestOrder.order_number} • ${latestOrder.status.replace('_', ' ').toUpperCase()}`
+                : 'No streetwear orders yet'}
+            </div>
+          </button>
+        </div>
       </div>
 
       {statusMsg && (
-        <div className="rounded-md border border-amber-500/20 bg-amber-500/10 p-4 text-sm text-amber-300">
-          {statusMsg}
+        <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-xs sm:text-sm text-amber-300 flex items-center justify-between">
+          <span>{statusMsg}</span>
+          <button
+            type="button"
+            onClick={() => setStatusMsg(null)}
+            className="text-amber-400 hover:text-white ml-3"
+          >
+            <X className="h-4 w-4" />
+          </button>
         </div>
       )}
 
+      {/* Segmented Navigation Bar */}
+      <div className="bg-zinc-900/80 border border-zinc-800/90 p-1.5 rounded-xl grid grid-cols-3 gap-1.5">
+        <button
+          type="button"
+          onClick={() => setActiveTab('barbershop')}
+          className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+            activeTab === 'barbershop'
+              ? 'bg-amber-500 text-black shadow-md shadow-amber-500/10'
+              : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
+          }`}
+        >
+          <Scissors className="h-4 w-4 flex-shrink-0" />
+          <span className="truncate">Barbershop &amp; VIP Pass</span>
+          <span
+            className={`hidden sm:inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-mono ${
+              activeTab === 'barbershop'
+                ? 'bg-black/20 text-black font-bold'
+                : 'bg-zinc-800 text-zinc-400'
+            }`}
+          >
+            {upcomingBookings.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('orders')}
+          className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+            activeTab === 'orders'
+              ? 'bg-amber-500 text-black shadow-md shadow-amber-500/10'
+              : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
+          }`}
+        >
+          <ShoppingBag className="h-4 w-4 flex-shrink-0" />
+          <span className="truncate">Apparel Orders</span>
+          <span
+            className={`hidden sm:inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-mono ${
+              activeTab === 'orders'
+                ? 'bg-black/20 text-black font-bold'
+                : 'bg-zinc-800 text-zinc-400'
+            }`}
+          >
+            {orders.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab('settings')}
+          className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+            activeTab === 'settings'
+              ? 'bg-amber-500 text-black shadow-md shadow-amber-500/10'
+              : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
+          }`}
+        >
+          <User className="h-4 w-4 flex-shrink-0" />
+          <span className="truncate">Profile &amp; Settings</span>
+        </button>
+      </div>
+
       {/* Reschedule Modal / Slide-down */}
       {reschedulingBooking && (
-        <div className="border border-amber-500/40 bg-zinc-900/90 rounded-xl p-6 shadow-2xl space-y-4">
+        <div className="border border-amber-500/40 bg-zinc-900/95 rounded-2xl p-5 sm:p-6 shadow-2xl space-y-4">
           <div className="flex items-center justify-between border-b border-zinc-800 pb-3">
             <div>
-              <h2 className="text-lg font-bold text-white flex items-center">
+              <h2 className="text-base sm:text-lg font-bold text-white flex items-center">
                 <Calendar className="mr-2 h-5 w-5 text-amber-500" />
                 Reschedule: {reschedulingBooking.service?.name}
               </h2>
@@ -753,14 +1091,16 @@ export default function AccountPage() {
               </button>
             </div>
 
-            {/* Available Plans List */}
             <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
-              {(availableSubPlans.length > 0 ? availableSubPlans : [
-                { plan_code: 'solo', name: 'The Solo Membership', price: 100, description: '1 haircut per month with priority booking.' },
-                { plan_code: 'twice', name: 'The Regular Membership', price: 190, description: '2 haircuts per month with queue skip and priority booking.' },
-                { plan_code: 'executive', name: 'The Executive', price: 350, description: 'Full combo, twice a month with hot towel & beard sculpt.' },
-                { plan_code: 'father-son', name: 'Father n Son Membership', price: 190, description: 'A combo cut for you and your boy — bonding time, sorted.' },
-              ]).map((plan) => {
+              {(availableSubPlans.length > 0
+                ? availableSubPlans
+                : [
+                    { plan_code: 'solo', name: 'The Solo Membership', price: 100, description: '1 haircut per month with priority booking.' },
+                    { plan_code: 'twice', name: 'The Regular Membership', price: 190, description: '2 haircuts per month with queue skip and priority booking.' },
+                    { plan_code: 'executive', name: 'The Executive', price: 350, description: 'Full combo, twice a month with hot towel & beard sculpt.' },
+                    { plan_code: 'father-son', name: 'Father n Son Membership', price: 190, description: 'A combo cut for you and your boy — bonding time, sorted.' },
+                  ]
+              ).map((plan) => {
                 const isCurrent = subscription?.plan_code === plan.plan_code;
                 const isSelected = selectedChangePlanCode === plan.plan_code;
 
@@ -787,9 +1127,7 @@ export default function AccountPage() {
                           </span>
                         )}
                       </div>
-                      <p className="text-xs text-zinc-400 max-w-sm leading-snug">
-                        {plan.description}
-                      </p>
+                      <p className="text-xs text-zinc-400 max-w-sm leading-snug">{plan.description}</p>
                     </div>
 
                     <div className="text-right flex-shrink-0 pl-3">
@@ -813,7 +1151,11 @@ export default function AccountPage() {
               </Button>
               <Button
                 size="sm"
-                disabled={!selectedChangePlanCode || selectedChangePlanCode === subscription?.plan_code || subActionLoading}
+                disabled={
+                  !selectedChangePlanCode ||
+                  selectedChangePlanCode === subscription?.plan_code ||
+                  subActionLoading
+                }
                 onClick={handleConfirmChangePlan}
                 className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs"
               >
@@ -846,13 +1188,19 @@ export default function AccountPage() {
             <div className="space-y-3 text-xs text-zinc-300 leading-relaxed">
               <p>
                 Are you sure you want to cancel your{' '}
-                <span className="font-bold text-white">{subscription?.plan_name || 'VIP Membership'}</span>?
+                <span className="font-bold text-white">
+                  {subscription?.plan_name || 'VIP Membership'}
+                </span>
+                ?
               </p>
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3 space-y-1 text-amber-200">
                 <div className="font-semibold text-amber-300">Period-End Access Retained:</div>
                 <p className="text-[11px]">
                   You will retain full access to your remaining{' '}
-                  <span className="font-bold">{subscriptionQuota?.available_cuts ?? 0} haircut(s)</span> until{' '}
+                  <span className="font-bold">
+                    {subscriptionQuota?.available_cuts ?? 0} haircut(s)
+                  </span>{' '}
+                  until{' '}
                   <span className="font-bold">
                     {subscriptionQuota?.period_end
                       ? new Date(subscriptionQuota.period_end).toLocaleDateString('en-ZA', {
@@ -889,64 +1237,20 @@ export default function AccountPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-        {/* Main Content Column */}
-        <div className="md:col-span-2 space-y-6">
-          {/* Profile Details */}
-          <Card className="border-zinc-800 bg-zinc-900/60">
-            <CardHeader>
-              <CardTitle className="text-xl text-white flex items-center">
-                <User className="mr-2 h-5 w-5 text-amber-500" />
-                Profile Information
-              </CardTitle>
-              <CardDescription>
-                Synchronized across streetwear checkout and barbershop reservations.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <form onSubmit={handleUpdateProfile} className="space-y-4">
-                <div className="space-y-2">
-                  <Label htmlFor="email">Email</Label>
-                  <Input id="email" type="email" value={user?.email || ''} disabled className="opacity-70" />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="fullName">Full Name</Label>
-                  <Input
-                    id="fullName"
-                    value={fullName}
-                    onChange={(e) => setFullName(e.target.value)}
-                    placeholder="Enter full name"
-                  />
-                </div>
-                <div className="space-y-2">
-                  <Label htmlFor="phone">Phone Number (Courier Guy SMS & Booking Updates)</Label>
-                  <Input
-                    id="phone"
-                    value={phone}
-                    onChange={(e) => setPhone(e.target.value)}
-                    placeholder="+27 82 123 4567"
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  disabled={updating}
-                  className="bg-amber-500 hover:bg-amber-400 text-black font-semibold"
-                >
-                  {updating ? 'Saving...' : 'Save Profile Changes'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-
-          {/* Barbershop Appointments */}
-          <Card className="border-zinc-800 bg-zinc-900/60">
-            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+      {/* TAB 1: BARBERSHOP & VIP PASS (Synchronized Hub) */}
+      {activeTab === 'barbershop' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          {/* Left Column (7 cols): Compact Calendar + Upcoming Appointments / Scrollable History */}
+          <Card className="lg:col-span-7 border-zinc-800 bg-zinc-900/60">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4">
               <div>
-                <CardTitle className="text-xl text-white flex items-center">
+                <CardTitle className="text-lg sm:text-xl text-white flex items-center">
                   <Scissors className="mr-2 h-5 w-5 text-amber-500" />
                   Barbershop Appointments ({bookings.length})
                 </CardTitle>
-                <CardDescription>Ace of Fyt grooming sessions and schedules</CardDescription>
+                <CardDescription className="text-xs">
+                  Hover or tap any highlighted date to inspect or manage your session
+                </CardDescription>
               </div>
               <div className="flex items-center gap-2 flex-wrap">
                 {bookings.length > 0 && (
@@ -969,21 +1273,22 @@ export default function AccountPage() {
                     )}
                   </Button>
                 )}
-                <Link href="/book">
-                  <Button variant="ghost" size="sm" className="text-amber-400 hover:text-amber-300 h-8 text-xs">
-                    Book Session <ExternalLink className="ml-1 h-3.5 w-3.5" />
-                  </Button>
-                </Link>
               </div>
             </CardHeader>
+
             <CardContent>
               {bookings.length === 0 ? (
-                <div className="text-center py-8 text-sm text-zinc-500 space-y-2">
+                <div className="text-center py-8 text-sm text-zinc-500 space-y-3">
                   <Clock className="mx-auto h-8 w-8 text-zinc-600" />
                   <p>You haven&apos;t booked any grooming appointments yet.</p>
+                  <Link href="/book">
+                    <Button size="sm" className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs">
+                      Book Your First Cut
+                    </Button>
+                  </Link>
                 </div>
               ) : showBookingHistory ? (
-                /* Scrollable Account Haircut History Section */
+                /* Scrollable Past Haircuts History Container */
                 <div className="space-y-3">
                   <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800 text-xs">
                     <div className="flex items-center gap-2">
@@ -996,146 +1301,27 @@ export default function AccountPage() {
                         &larr; Back to Calendar
                       </Button>
                       <span className="font-mono uppercase text-zinc-300 font-bold">
-                        Account Haircut History ({historyBookings.length})
+                        Past Haircuts ({historyBookings.length})
                       </span>
                     </div>
                     <span className="text-[11px] text-zinc-500 hidden sm:inline">
-                      Scroll to browse past grooming sessions
+                      Scroll to browse history
                     </span>
                   </div>
 
-                  <div className="max-h-[440px] overflow-y-auto pr-1 space-y-3">
+                  <div className="max-h-[440px] overflow-y-auto pr-1 space-y-2.5">
                     {historyBookings.length === 0 ? (
                       <div className="py-8 text-center text-xs text-zinc-500">
                         No past haircut records found yet.
                       </div>
                     ) : (
-                      historyBookings.map((booking) => {
-                        const startDate = new Date(booking.start_time);
-                        const isPast = startDate < new Date();
-                        const isModifiable =
-                          (booking.status === 'confirmed' || booking.status === 'pending') && !isPast;
-
-                        return (
-                          <div
-                            key={booking.id}
-                            className="border border-zinc-800/80 rounded-lg p-3.5 bg-zinc-950/40 space-y-2.5"
-                          >
-                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-2">
-                              <div>
-                                <span className="font-bold text-white text-sm">
-                                  {booking.service?.name || 'Grooming Service'}
-                                </span>
-                                <span className="text-xs text-zinc-400 ml-2">
-                                  with {booking.staff?.display_name || 'Master Barber'}
-                                </span>
-                              </div>
-                              <div className="flex items-center space-x-2">
-                                <span
-                                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${
-                                    booking.status === 'confirmed'
-                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                      : booking.status === 'completed'
-                                      ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                                      : booking.status === 'cancelled'
-                                      ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                  }`}
-                                >
-                                  {booking.status}
-                                </span>
-                                {Number(booking.total_amount) === 0 || (booking as any).is_subscription_covered || (booking as any).payment_status === 'membership_covered' ? (
-                                  <span className="font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
-                                    Included in Membership (R0.00)
-                                  </span>
-                                ) : (booking as any).payment_status === 'paid_online' ? (
-                                  <span className="font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
-                                    Paid Online (R {Number(booking.total_amount).toFixed(2)})
-                                  </span>
-                                ) : (booking as any).payment_status === 'paid_in_chair' ? (
-                                  <span className="font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
-                                    Paid in Chair (R {Number(booking.total_amount).toFixed(2)})
-                                  </span>
-                                ) : booking.status === 'pending' ? (
-                                  <span className="font-bold text-yellow-400 text-xs bg-yellow-500/10 px-2 py-0.5 rounded border border-yellow-500/20 whitespace-nowrap">
-                                    Payment Pending (R {Number(booking.total_amount).toFixed(2)})
-                                  </span>
-                                ) : (
-                                  <span className="font-bold text-amber-400 text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 whitespace-nowrap">
-                                    Due in Chair (R {Number(booking.total_amount).toFixed(2)})
-                                  </span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="flex flex-wrap items-center justify-between text-xs text-zinc-400 pt-0.5 gap-2">
-                              <div className="flex flex-wrap items-center gap-3">
-                                <span className="flex items-center text-zinc-200">
-                                  <Clock className="mr-1 h-3.5 w-3.5 text-amber-500" />
-                                  {startDate.toLocaleDateString('en-ZA', {
-                                    timeZone: 'Africa/Johannesburg',
-                                    weekday: 'short',
-                                    month: 'short',
-                                    day: 'numeric',
-                                  })}{' '}
-                                  at{' '}
-                                  {startDate.toLocaleTimeString('en-ZA', {
-                                    timeZone: 'Africa/Johannesburg',
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                    hour12: false,
-                                  })}
-                                </span>
-                                <span className="flex items-center text-zinc-300">
-                                  <MapPin className="mr-1 h-3.5 w-3.5 text-amber-500" />
-                                  {booking.location?.name || 'Dissafyt Studio - Bernie'}
-                                </span>
-                                {booking.service?.duration_minutes && (
-                                  <span className="text-zinc-500">
-                                    ({booking.service.duration_minutes} mins)
-                                  </span>
-                                )}
-                              </div>
-
-                              {isModifiable && (
-                                <div className="flex items-center gap-2">
-                                  <Button
-                                    variant="outline"
-                                    size="sm"
-                                    onClick={() => openRescheduleModal(booking)}
-                                    className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 text-xs h-7 px-2"
-                                  >
-                                    <Calendar className="mr-1 h-3 w-3" />
-                                    Reschedule
-                                  </Button>
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    disabled={cancellingBookingId === booking.id}
-                                    onClick={() => handleCancelBooking(booking.id)}
-                                    className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs h-7 px-2"
-                                  >
-                                    {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel'}
-                                  </Button>
-                                </div>
-                              )}
-                            </div>
-
-                            {booking.notes && (
-                              <div className="text-[11px] text-zinc-500 italic">
-                                Notes: &ldquo;{booking.notes}&rdquo;
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })
+                      historyBookings.map((booking) => renderBookingRow(booking))
                     )}
                   </div>
                 </div>
               ) : (
                 /* Default Mode: Compact Calendar View with Hover Modal + Upcoming Appointments Below */
                 <div className="space-y-5">
-                  {/* Small Calendar Widget */}
                   <div className="relative max-w-sm mx-auto bg-zinc-950/70 border border-zinc-800/90 rounded-2xl p-4 shadow-inner">
                     {/* Calendar Header */}
                     <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
@@ -1215,7 +1401,9 @@ export default function AccountPage() {
                             onMouseLeave={() => setHoveredDateKey(null)}
                             onClick={() => {
                               if (hasBookings) {
-                                setSelectedDateKey((prev) => (prev === cell.dateKey ? null : cell.dateKey));
+                                setSelectedDateKey((prev) =>
+                                  prev === cell.dateKey ? null : cell.dateKey
+                                );
                               }
                             }}
                             className={`h-8 w-8 sm:h-9 sm:w-9 mx-auto rounded-lg flex flex-col items-center justify-center text-xs relative transition-all ${
@@ -1253,15 +1441,19 @@ export default function AccountPage() {
                           <div className="flex items-center gap-2">
                             <Calendar className="h-4 w-4 text-amber-500" />
                             <span className="font-bold text-xs text-white">
-                              {new Date(activeHoverBookings[0].start_time).toLocaleDateString('en-ZA', {
-                                timeZone: 'Africa/Johannesburg',
-                                weekday: 'short',
-                                month: 'short',
-                                day: 'numeric',
-                              })}
+                              {new Date(activeHoverBookings[0].start_time).toLocaleDateString(
+                                'en-ZA',
+                                {
+                                  timeZone: 'Africa/Johannesburg',
+                                  weekday: 'short',
+                                  month: 'short',
+                                  day: 'numeric',
+                                }
+                              )}
                             </span>
                             <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
-                              {activeHoverBookings.length} {activeHoverBookings.length === 1 ? 'cut' : 'cuts'}
+                              {activeHoverBookings.length}{' '}
+                              {activeHoverBookings.length === 1 ? 'cut' : 'cuts'}
                             </span>
                           </div>
                           <button
@@ -1280,7 +1472,8 @@ export default function AccountPage() {
                           {activeHoverBookings.map((b) => {
                             const bStart = new Date(b.start_time);
                             const bIsPast = bStart < new Date();
-                            const bModifiable = (b.status === 'confirmed' || b.status === 'pending') && !bIsPast;
+                            const bModifiable =
+                              (b.status === 'confirmed' || b.status === 'pending') && !bIsPast;
 
                             return (
                               <div
@@ -1307,7 +1500,7 @@ export default function AccountPage() {
                                         : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
                                     }`}
                                   >
-                                    {b.status}
+                                    {b.status.replace('_', ' ')}
                                   </span>
                                 </div>
 
@@ -1382,126 +1575,21 @@ export default function AccountPage() {
 
                     {upcomingBookings.length === 0 ? (
                       <div className="p-4 rounded-xl bg-zinc-950/40 border border-zinc-800/60 text-center space-y-2">
-                        <p className="text-xs text-zinc-400">No upcoming grooming appointments scheduled.</p>
+                        <p className="text-xs text-zinc-400">
+                          No upcoming grooming appointments scheduled.
+                        </p>
                         <Link href="/book">
-                          <Button size="sm" className="bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold h-7">
+                          <Button
+                            size="sm"
+                            className="bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold h-7"
+                          >
                             Book Next Session
                           </Button>
                         </Link>
                       </div>
                     ) : (
-                      <div className="space-y-3">
-                        {upcomingBookings.map((booking) => {
-                          const startDate = new Date(booking.start_time);
-                          const isPast = startDate < new Date();
-                          const isModifiable =
-                            (booking.status === 'confirmed' || booking.status === 'pending') && !isPast;
-
-                          return (
-                            <div
-                              key={booking.id}
-                              className="border border-zinc-800/80 rounded-lg p-3.5 bg-zinc-950/40 space-y-2.5"
-                            >
-                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-2">
-                                <div>
-                                  <span className="font-bold text-white text-sm">
-                                    {booking.service?.name || 'Grooming Service'}
-                                  </span>
-                                  <span className="text-xs text-zinc-400 ml-2">
-                                    with {booking.staff?.display_name || 'Master Barber'}
-                                  </span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                  <span
-                                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${
-                                      booking.status === 'confirmed'
-                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                                    }`}
-                                  >
-                                    {booking.status}
-                                  </span>
-                                  {Number(booking.total_amount) === 0 || (booking as any).is_subscription_covered || (booking as any).payment_status === 'membership_covered' ? (
-                                    <span className="font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
-                                      Included in Membership (R0.00)
-                                    </span>
-                                  ) : (booking as any).payment_status === 'paid_online' ? (
-                                    <span className="font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
-                                      Paid Online (R {Number(booking.total_amount).toFixed(2)})
-                                    </span>
-                                  ) : booking.status === 'pending' ? (
-                                    <span className="font-bold text-yellow-400 text-xs bg-yellow-500/10 px-2 py-0.5 rounded border border-yellow-500/20 whitespace-nowrap">
-                                      Payment Pending (R {Number(booking.total_amount).toFixed(2)})
-                                    </span>
-                                  ) : (
-                                    <span className="font-bold text-amber-400 text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 whitespace-nowrap">
-                                      Due in Chair (R {Number(booking.total_amount).toFixed(2)})
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-
-                              <div className="flex flex-wrap items-center justify-between text-xs text-zinc-400 pt-0.5 gap-2">
-                                <div className="flex flex-wrap items-center gap-3">
-                                  <span className="flex items-center text-zinc-200">
-                                    <Clock className="mr-1 h-3.5 w-3.5 text-amber-500" />
-                                    {startDate.toLocaleDateString('en-ZA', {
-                                      timeZone: 'Africa/Johannesburg',
-                                      weekday: 'short',
-                                      month: 'short',
-                                      day: 'numeric',
-                                    })}{' '}
-                                    at{' '}
-                                    {startDate.toLocaleTimeString('en-ZA', {
-                                      timeZone: 'Africa/Johannesburg',
-                                      hour: '2-digit',
-                                      minute: '2-digit',
-                                      hour12: false,
-                                    })}
-                                  </span>
-                                  <span className="flex items-center text-zinc-300">
-                                    <MapPin className="mr-1 h-3.5 w-3.5 text-amber-500" />
-                                    {booking.location?.name || 'Dissafyt Studio - Bernie'}
-                                  </span>
-                                  {booking.service?.duration_minutes && (
-                                    <span className="text-zinc-500">
-                                      ({booking.service.duration_minutes} mins)
-                                    </span>
-                                  )}
-                                </div>
-
-                                {isModifiable && (
-                                  <div className="flex items-center gap-2">
-                                    <Button
-                                      variant="outline"
-                                      size="sm"
-                                      onClick={() => openRescheduleModal(booking)}
-                                      className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 text-xs h-7 px-2"
-                                    >
-                                      <Calendar className="mr-1 h-3 w-3" />
-                                      Reschedule
-                                    </Button>
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      disabled={cancellingBookingId === booking.id}
-                                      onClick={() => handleCancelBooking(booking.id)}
-                                      className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs h-7 px-2"
-                                    >
-                                      {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel'}
-                                    </Button>
-                                  </div>
-                                )}
-                              </div>
-
-                              {booking.notes && (
-                                <div className="text-[11px] text-zinc-500 italic">
-                                  Notes: &ldquo;{booking.notes}&rdquo;
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })}
+                      <div className="space-y-2.5">
+                        {upcomingBookings.map((booking) => renderBookingRow(booking))}
                       </div>
                     )}
                   </div>
@@ -1510,54 +1598,290 @@ export default function AccountPage() {
             </CardContent>
           </Card>
 
-          {/* Apparel Orders with Tracking Visualization */}
-          <Card className="border-zinc-800 bg-zinc-900/60">
-            <CardHeader className="flex flex-row items-center justify-between">
-              <div>
-                <CardTitle className="text-xl text-white flex items-center">
-                  <ShoppingBag className="mr-2 h-5 w-5 text-amber-500" />
-                  Apparel Orders ({orders.length})
-                </CardTitle>
-                <CardDescription>Streetwear purchases and delivery tracking</CardDescription>
-              </div>
-              <Link href="/shop">
-                <Button variant="ghost" size="sm" className="text-amber-400 hover:text-amber-300">
-                  Shop Catalog <ExternalLink className="ml-1 h-3.5 w-3.5" />
-                </Button>
-              </Link>
-            </CardHeader>
-            <CardContent>
-              {orders.length === 0 ? (
-                <div className="text-center py-8 text-sm text-zinc-500 space-y-2">
-                  <Package className="mx-auto h-8 w-8 text-zinc-600" />
-                  <p>You haven&apos;t placed any clothing orders yet.</p>
-                </div>
-              ) : (
-                <div className="space-y-6">
-                  {orders.map((order) => {
-                    const status = order.status.toLowerCase();
-                    const isPaid = status === 'paid' || status === 'processing' || status === 'shipped' || status === 'delivered';
-                    const isProcessing = status === 'processing' || status === 'shipped' || status === 'delivered';
-                    const isShipped = status === 'shipped' || status === 'delivered';
-                    const isDelivered = status === 'delivered';
+          {/* Right Column (5 cols): VIP Membership Pass Directly In Sync */}
+          <div className="lg:col-span-5 space-y-5">
+            {subscription ? (
+              <Card className="border-amber-500/40 bg-gradient-to-b from-zinc-900 via-zinc-950 to-zinc-950 shadow-lg shadow-amber-500/5">
+                <CardHeader className="pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base text-white flex items-center">
+                      <Sparkles className="mr-2 h-4 w-4 text-amber-500" />
+                      VIP Membership Pass
+                    </CardTitle>
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${
+                        subscription.status === 'cancelled'
+                          ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
+                          : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                      }`}
+                    >
+                      {subscription.status === 'cancelled' ? 'Cancelled (Active Period)' : 'Active'}
+                    </span>
+                  </div>
+                  <CardDescription className="text-xs">
+                    Ace of Fyt Recurring Chair Pass &bull; Priority Queue
+                  </CardDescription>
+                </CardHeader>
 
-                    return (
-                      <div
-                        key={order.id}
-                        className="border border-zinc-800/80 rounded-lg p-5 bg-zinc-950/40 space-y-4"
+                <CardContent className="space-y-4 text-xs">
+                  <div className="flex items-baseline justify-between border-b border-zinc-800 pb-2.5">
+                    <span className="font-bold text-white text-sm">
+                      {subscriptionQuota?.plan_name || subscription.plan_name || 'VIP Membership'}
+                    </span>
+                    <span className="font-mono font-bold text-amber-400 text-sm">
+                      R {Number(subscription.price || 100).toFixed(2)}/mo
+                    </span>
+                  </div>
+
+                  {subscriptionQuota ? (
+                    <div className="rounded-xl bg-zinc-900/90 border border-zinc-800 p-3.5 space-y-2.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-zinc-400 font-medium text-[11px]">
+                          Monthly Cut Allotment
+                        </span>
+                        <span
+                          className={`font-semibold text-xs px-2 py-0.5 rounded-full ${
+                            subscriptionQuota.available_cuts > 0
+                              ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
+                              : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
+                          }`}
+                        >
+                          {subscriptionQuota.available_cuts} of {subscriptionQuota.total_cuts} cut
+                          {subscriptionQuota.total_cuts > 1 ? 's' : ''} available
+                        </span>
+                      </div>
+
+                      <div className="w-full bg-zinc-950 rounded-full h-2 overflow-hidden border border-zinc-800">
+                        <div
+                          className={`h-full transition-all duration-500 ${
+                            subscriptionQuota.available_cuts > 0 ? 'bg-amber-500' : 'bg-zinc-600'
+                          }`}
+                          style={{
+                            width: `${Math.min(
+                              100,
+                              Math.round(
+                                (subscriptionQuota.available_cuts /
+                                  Math.max(1, subscriptionQuota.total_cuts)) *
+                                  100
+                              )
+                            )}%`,
+                          }}
+                        />
+                      </div>
+
+                      <div className="flex items-center justify-between text-[10px] text-zinc-500 pt-0.5">
+                        <span>{subscriptionQuota.used_cuts} used this cycle</span>
+                        <span>
+                          {subscription.status === 'cancelled' ? 'Expires ' : 'Renews '}
+                          {subscriptionQuota.period_end
+                            ? new Date(subscriptionQuota.period_end).toLocaleDateString('en-ZA', {
+                                day: 'numeric',
+                                month: 'short',
+                                year: 'numeric',
+                              })
+                            : 'next month'}
+                        </span>
+                      </div>
+                    </div>
+                  ) : (
+                    <p className="text-zinc-400 text-[11px] leading-relaxed">
+                      Your monthly haircut allotment is active. Book your fresh cut anytime with
+                      guaranteed chair time.
+                    </p>
+                  )}
+
+                  <div className="pt-1">
+                    {subscriptionQuota && subscriptionQuota.available_cuts <= 0 ? (
+                      <div className="space-y-1.5">
+                        <Link href="/book">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full border-zinc-700 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-200 text-xs h-9"
+                          >
+                            Book Extra Cut (Standard Rate)
+                          </Button>
+                        </Link>
+                        <p className="text-[10px] text-center text-zinc-500">
+                          Monthly included cuts used. Renews on{' '}
+                          {subscriptionQuota.period_end
+                            ? new Date(subscriptionQuota.period_end).toLocaleDateString('en-ZA', {
+                                day: 'numeric',
+                                month: 'short',
+                              })
+                            : 'cycle end'}
+                          .
+                        </p>
+                      </div>
+                    ) : (
+                      <Link href="/book">
+                        <Button
+                          size="sm"
+                          className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-9 shadow-md shadow-amber-500/10"
+                        >
+                          Book Included Cut (R0.00)
+                        </Button>
+                      </Link>
+                    )}
+                  </div>
+
+                  <div className="pt-2.5 border-t border-zinc-800/80 flex items-center justify-between gap-2">
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setSelectedChangePlanCode(subscription.plan_code || 'twice');
+                        setIsChangePlanOpen(true);
+                      }}
+                      className="flex-1 border-zinc-700 hover:border-zinc-500 bg-zinc-900 text-zinc-200 text-[11px] h-7"
+                    >
+                      Change Plan
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="outline"
+                      onClick={handleSyncSubscription}
+                      disabled={syncingSub}
+                      className="border-zinc-700 hover:border-zinc-500 bg-zinc-900 text-zinc-300 text-[11px] h-7 px-2.5 flex items-center gap-1.5"
+                      title="Synchronize status with PayFast"
+                    >
+                      <RefreshCw
+                        className={`h-3 w-3 ${
+                          syncingSub ? 'animate-spin text-amber-400' : 'text-zinc-400'
+                        }`}
+                      />
+                      <span>{syncingSub ? 'Syncing...' : 'Sync'}</span>
+                    </Button>
+                    {subscription.status === 'active' ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setIsCancelSubOpen(true)}
+                        className="text-zinc-500 hover:text-red-400 hover:bg-red-500/10 text-[11px] h-7 px-2"
                       >
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-3">
+                        Cancel
+                      </Button>
+                    ) : (
+                      <span className="text-[10px] font-mono text-zinc-500">
+                        Cancels on cycle end
+                      </span>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card className="border-zinc-800 bg-gradient-to-b from-zinc-900/70 to-zinc-950 p-5 space-y-4">
+                <div className="space-y-1.5">
+                  <div className="inline-flex items-center space-x-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 text-[10px] font-mono uppercase text-amber-400">
+                    <Sparkles className="h-3 w-3" />
+                    <span>VIP GROOMING GUILD</span>
+                  </div>
+                  <h3 className="text-sm font-bold text-white uppercase tracking-tight">
+                    Ace of Fyt Recurring Chair Pass
+                  </h3>
+                  <p className="text-xs text-zinc-400 leading-relaxed">
+                    Save on regular haircut sessions, skip the queue with priority booking, and
+                    unlock exclusive streetwear drop pricing.
+                  </p>
+                </div>
+                <div className="space-y-2">
+                  <Link href="/book#memberships" className="block">
+                    <Button
+                      size="sm"
+                      className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-8 shadow-md shadow-amber-500/10"
+                    >
+                      Explore Memberships (From R100/mo)
+                    </Button>
+                  </Link>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={handleSyncSubscription}
+                    disabled={syncingSub}
+                    className="w-full border-zinc-800 hover:border-zinc-700 bg-zinc-900/40 text-zinc-400 hover:text-zinc-200 text-xs h-8 flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw
+                      className={`h-3.5 w-3.5 ${
+                        syncingSub ? 'animate-spin text-amber-400' : 'text-zinc-400'
+                      }`}
+                    />
+                    <span>
+                      {syncingSub
+                        ? 'Checking PayFast Billing...'
+                        : 'Already Subscribed? Sync with PayFast'}
+                    </span>
+                  </Button>
+                </div>
+              </Card>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* TAB 2: APPAREL ORDERS & FULFILLMENT TRACKING */}
+      {activeTab === 'orders' && (
+        <Card className="border-zinc-800 bg-zinc-900/60">
+          <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div>
+              <CardTitle className="text-lg sm:text-xl text-white flex items-center">
+                <ShoppingBag className="mr-2 h-5 w-5 text-amber-500" />
+                Apparel Orders ({orders.length})
+              </CardTitle>
+              <CardDescription className="text-xs">
+                Dissafyt streetwear purchases and Courier Guy fulfillment tracking
+              </CardDescription>
+            </div>
+            <Link href="/shop">
+              <Button variant="outline" size="sm" className="border-zinc-700 text-amber-400 hover:text-amber-300 text-xs h-8">
+                Explore Catalog <ExternalLink className="ml-1.5 h-3.5 w-3.5" />
+              </Button>
+            </Link>
+          </CardHeader>
+          <CardContent>
+            {orders.length === 0 ? (
+              <div className="text-center py-10 text-sm text-zinc-500 space-y-3">
+                <Package className="mx-auto h-9 w-9 text-zinc-600" />
+                <p>You haven&apos;t placed any clothing orders yet.</p>
+                <Link href="/shop">
+                  <Button size="sm" className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs">
+                    Browse Latest Streetwear Drops
+                  </Button>
+                </Link>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {orders.map((order) => {
+                  const status = order.status.toLowerCase();
+                  const isPaid =
+                    status === 'paid' ||
+                    status === 'processing' ||
+                    status === 'shipped' ||
+                    status === 'delivered';
+                  const isShipped = status === 'shipped' || status === 'delivered';
+                  const isDelivered = status === 'delivered';
+
+                  return (
+                    <div
+                      key={order.id}
+                      className="border border-zinc-800/80 rounded-xl p-4 bg-zinc-950/50 space-y-3.5 flex flex-col justify-between"
+                    >
+                      <div className="space-y-3">
+                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-2.5">
                           <div>
                             <span className="font-mono font-bold text-white text-sm">
                               {order.order_number}
                             </span>
                             <span className="text-xs text-zinc-500 ml-2">
-                              {new Date(order.created_at).toLocaleDateString()}
+                              {new Date(order.created_at).toLocaleDateString('en-ZA')}
                             </span>
                           </div>
                           <div className="flex items-center space-x-2">
                             <span
-                              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${
+                              className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
                                 order.status === 'paid'
                                   ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
                                   : order.status === 'shipped'
@@ -1567,370 +1891,242 @@ export default function AccountPage() {
                             >
                               {order.status.replace('_', ' ')}
                             </span>
-                            <span className="font-extrabold text-amber-400 text-sm">
+                            <span className="font-mono font-bold text-amber-400 text-sm">
                               R {Number(order.total).toFixed(2)}
                             </span>
                           </div>
                         </div>
 
                         {/* 4-Step Fulfillment Tracker */}
-                        <div className="py-2">
-                          <div className="text-[11px] font-semibold text-zinc-400 uppercase tracking-wider mb-2">
-                            Fulfillment Journey
-                          </div>
-                          <div className="grid grid-cols-4 gap-2 text-center text-[11px]">
+                        <div className="py-1">
+                          <div className="grid grid-cols-4 gap-1.5 text-center text-[10px]">
                             <div className="space-y-1">
                               <div className="h-1.5 rounded-full bg-amber-500" />
-                              <span className="text-amber-400 font-medium">Placed</span>
+                              <span className="text-amber-400 font-medium block">Placed</span>
                             </div>
                             <div className="space-y-1">
                               <div
-                                className={`h-1.5 rounded-full ${isPaid ? 'bg-emerald-500' : 'bg-zinc-800'}`}
+                                className={`h-1.5 rounded-full ${
+                                  isPaid ? 'bg-emerald-500' : 'bg-zinc-800'
+                                }`}
                               />
-                              <span className={isPaid ? 'text-emerald-400 font-medium' : 'text-zinc-500'}>
-                                Paid (PayFast)
+                              <span
+                                className={`block ${
+                                  isPaid ? 'text-emerald-400 font-medium' : 'text-zinc-500'
+                                }`}
+                              >
+                                Paid
                               </span>
                             </div>
                             <div className="space-y-1">
                               <div
-                                className={`h-1.5 rounded-full ${isShipped ? 'bg-blue-500' : 'bg-zinc-800'}`}
+                                className={`h-1.5 rounded-full ${
+                                  isShipped ? 'bg-blue-500' : 'bg-zinc-800'
+                                }`}
                               />
-                              <span className={isShipped ? 'text-blue-400 font-medium' : 'text-zinc-500'}>
+                              <span
+                                className={`block ${
+                                  isShipped ? 'text-blue-400 font-medium' : 'text-zinc-500'
+                                }`}
+                              >
                                 Courier Guy
                               </span>
                             </div>
                             <div className="space-y-1">
                               <div
-                                className={`h-1.5 rounded-full ${isDelivered ? 'bg-emerald-400' : 'bg-zinc-800'}`}
+                                className={`h-1.5 rounded-full ${
+                                  isDelivered ? 'bg-emerald-400' : 'bg-zinc-800'
+                                }`}
                               />
-                              <span className={isDelivered ? 'text-emerald-300 font-medium' : 'text-zinc-500'}>
+                              <span
+                                className={`block ${
+                                  isDelivered ? 'text-emerald-300 font-medium' : 'text-zinc-500'
+                                }`}
+                              >
                                 Delivered
                               </span>
                             </div>
                           </div>
                         </div>
 
-                        <div className="text-xs text-zinc-400 space-y-1 bg-zinc-900/40 p-3 rounded">
+                        <div className="text-xs text-zinc-300 space-y-1 bg-zinc-900/50 p-2.5 rounded-lg border border-zinc-800/60">
                           {order.order_items?.map((item) => (
                             <div key={item.id} className="flex justify-between">
-                              <span>
+                              <span className="truncate pr-2">
                                 {item.quantity}x {item.product_name}
                               </span>
-                              <span className="font-mono">R {Number(item.total_price).toFixed(2)}</span>
+                              <span className="font-mono text-zinc-400 flex-shrink-0">
+                                R {Number(item.total_price).toFixed(2)}
+                              </span>
                             </div>
                           ))}
                         </div>
-
-                        {order.shipping_address && (
-                          <div className="text-[11px] text-zinc-500 flex items-center pt-1">
-                            <Truck className="h-3.5 w-3.5 mr-1.5 text-zinc-400" />
-                            Waybill Destination: {order.shipping_address.street_address},{' '}
-                            {order.shipping_address.city}
-                          </div>
-                        )}
                       </div>
-                    );
-                  })}
-                </div>
-              )}
-            </CardContent>
-          </Card>
-        </div>
 
-        {/* Sidebar Column: Roles, Notifications, Quick Actions */}
-        <div className="space-y-6">
-          {/* Active Membership or Join Guild Card */}
-          {subscription ? (
-            <Card className="border-amber-500/40 bg-gradient-to-b from-zinc-900 via-zinc-950 to-zinc-950 shadow-lg shadow-amber-500/5">
-              <CardHeader className="pb-3">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-base text-white flex items-center">
-                    <Scissors className="mr-2 h-4 w-4 text-amber-500" />
-                    VIP Membership
-                  </CardTitle>
-                  <span
-                    className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${
-                      subscription.status === 'cancelled'
-                        ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
-                        : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
-                    }`}
-                  >
-                    {subscription.status === 'cancelled' ? 'Cancelled (Active Period)' : 'Active'}
-                  </span>
-                </div>
-                <CardDescription className="text-xs">
-                  Ace of Fyt Recurring Chair Pass
-                </CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3.5 text-xs">
-                <div className="flex items-baseline justify-between border-b border-zinc-800 pb-2">
-                  <span className="font-bold text-white text-sm">
-                    {subscriptionQuota?.plan_name || subscription.plan_name || 'VIP Membership'}
-                  </span>
-                  <span className="font-mono font-bold text-amber-400">
-                    R {Number(subscription.price || 100).toFixed(2)}/mo
-                  </span>
-                </div>
-
-                {/* Quota Telemetry & Cut Count Display */}
-                {subscriptionQuota ? (
-                  <div className="rounded-lg bg-zinc-900/90 border border-zinc-800 p-3 space-y-2">
-                    <div className="flex items-center justify-between">
-                      <span className="text-zinc-400 font-medium text-[11px]">Monthly Allotment</span>
-                      <span
-                        className={`font-semibold text-xs px-2 py-0.5 rounded-full ${
-                          subscriptionQuota.available_cuts > 0
-                            ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                            : 'bg-zinc-800 text-zinc-400 border border-zinc-700'
-                        }`}
-                      >
-                        {subscriptionQuota.available_cuts} of {subscriptionQuota.total_cuts} cut
-                        {subscriptionQuota.total_cuts > 1 ? 's' : ''} available
-                      </span>
+                      {order.shipping_address && (
+                        <div className="text-[11px] text-zinc-500 flex items-center pt-2 border-t border-zinc-800/60">
+                          <Truck className="h-3.5 w-3.5 mr-1.5 text-amber-500/80 flex-shrink-0" />
+                          <span className="truncate">
+                            {order.shipping_address.street_address}, {order.shipping_address.city}
+                          </span>
+                        </div>
+                      )}
                     </div>
-
-                    {/* Progress Bar */}
-                    <div className="w-full bg-zinc-950 rounded-full h-2 overflow-hidden border border-zinc-800">
-                      <div
-                        className={`h-full transition-all duration-500 ${
-                          subscriptionQuota.available_cuts > 0 ? 'bg-amber-500' : 'bg-zinc-600'
-                        }`}
-                        style={{
-                          width: `${Math.min(
-                            100,
-                            Math.round(
-                              (subscriptionQuota.available_cuts / Math.max(1, subscriptionQuota.total_cuts)) * 100
-                            )
-                          )}%`,
-                        }}
-                      />
-                    </div>
-
-                    <div className="flex items-center justify-between text-[10px] text-zinc-500 pt-0.5">
-                      <span>{subscriptionQuota.used_cuts} used this cycle</span>
-                      <span>
-                        {subscription.status === 'cancelled' ? 'Expires ' : 'Renews '}
-                        {subscriptionQuota.period_end
-                          ? new Date(subscriptionQuota.period_end).toLocaleDateString('en-ZA', {
-                              day: 'numeric',
-                              month: 'short',
-                              year: 'numeric',
-                            })
-                          : 'next month'}
-                      </span>
-                    </div>
-                  </div>
-                ) : (
-                  <p className="text-zinc-400 text-[11px] leading-relaxed">
-                    Your monthly haircut allotment is active. Book your fresh cut anytime with guaranteed chair time.
-                  </p>
-                )}
-
-                {/* Primary Booking Action */}
-                <div className="pt-1">
-                  {subscriptionQuota && subscriptionQuota.available_cuts <= 0 ? (
-                    <div className="space-y-1.5">
-                      <Link href="/book">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="w-full border-zinc-700 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-200 text-xs h-8"
-                        >
-                          Book Extra Cut (Standard Rate)
-                        </Button>
-                      </Link>
-                      <p className="text-[10px] text-center text-zinc-500">
-                        Monthly included cuts used. Renews on{' '}
-                        {subscriptionQuota.period_end
-                          ? new Date(subscriptionQuota.period_end).toLocaleDateString('en-ZA', {
-                              day: 'numeric',
-                              month: 'short',
-                            })
-                          : 'cycle end'}
-                        .
-                      </p>
-                    </div>
-                  ) : (
-                    <Link href="/book">
-                      <Button size="sm" className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-8 shadow-md shadow-amber-500/10">
-                        Book Included Cut (R0.00)
-                      </Button>
-                    </Link>
-                  )}
-                </div>
-
-                {/* Self-Service Plan Controls */}
-                <div className="pt-2 border-t border-zinc-800/80 flex items-center justify-between gap-2">
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      setSelectedChangePlanCode(subscription.plan_code || 'twice');
-                      setIsChangePlanOpen(true);
-                    }}
-                    className="flex-1 border-zinc-700 hover:border-zinc-500 bg-zinc-900 text-zinc-200 text-[11px] h-7"
-                  >
-                    Change Plan
-                  </Button>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    onClick={handleSyncSubscription}
-                    disabled={syncingSub}
-                    className="border-zinc-700 hover:border-zinc-500 bg-zinc-900 text-zinc-300 text-[11px] h-7 px-2.5 flex items-center gap-1.5"
-                    title="Synchronize status with PayFast"
-                  >
-                    <RefreshCw className={`h-3 w-3 ${syncingSub ? 'animate-spin text-amber-400' : 'text-zinc-400'}`} />
-                    <span>{syncingSub ? 'Syncing...' : 'Sync'}</span>
-                  </Button>
-                  {subscription.status === 'active' ? (
-                    <Button
-                      type="button"
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => setIsCancelSubOpen(true)}
-                      className="text-zinc-500 hover:text-red-400 hover:bg-red-500/10 text-[11px] h-7 px-2"
-                    >
-                      Cancel
-                    </Button>
-                  ) : (
-                    <span className="text-[10px] font-mono text-zinc-500">
-                      Cancels on cycle end
-                    </span>
-                  )}
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card className="border-zinc-800 bg-gradient-to-b from-zinc-900/70 to-zinc-950 p-5 space-y-3.5">
-              <div className="space-y-1.5">
-                <div className="inline-flex items-center space-x-1.5 rounded-full bg-amber-500/10 border border-amber-500/30 px-2.5 py-0.5 text-[10px] font-mono uppercase text-amber-400">
-                  <Sparkles className="h-3 w-3" />
-                  <span>VIP GROOMING GUILD</span>
-                </div>
-                <h3 className="text-sm font-bold text-white uppercase tracking-tight">
-                  Ace of Fyt Recurring Chair Pass
-                </h3>
-                <p className="text-xs text-zinc-400 leading-relaxed">
-                  Save on regular haircut sessions, skip the queue with priority booking, and unlock exclusive streetwear drop pricing.
-                </p>
+                  );
+                })}
               </div>
-              <div className="space-y-2">
-                <Link href="/book#memberships" className="block">
-                  <Button size="sm" className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-8 shadow-md shadow-amber-500/10">
-                    Explore Memberships (From R100/mo)
-                  </Button>
-                </Link>
-                <Button
-                  type="button"
-                  size="sm"
-                  variant="outline"
-                  onClick={handleSyncSubscription}
-                  disabled={syncingSub}
-                  className="w-full border-zinc-800 hover:border-zinc-700 bg-zinc-900/40 text-zinc-400 hover:text-zinc-200 text-xs h-8 flex items-center justify-center gap-2"
-                >
-                  <RefreshCw className={`h-3.5 w-3.5 ${syncingSub ? 'animate-spin text-amber-400' : 'text-zinc-400'}`} />
-                  <span>{syncingSub ? 'Checking PayFast Billing...' : 'Already Subscribed? Sync with PayFast'}</span>
-                </Button>
-              </div>
-            </Card>
-          )}
+            )}
+          </CardContent>
+        </Card>
+      )}
 
-          {/* Notification Preferences */}
+      {/* TAB 3: PROFILE & SETTINGS (Synchronized Two-Column Layout) */}
+      {activeTab === 'settings' && (
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start">
+          {/* Personal & Contact Details */}
           <Card className="border-zinc-800 bg-zinc-900/60">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base text-white flex items-center">
-                <Bell className="mr-2 h-4 w-4 text-amber-500" />
-                Notification Preferences
+            <CardHeader>
+              <CardTitle className="text-lg text-white flex items-center">
+                <User className="mr-2 h-5 w-5 text-amber-500" />
+                Profile &amp; Delivery Contact
               </CardTitle>
               <CardDescription className="text-xs">
-                Manage alerts for bookings and drops
+                Synchronized across streetwear checkout and barbershop reservations
               </CardDescription>
             </CardHeader>
             <CardContent>
-              <form onSubmit={handleSaveNotifications} className="space-y-3 text-xs">
-                <label className="flex items-center space-x-2 text-zinc-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={notifOrderEmail}
-                    onChange={(e) => setNotifOrderEmail(e.target.checked)}
-                    className="rounded border-zinc-700 bg-zinc-950 text-amber-500 focus:ring-amber-500"
+              <form onSubmit={handleUpdateProfile} className="space-y-4">
+                <div className="space-y-1.5">
+                  <Label htmlFor="email" className="text-xs text-zinc-300">
+                    Account Email
+                  </Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={user?.email || ''}
+                    disabled
+                    className="opacity-70 text-xs"
                   />
-                  <span>Email order status updates</span>
-                </label>
-                <label className="flex items-center space-x-2 text-zinc-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={notifBookingSMS}
-                    onChange={(e) => setNotifBookingSMS(e.target.checked)}
-                    className="rounded border-zinc-700 bg-zinc-950 text-amber-500 focus:ring-amber-500"
-                  />
-                  <span>SMS/WhatsApp appointment reminders</span>
-                </label>
-                <label className="flex items-center space-x-2 text-zinc-300 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={notifDropAlerts}
-                    onChange={(e) => setNotifDropAlerts(e.target.checked)}
-                    className="rounded border-zinc-700 bg-zinc-950 text-amber-500 focus:ring-amber-500"
-                  />
-                  <span>VIP streetwear drops & early access</span>
-                </label>
-
-                <div className="pt-2">
-                  <Button
-                    type="submit"
-                    variant="outline"
-                    size="sm"
-                    className="w-full border-zinc-700 text-zinc-300 hover:bg-zinc-800 text-xs"
-                  >
-                    Save Preferences
-                  </Button>
-                  {notifSavedMsg && (
-                    <div className="text-[11px] text-emerald-400 mt-1 text-center font-medium">
-                      {notifSavedMsg}
-                    </div>
-                  )}
                 </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="fullName" className="text-xs text-zinc-300">
+                    Full Name
+                  </Label>
+                  <Input
+                    id="fullName"
+                    value={fullName}
+                    onChange={(e) => setFullName(e.target.value)}
+                    placeholder="Enter full name"
+                    className="text-xs"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="phone" className="text-xs text-zinc-300">
+                    Phone Number (Courier Guy SMS &amp; Booking Reminders)
+                  </Label>
+                  <Input
+                    id="phone"
+                    value={phone}
+                    onChange={(e) => setPhone(e.target.value)}
+                    placeholder="+27 82 123 4567"
+                    className="text-xs"
+                  />
+                </div>
+                <Button
+                  type="submit"
+                  disabled={updating}
+                  className="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-9"
+                >
+                  {updating ? 'Saving...' : 'Save Profile Changes'}
+                </Button>
               </form>
             </CardContent>
           </Card>
 
-          {/* Assigned Roles */}
-          <Card className="border-zinc-800 bg-zinc-900/60">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-base text-white flex items-center">
-                <Shield className="mr-2 h-4 w-4 text-amber-500" />
-                Assigned Platform Roles
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-2">
-              {user?.roles?.map((role) => (
-                <div
-                  key={role}
-                  className="flex items-center justify-between rounded-md bg-zinc-800/80 px-3 py-1.5 text-xs"
-                >
-                  <span className="capitalize font-medium text-zinc-200">{role}</span>
-                  <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
-                </div>
-              ))}
-            </CardContent>
-          </Card>
+          {/* Notification Preferences & Platform Roles */}
+          <div className="space-y-6">
+            <Card className="border-zinc-800 bg-zinc-900/60">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg text-white flex items-center">
+                  <Bell className="mr-2 h-5 w-5 text-amber-500" />
+                  Notification Preferences
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Configure how you receive booking and drop updates
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <form onSubmit={handleSaveNotifications} className="space-y-3 text-xs">
+                  <label className="flex items-center space-x-2.5 text-zinc-300 cursor-pointer p-2 rounded-lg hover:bg-zinc-800/40 transition">
+                    <input
+                      type="checkbox"
+                      checked={notifOrderEmail}
+                      onChange={(e) => setNotifOrderEmail(e.target.checked)}
+                      className="rounded border-zinc-700 bg-zinc-950 text-amber-500 focus:ring-amber-500"
+                    />
+                    <span>Email order status &amp; waybill updates</span>
+                  </label>
+                  <label className="flex items-center space-x-2.5 text-zinc-300 cursor-pointer p-2 rounded-lg hover:bg-zinc-800/40 transition">
+                    <input
+                      type="checkbox"
+                      checked={notifBookingSMS}
+                      onChange={(e) => setNotifBookingSMS(e.target.checked)}
+                      className="rounded border-zinc-700 bg-zinc-950 text-amber-500 focus:ring-amber-500"
+                    />
+                    <span>SMS/WhatsApp barber appointment reminders</span>
+                  </label>
+                  <label className="flex items-center space-x-2.5 text-zinc-300 cursor-pointer p-2 rounded-lg hover:bg-zinc-800/40 transition">
+                    <input
+                      type="checkbox"
+                      checked={notifDropAlerts}
+                      onChange={(e) => setNotifDropAlerts(e.target.checked)}
+                      className="rounded border-zinc-700 bg-zinc-950 text-amber-500 focus:ring-amber-500"
+                    />
+                    <span>VIP streetwear drops &amp; early access alerts</span>
+                  </label>
 
-          {/* Quick Shortcuts */}
-          <Card className="border-zinc-800 bg-zinc-900/60 p-4 space-y-2 text-xs">
-            <div className="font-semibold text-white">Platform Shortcuts</div>
-            <Link href="/book" className="block text-zinc-400 hover:text-amber-400">
-              &bull; Book Barber Appointment
-            </Link>
-            <Link href="/shop" className="block text-zinc-400 hover:text-amber-400">
-              &bull; Explore Clothing Catalog
-            </Link>
-          </Card>
+                  <div className="pt-2 flex items-center gap-3">
+                    <Button
+                      type="submit"
+                      variant="outline"
+                      size="sm"
+                      className="border-zinc-700 text-zinc-200 hover:bg-zinc-800 text-xs h-8"
+                    >
+                      Save Preferences
+                    </Button>
+                    {notifSavedMsg && (
+                      <span className="text-[11px] text-emerald-400 font-medium">
+                        {notifSavedMsg}
+                      </span>
+                    )}
+                  </div>
+                </form>
+              </CardContent>
+            </Card>
+
+            <Card className="border-zinc-800 bg-zinc-900/60">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-base text-white flex items-center">
+                  <Shield className="mr-2 h-4 w-4 text-amber-500" />
+                  Account Access &amp; Roles
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="flex flex-wrap gap-2">
+                {user?.roles?.map((role) => (
+                  <div
+                    key={role}
+                    className="inline-flex items-center gap-2 rounded-lg bg-zinc-800/80 border border-zinc-700/70 px-3 py-1.5 text-xs"
+                  >
+                    <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400" />
+                    <span className="capitalize font-medium text-zinc-200">{role}</span>
+                  </div>
+                ))}
+              </CardContent>
+            </Card>
+          </div>
         </div>
-      </div>
+      )}
     </div>
   );
 }
+
