@@ -367,8 +367,99 @@ export class BarbershopService {
   }
 
   /**
+   * Resolves the required specialist category ('barber' | 'nail_tech' | 'beautician') for a service.
+   */
+  static resolveServiceSpecialty(service: { specialty?: string | null; name?: string | null }): string {
+    if (service.specialty && ['barber', 'nail_tech', 'beautician'].includes(service.specialty)) {
+      return service.specialty;
+    }
+    const lowerName = (service.name || '').toLowerCase();
+    if (
+      lowerName.includes('nail') ||
+      lowerName.includes('manicure') ||
+      lowerName.includes('pedicure') ||
+      lowerName.includes('acrylic') ||
+      lowerName.includes('gel')
+    ) {
+      return 'nail_tech';
+    }
+    if (
+      lowerName.includes('facial') ||
+      lowerName.includes('wax') ||
+      lowerName.includes('lash') ||
+      lowerName.includes('brow') ||
+      lowerName.includes('makeup') ||
+      lowerName.includes('massage') ||
+      lowerName.includes('beauty')
+    ) {
+      return 'beautician';
+    }
+    return 'barber';
+  }
+
+  /**
+   * Verifies if an individual specialist is scheduled to work on a given SAST date/time slot
+   * and has not marked the date as a blocked day off.
+   */
+  static isSpecialistWorkingAtSlot(
+    staff: any,
+    dateLabel: string,
+    weekday: string,
+    weekdayKey: string,
+    slotStartDecimal: number,
+    slotEndDecimal: number
+  ): boolean {
+    // 1. Check blocked dates (sick days / time off)
+    if (Array.isArray(staff.blocked_dates) && staff.blocked_dates.includes(dateLabel)) {
+      return false;
+    }
+
+    // 2. Check working_days array (e.g. ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'])
+    if (Array.isArray(staff.working_days) && staff.working_days.length > 0) {
+      if (!staff.working_days.includes(weekday)) {
+        return false;
+      }
+    }
+
+    // 3. Check custom shift start / end hours
+    const startHr = typeof staff.work_start_hour === 'number' ? staff.work_start_hour : 9;
+    const endHr =
+      typeof staff.work_end_hour === 'number'
+        ? staff.work_end_hour
+        : weekday === 'Sat'
+        ? 17
+        : 18;
+
+    if (slotStartDecimal < startHr || slotEndDecimal > endHr) {
+      return false;
+    }
+
+    // 4. Preserve legacy working_hours JSON object support if populated
+    if (staff.working_hours && typeof staff.working_hours === 'object') {
+      const shift = (staff.working_hours as any)[weekdayKey];
+      if (shift) {
+        if (shift.active === false) {
+          return false;
+        }
+        if (shift.start && shift.end) {
+          const [sH, sM] = shift.start.split(':').map((n: string) => parseInt(n, 10));
+          const [eH, eM] = shift.end.split(':').map((n: string) => parseInt(n, 10));
+          const shiftStartDecimal = sH + (sM || 0) / 60;
+          const shiftEndDecimal = eH + (eM || 0) / 60;
+          if (slotStartDecimal < shiftStartDecimal || slotEndDecimal > shiftEndDecimal) {
+            return false;
+          }
+        }
+      }
+    }
+
+    return true;
+  }
+
+  /**
    * Calculates real-time available time slots for a specific date and service.
    * Accounts for shop operating hours, service duration (rounded to slot increments),
+   * cross-specialty matching (Barber vs Nail Tech vs Beautician), individual specialist schedules,
    * South Africa Standard Time (SAST, UTC+2), and existing bookings.
    */
   static async getAvailableSlots(params: {
@@ -379,7 +470,7 @@ export class BarbershopService {
   }): Promise<{ slots: AvailableSlot[]; service?: BarberService; error?: string }> {
     const admin = getSupabaseAdminClient();
 
-    // 1. Fetch the service to know its duration
+    // 1. Fetch the service to know its duration and specialty
     const { data: service, error: sErr } = await admin
       .from('services')
       .select('*')
@@ -390,6 +481,8 @@ export class BarbershopService {
     if (sErr || !service) {
       return { slots: [], error: 'Selected service was not found or is inactive.' };
     }
+
+    const requiredSpecialty = BarbershopService.resolveServiceSpecialty(service);
 
     // 2. Fetch active staff
     let staffQuery = admin.from('staff').select('*').eq('is_active', true);
@@ -414,17 +507,25 @@ export class BarbershopService {
       }
     }
 
-    if (stErr || !activeStaff || activeStaff.length === 0) {
-      return { slots: [], service, error: 'No active barbers available for this request.' };
+    // Filter staff to only those matching the service's specialty
+    const matchingStaff = (activeStaff || []).filter(
+      (s: any) => (s.specialty || 'barber') === requiredSpecialty
+    );
+
+    if (stErr || matchingStaff.length === 0) {
+      return {
+        slots: [],
+        service,
+        error: 'No active specialists in this category are available for this request.',
+      };
     }
 
     // 3. Determine shop operating hours for the given day in SAST
     const midday = new Date(`${params.date}T12:00:00${SAST_OFFSET}`);
-    const { weekday } = getSASTComponents(midday);
+    const { weekday, dateLabel } = getSASTComponents(midday);
     const weekdayKey = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][midday.getDay()];
 
     if (weekday === 'Sun') {
-      // Barbershop closed on Sundays
       return { slots: [], service };
     }
 
@@ -470,34 +571,29 @@ export class BarbershopService {
           continue;
         }
 
-        // Find which barbers are free during [slotStart, slotEnd)
-        const freeStaff = activeStaff.filter((barber) => {
-          // 1. Verify barber's personal working hours on this weekday if configured
-          if (barber.working_hours && typeof barber.working_hours === 'object') {
-            const shift = (barber.working_hours as any)[weekdayKey];
-            if (shift) {
-              if (shift.active === false) {
-                return false; // Barber is off on this day
-              }
-              if (shift.start && shift.end) {
-                const [sH, sM] = shift.start.split(':').map((n: string) => parseInt(n, 10));
-                const [eH, eM] = shift.end.split(':').map((n: string) => parseInt(n, 10));
-                const shiftStartDecimal = sH + (sM || 0) / 60;
-                const shiftEndDecimal = eH + (eM || 0) / 60;
-                const slotStartDecimal = hour + minute / 60;
-                const slotEndDecimal = slotStartDecimal + effectiveDurationMinutes / 60;
+        const slotStartDecimal = hour + minute / 60;
+        const slotEndDecimal = slotStartDecimal + effectiveDurationMinutes / 60;
 
-                if (slotStartDecimal < shiftStartDecimal || slotEndDecimal > shiftEndDecimal) {
-                  return false; // Slot falls outside this barber's working shift
-                }
-              }
-            }
+        // Find which matching specialists are free during [slotStart, slotEnd)
+        const freeStaff = matchingStaff.filter((barber) => {
+          // 1. Verify specialist's working days, shift hours, and blocked off-dates
+          if (
+            !BarbershopService.isSpecialistWorkingAtSlot(
+              barber,
+              dateLabel,
+              weekday,
+              weekdayKey,
+              slotStartDecimal,
+              slotEndDecimal
+            )
+          ) {
+            return false;
           }
 
           // 2. Check collision against existing non-cancelled bookings
           const hasCollision = existingBookings.some((b) => {
             if (b.staff_id && b.staff_id !== barber.id) {
-              return false; // Booking belongs to another barber
+              return false; // Booking belongs to another specialist
             }
             const bStart = new Date(b.start_time);
             const bEnd = new Date(b.end_time);
@@ -530,15 +626,20 @@ export class BarbershopService {
 
   /**
    * Evaluates if a given service is covered by the subscriber's membership tier.
+   * Only Barber services are eligible for haircut memberships (excludes Nail Tech & Beautician services).
    * - 'solo': 1 standard haircut (<= 30 min, excluding combos/beards/executive)
    * - 'twice': 2 standard haircuts (<= 30 min, excluding combos/beards/executive)
-   * - 'executive': 2 combo cuts (all grooming services included)
+   * - 'executive': 2 combo cuts (all barber grooming services included)
    */
   static isServiceEligibleForPlan(
     planCode: string | null | undefined,
-    service: { name?: string; duration_minutes?: number }
+    service: { name?: string; duration_minutes?: number; specialty?: string | null }
   ): boolean {
     if (!service) return false;
+    if (BarbershopService.resolveServiceSpecialty(service) !== 'barber') {
+      return false;
+    }
+
     const plan = (planCode || '').toLowerCase();
     if (plan === 'executive' || plan === 'founder_pass_12cuts') return true;
 
@@ -723,7 +824,8 @@ export class BarbershopService {
   }
 
   /**
-   * Authoritatively creates an appointment with concurrency and anti-collision checks.
+   * Authoritatively creates an appointment with concurrency, cross-specialty matching,
+   * specialist shift/day-off validation, and anti-hoarding/no-show checks.
    */
   static async createBooking(input: CreateBookingInput): Promise<{
     success: boolean;
@@ -748,6 +850,8 @@ export class BarbershopService {
       return { success: false, error: 'Service not found or is currently inactive.' };
     }
 
+    const requiredSpecialty = BarbershopService.resolveServiceSpecialty(service);
+
     const startTime = new Date(input.start_time);
     if (isNaN(startTime.getTime())) {
       return { success: false, error: 'Invalid start time format.' };
@@ -763,9 +867,10 @@ export class BarbershopService {
     // Validate shop operating hours in SAST
     const sastStart = getSASTComponents(startTime);
     const sastEnd = getSASTComponents(endTime);
+    const weekdayKey = ['sunday', 'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday'][startTime.getDay()];
 
     if (sastStart.weekday === 'Sun') {
-      return { success: false, error: 'Ace of Fyt is closed on Sundays.' };
+      return { success: false, error: 'Studio is closed on Sundays.' };
     }
 
     const openHour = 9;
@@ -808,22 +913,46 @@ export class BarbershopService {
       };
     }
 
-    // 2. Resolve and assign barber
+    // 2. Resolve and assign specialist (enforcing specialty match & specialist working schedule)
     let assignedStaffId = input.staff_id || null;
 
     // Fetch active staff
     const { data: activeStaff } = await admin.from('staff').select('*').eq('is_active', true);
     if (!activeStaff || activeStaff.length === 0) {
-      return { success: false, error: 'No active barbers available to take appointments.' };
+      return { success: false, error: 'No active specialists available to take appointments.' };
     }
 
     if (assignedStaffId && assignedStaffId !== 'any') {
       const barber = activeStaff.find((s) => s.id === assignedStaffId);
       if (!barber) {
-        return { success: false, error: 'Requested barber is not active or does not exist.' };
+        return { success: false, error: 'Requested specialist is not active or does not exist.' };
       }
 
-      // Check collision for this barber
+      const staffSpecialty = barber.specialty || 'barber';
+      if (staffSpecialty !== requiredSpecialty) {
+        return {
+          success: false,
+          error: `Selected specialist does not perform this service category. Please select an available specialist for ${service.name}.`,
+        };
+      }
+
+      if (
+        !BarbershopService.isSpecialistWorkingAtSlot(
+          barber,
+          sastStart.dateLabel,
+          sastStart.weekday,
+          weekdayKey,
+          startDecimalHour,
+          endDecimalHour
+        )
+      ) {
+        return {
+          success: false,
+          error: `${barber.display_name} is off-duty or unavailable during this time slot. Please choose another time or specialist.`,
+        };
+      }
+
+      // Check collision for this specialist
       const { data: collisions } = await admin
         .from('bookings')
         .select('id')
@@ -835,14 +964,26 @@ export class BarbershopService {
       if (collisions && collisions.length > 0) {
         return {
           success: false,
-          error: 'This barber is already booked for the selected time slot. Please choose another slot.',
+          error: 'This specialist is already booked for the selected time slot. Please choose another slot.',
         };
       }
     } else {
-      // "Any barber" selected: find first free barber
+      // "Any specialist" selected: find first free specialist matching the service's specialty & schedule
       let freeBarber: Staff | null = null;
+      const matchingSpecialists = activeStaff.filter(
+        (s: any) =>
+          (s.specialty || 'barber') === requiredSpecialty &&
+          BarbershopService.isSpecialistWorkingAtSlot(
+            s,
+            sastStart.dateLabel,
+            sastStart.weekday,
+            weekdayKey,
+            startDecimalHour,
+            endDecimalHour
+          )
+      );
 
-      for (const barber of activeStaff) {
+      for (const barber of matchingSpecialists) {
         const { data: collisions } = await admin
           .from('bookings')
           .select('id')
@@ -858,7 +999,10 @@ export class BarbershopService {
       }
 
       if (!freeBarber) {
-        return { success: false, error: 'All barbers are booked for this slot. Please select another time.' };
+        return {
+          success: false,
+          error: 'All specialists for this service are booked or off-duty for this slot. Please select another time.',
+        };
       }
       assignedStaffId = freeBarber.id;
     }
@@ -890,7 +1034,49 @@ export class BarbershopService {
 
     const totalAmount = isCoveredBySubscription ? 0.00 : Number(service.price || 0);
     const paymentStatus: 'membership_covered' | 'unpaid' = isCoveredBySubscription ? 'membership_covered' : 'unpaid';
-    
+
+    // 3b. Anti-Hoarding & No-Show Protection when customer selects "Pay in Chair"
+    if (!isCoveredBySubscription && input.payment_choice !== 'payfast') {
+      // Rule 1: High-duration services (60+ mins, e.g. Nail sets, Beauty treatments, Executive packages) require online payment
+      if (effectiveDurationMinutes >= 60) {
+        return {
+          success: false,
+          error: 'Appointments of 60 minutes or longer require upfront online payment via PayFast to secure your specialist slot.',
+        };
+      }
+
+      // Rule 2: Customers with any past no_show must pay online via PayFast
+      const { data: pastNoShows } = await admin
+        .from('bookings')
+        .select('id')
+        .eq('customer_id', input.customer_id)
+        .eq('status', 'no_show')
+        .limit(1);
+
+      if (pastNoShows && pastNoShows.length > 0) {
+        return {
+          success: false,
+          error: 'Pay in Chair is unavailable due to a previous No-Show on your account. Please select PayFast online payment to book.',
+        };
+      }
+
+      // Rule 3: Cap active unpaid "Pay in Chair" bookings to max 2 per customer to prevent slot hoarding
+      const { data: activeUnpaid } = await admin
+        .from('bookings')
+        .select('id')
+        .eq('customer_id', input.customer_id)
+        .in('status', ['confirmed', 'pending'])
+        .eq('payment_status', 'unpaid')
+        .gte('start_time', new Date().toISOString());
+
+      if (activeUnpaid && activeUnpaid.length >= 2) {
+        return {
+          success: false,
+          error: 'You already have 2 active unpaid appointments scheduled. Please use PayFast online payment or complete your existing bookings first.',
+        };
+      }
+    }
+
     // Determine booking status and audit note based on payment choice
     let bookingStatus: 'confirmed' | 'pending' = 'confirmed';
     let statusNote = coverageNote;

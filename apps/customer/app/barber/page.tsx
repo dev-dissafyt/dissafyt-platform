@@ -69,6 +69,10 @@ interface BarberProfile {
   bank_account_hash?: string | null;
   has_station_pin?: boolean;
   pos_terminal_id?: string | null;
+  working_days?: string[];
+  work_start_hour?: number;
+  work_end_hour?: number;
+  blocked_dates?: string[];
 }
 
 const SPECIALTY_LABELS: Record<string, string> = {
@@ -76,6 +80,8 @@ const SPECIALTY_LABELS: Record<string, string> = {
   nail_tech: 'Nail Technician',
   beautician: 'Beautician',
 };
+
+const ALL_WEEK_DAYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
 interface DashboardSummary {
   totalBookings: number;
@@ -85,6 +91,11 @@ interface DashboardSummary {
   netBarberPayout: number;
   settledPayouts: number;
   pendingChairCash: number;
+  onlineGrossRevenue?: number;
+  onlineSpecialistShare?: number;
+  chairCashRevenue?: number;
+  chairPlatformFeeOwed?: number;
+  netEftSettlement?: number;
 }
 
 export default function BarberPortalPage() {
@@ -103,7 +114,16 @@ export default function BarberPortalPage() {
   const [stationPin, setStationPin] = useState('');
   const [newStationPin, setNewStationPin] = useState('');
   const [savingSettings, setSavingSettings] = useState(false);
-  const [activeTab, setActiveTab] = useState<'appointments' | 'payouts'>('appointments');
+
+  // Schedule & Off-Days state
+  const [workingDays, setWorkingDays] = useState<string[]>(['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']);
+  const [workStartHour, setWorkStartHour] = useState<number>(9);
+  const [workEndHour, setWorkEndHour] = useState<number>(18);
+  const [blockedDates, setBlockedDates] = useState<string[]>([]);
+  const [newBlockedDate, setNewBlockedDate] = useState<string>('');
+  const [savingSchedule, setSavingSchedule] = useState(false);
+
+  const [activeTab, setActiveTab] = useState<'appointments' | 'schedule' | 'payouts'>('appointments');
 
   async function loadDashboard() {
     setLoading(true);
@@ -136,6 +156,14 @@ export default function BarberPortalPage() {
         setBankBranch(data.barber.bank_branch_code || '');
         setStationPin('');
         setNewStationPin('');
+        setWorkingDays(
+          Array.isArray(data.barber.working_days) && data.barber.working_days.length > 0
+            ? data.barber.working_days
+            : ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+        );
+        setWorkStartHour(typeof data.barber.work_start_hour === 'number' ? data.barber.work_start_hour : 9);
+        setWorkEndHour(typeof data.barber.work_end_hour === 'number' ? data.barber.work_end_hour : 18);
+        setBlockedDates(Array.isArray(data.barber.blocked_dates) ? data.barber.blocked_dates : []);
       }
     } catch (err: any) {
       console.error(err);
@@ -193,7 +221,67 @@ export default function BarberPortalPage() {
     }
   }
 
+  async function handleSaveSchedule(e: React.FormEvent) {
+    e.preventDefault();
+    if (!barber) return;
+    setSavingSchedule(true);
+    setStatusMsg(null);
+
+    try {
+      const supabase = getSupabaseBrowserClient();
+      const { data: sessionData } = await supabase.auth.getSession();
+      const token = sessionData?.session?.access_token;
+
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (token) headers['Authorization'] = `Bearer ${token}`;
+
+      const res = await fetch('/api/barber/dashboard', {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify({
+          staff_id: barber.id,
+          working_days: workingDays,
+          work_start_hour: workStartHour,
+          work_end_hour: workEndHour,
+          blocked_dates: blockedDates,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to update schedule');
+
+      setStatusMsg({
+        type: 'success',
+        text: 'Station shift hours, working days, and blocked off-dates updated.',
+      });
+      loadDashboard();
+    } catch (err: any) {
+      setStatusMsg({ type: 'error', text: err.message || 'Error saving schedule' });
+    } finally {
+      setSavingSchedule(false);
+    }
+  }
+
+  function toggleWorkDay(day: string) {
+    setWorkingDays((prev) =>
+      prev.includes(day) ? prev.filter((d) => d !== day) : [...prev, day]
+    );
+  }
+
+  function addBlockedDate() {
+    if (!newBlockedDate) return;
+    if (!blockedDates.includes(newBlockedDate)) {
+      setBlockedDates((prev) => [...prev, newBlockedDate].sort());
+    }
+    setNewBlockedDate('');
+  }
+
+  function removeBlockedDate(dateStr: string) {
+    setBlockedDates((prev) => prev.filter((d) => d !== dateStr));
+  }
+
   const specialtyLabel = SPECIALTY_LABELS[barber?.specialty || 'barber'] || 'Specialist';
+  const netEft = summary?.netEftSettlement ?? 0;
 
   return (
     <div className="min-h-screen bg-stone-950 text-stone-100 font-sans pb-24">
@@ -262,19 +350,19 @@ export default function BarberPortalPage() {
           </div>
         )}
 
-        {/* Financial Metrics Cards */}
+        {/* Financial & True Cash vs Online Settlement Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           <Card className="bg-stone-900/50 border-stone-800 backdrop-blur-sm">
             <CardContent className="p-5 space-y-2">
               <div className="flex items-center justify-between text-stone-400 text-xs uppercase tracking-wider font-medium">
-                <span>Gross Client Revenue</span>
-                <TrendingUp className="h-4 w-4 text-stone-500" />
+                <span>Online Share (85% Held)</span>
+                <TrendingUp className="h-4 w-4 text-emerald-400" />
               </div>
               <div className="text-2xl font-bold font-mono text-white">
-                R {summary?.grossRevenue.toFixed(2) || '0.00'}
+                + R {(summary?.onlineSpecialistShare ?? summary?.settledPayouts ?? 0).toFixed(2)}
               </div>
               <p className="text-[11px] text-stone-500">
-                Total client spend across {summary?.totalBookings || 0} scheduled sessions
+                85% of R {(summary?.onlineGrossRevenue ?? 0).toFixed(2)} collected online & memberships
               </p>
             </CardContent>
           </Card>
@@ -282,14 +370,14 @@ export default function BarberPortalPage() {
           <Card className="bg-stone-900/50 border-stone-800 backdrop-blur-sm">
             <CardContent className="p-5 space-y-2">
               <div className="flex items-center justify-between text-stone-400 text-xs uppercase tracking-wider font-medium">
-                <span>Platform Fee Split (15%)</span>
-                <Percent className="h-4 w-4 text-amber-500" />
+                <span>In-Chair 15% Fee Owed</span>
+                <Percent className="h-4 w-4 text-rose-400" />
               </div>
-              <div className="text-2xl font-bold font-mono text-amber-400">
-                - R {summary?.platformFees.toFixed(2) || '0.00'}
+              <div className="text-2xl font-bold font-mono text-rose-400">
+                - R {(summary?.chairPlatformFeeOwed ?? 0).toFixed(2)}
               </div>
               <p className="text-[11px] text-stone-500">
-                Dissafyt platform facilities, booking & payment fee
+                15% studio fee on R {(summary?.chairCashRevenue ?? 0).toFixed(2)} paid in chair
               </p>
             </CardContent>
           </Card>
@@ -297,14 +385,16 @@ export default function BarberPortalPage() {
           <Card className="bg-amber-500/10 border-amber-500/30 backdrop-blur-sm">
             <CardContent className="p-5 space-y-2">
               <div className="flex items-center justify-between text-amber-400 text-xs uppercase tracking-wider font-bold">
-                <span>Net Barber Payout (85%)</span>
+                <span>Net Weekly EFT Settlement</span>
                 <DollarSign className="h-4 w-4 text-amber-400" />
               </div>
-              <div className="text-2xl font-bold font-mono text-amber-300">
-                R {summary?.netBarberPayout.toFixed(2) || '0.00'}
+              <div className={`text-2xl font-bold font-mono ${netEft >= 0 ? 'text-amber-300' : 'text-rose-400'}`}>
+                {netEft >= 0 ? `R ${netEft.toFixed(2)}` : `- R ${Math.abs(netEft).toFixed(2)}`}
               </div>
               <p className="text-[11px] text-amber-400/80">
-                Your direct take-home earnings across all clients
+                {netEft >= 0
+                  ? 'Online 85% Share minus In-Chair 15% Platform Fee'
+                  : 'Net studio fee balance due from in-chair cash'}
               </p>
             </CardContent>
           </Card>
@@ -312,22 +402,21 @@ export default function BarberPortalPage() {
           <Card className="bg-stone-900/50 border-stone-800 backdrop-blur-sm">
             <CardContent className="p-5 space-y-2">
               <div className="flex items-center justify-between text-stone-400 text-xs uppercase tracking-wider font-medium">
-                <span>POS & Card Terminal</span>
+                <span>Total Take-Home (85%)</span>
                 <Smartphone className="h-4 w-4 text-emerald-400" />
               </div>
-              <div className="text-sm font-bold font-mono text-emerald-400 flex items-center gap-1.5 pt-1">
-                <CheckCircle className="h-4 w-4" />
-                {barber?.pos_terminal_id ? `Station POS: ${barber.pos_terminal_id}` : 'Terminal Ready for Deployment'}
+              <div className="text-2xl font-bold font-mono text-emerald-400">
+                R {summary?.netBarberPayout.toFixed(2) || '0.00'}
               </div>
               <p className="text-[11px] text-stone-500">
-                Assigned hardware terminal for in-person contactless taps
+                Combined net earnings across {summary?.totalBookings || 0} sessions
               </p>
             </CardContent>
           </Card>
         </div>
 
         {/* Tabs */}
-        <div className="flex items-center space-x-2 border-b border-stone-800 pb-2">
+        <div className="flex flex-wrap items-center gap-2 border-b border-stone-800 pb-2">
           <button
             onClick={() => setActiveTab('appointments')}
             className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
@@ -337,7 +426,18 @@ export default function BarberPortalPage() {
             }`}
           >
             <Calendar className="h-3.5 w-3.5" />
-            Client Sessions & Cashflow Ledger ({cashflow.length})
+            Client Sessions & Settlement Ledger ({cashflow.length})
+          </button>
+          <button
+            onClick={() => setActiveTab('schedule')}
+            className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-2 ${
+              activeTab === 'schedule'
+                ? 'bg-amber-500 text-black shadow-md shadow-amber-500/10'
+                : 'text-stone-400 hover:text-white hover:bg-stone-900'
+            }`}
+          >
+            <Clock className="h-3.5 w-3.5" />
+            Shift Hours & Off-Days
           </button>
           <button
             onClick={() => setActiveTab('payouts')}
@@ -348,7 +448,7 @@ export default function BarberPortalPage() {
             }`}
           >
             <CreditCard className="h-3.5 w-3.5" />
-            PayFast & Banking Settings
+            PayFast & Banking Vault
           </button>
         </div>
 
@@ -360,11 +460,11 @@ export default function BarberPortalPage() {
                 <h2 className="text-base font-bold text-white flex items-center gap-2">
                   <span>Client Cashflow per Appointment</span>
                   <span className="text-xs font-mono font-normal text-stone-400">
-                    (Direct 85% Split Calculated Live)
+                    (Direct 85% Split + Anti-Poaching Privacy Masking)
                   </span>
                 </h2>
                 <p className="text-xs text-stone-400">
-                  Detailed ledger breakdown showing client identity, gross price, platform fee, and net barber earnings.
+                  Client phone numbers and emails are masked for POPIA privacy compliance.
                 </p>
               </div>
             </div>
@@ -380,7 +480,7 @@ export default function BarberPortalPage() {
                       <th className="py-3 px-4 font-semibold">Location</th>
                       <th className="py-3 px-4 font-semibold text-right">Gross Price</th>
                       <th className="py-3 px-4 font-semibold text-right">Platform Fee (15%)</th>
-                      <th className="py-3 px-4 font-semibold text-right text-amber-400">Barber Net (85%)</th>
+                      <th className="py-3 px-4 font-semibold text-right text-amber-400">Specialist Net (85%)</th>
                       <th className="py-3 px-4 font-semibold text-center">Settlement Status</th>
                     </tr>
                   </thead>
@@ -446,19 +546,19 @@ export default function BarberPortalPage() {
                           <td className="py-3 px-4 text-center">
                             {item.isSubscriptionCovered || item.paymentStatus === 'membership_covered' ? (
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                                Member Covered
+                                Member Covered (+85% EFT)
                               </span>
                             ) : item.paymentStatus === 'paid_online' ? (
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
-                                PayFast Settled
+                                Paid Online (+85% EFT)
                               </span>
                             ) : item.paymentStatus === 'paid_in_chair' ? (
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/10 text-amber-400 border border-amber-500/30">
-                                Paid in Chair
+                                Paid in Chair (-15% Fee)
                               </span>
                             ) : (
                               <span className="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-stone-800 text-stone-300 border border-stone-700">
-                                Pay on Arrival
+                                Pay in Chair (-15% Fee)
                               </span>
                             )}
                           </td>
@@ -470,6 +570,134 @@ export default function BarberPortalPage() {
               </div>
             </div>
           </div>
+        )}
+
+        {/* Tab 2: Shift Hours & Blocked Off-Days */}
+        {activeTab === 'schedule' && (
+          <Card className="bg-stone-900/50 border-stone-800 shadow-xl">
+            <CardHeader>
+              <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
+                <Clock className="h-5 w-5 text-amber-500" />
+                Station Shift Hours & Blocked Off-Days
+              </CardTitle>
+              <p className="text-xs text-stone-400">
+                Customize your active working days, daily shift hours, and block off specific dates for sick leave or personal days without deactivating your profile.
+              </p>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={handleSaveSchedule} className="space-y-6">
+                <div className="space-y-2">
+                  <Label className="text-xs font-bold text-stone-300 uppercase tracking-wider">
+                    Active Working Days
+                  </Label>
+                  <div className="flex flex-wrap gap-2">
+                    {ALL_WEEK_DAYS.map((day) => {
+                      const active = workingDays.includes(day);
+                      return (
+                        <button
+                          key={day}
+                          type="button"
+                          onClick={() => toggleWorkDay(day)}
+                          className={`px-3.5 py-2 rounded-lg text-xs font-mono font-bold border transition-all ${
+                            active
+                              ? 'bg-amber-500/20 border-amber-500 text-amber-300'
+                              : 'bg-stone-950 border-stone-800 text-stone-500 hover:text-stone-300'
+                          }`}
+                        >
+                          {day}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-md">
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-stone-300">Shift Start Hour (SAST)</Label>
+                    <select
+                      value={workStartHour}
+                      onChange={(e) => setWorkStartHour(Number(e.target.value))}
+                      className="w-full rounded-md border border-stone-800 bg-stone-950 px-3 py-2 text-xs text-white font-mono"
+                    >
+                      {[7, 8, 9, 10, 11, 12, 13, 14].map((h) => (
+                        <option key={h} value={h}>
+                          {String(h).padStart(2, '0')}:00
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="space-y-1.5">
+                    <Label className="text-xs text-stone-300">Shift End Hour (SAST)</Label>
+                    <select
+                      value={workEndHour}
+                      onChange={(e) => setWorkEndHour(Number(e.target.value))}
+                      className="w-full rounded-md border border-stone-800 bg-stone-950 px-3 py-2 text-xs text-white font-mono"
+                    >
+                      {[13, 14, 15, 16, 17, 18, 19, 20, 21].map((h) => (
+                        <option key={h} value={h}>
+                          {String(h).padStart(2, '0')}:00
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <div className="space-y-3 pt-2 border-t border-stone-800">
+                  <Label className="text-xs font-bold text-stone-300 uppercase tracking-wider">
+                    Blocked Off-Dates (Sick Leave / Time Off)
+                  </Label>
+                  <div className="flex flex-wrap items-center gap-2 max-w-md">
+                    <Input
+                      type="date"
+                      value={newBlockedDate}
+                      onChange={(e) => setNewBlockedDate(e.target.value)}
+                      className="bg-stone-950 border-stone-800 text-white text-xs font-mono w-48"
+                    />
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={addBlockedDate}
+                      className="border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 text-xs"
+                    >
+                      + Block Date
+                    </Button>
+                  </div>
+                  {blockedDates.length > 0 ? (
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      {blockedDates.map((d) => (
+                        <span
+                          key={d}
+                          className="inline-flex items-center gap-2 rounded-lg bg-rose-500/10 border border-rose-500/30 px-3 py-1 text-xs font-mono text-rose-300"
+                        >
+                          {d}
+                          <button
+                            type="button"
+                            onClick={() => removeBlockedDate(d)}
+                            className="text-rose-400 hover:text-white font-bold"
+                          >
+                            &times;
+                          </button>
+                        </span>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-[11px] text-stone-500">No blocked off-dates configured.</p>
+                  )}
+                </div>
+
+                <div className="pt-4 border-t border-stone-800 flex justify-end">
+                  <Button
+                    type="submit"
+                    disabled={savingSchedule}
+                    className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs px-6 h-10"
+                  >
+                    {savingSchedule ? 'Saving Schedule...' : 'Save Station Schedule'}
+                  </Button>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
         )}
 
         {/* Tab 2: Payouts & Banking Settings */}

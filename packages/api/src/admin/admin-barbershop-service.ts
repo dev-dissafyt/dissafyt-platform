@@ -6,6 +6,7 @@ import { StaffVaultService } from '../security/staff-vault';
 export interface CreateServiceInput {
   name: string;
   description?: string;
+  specialty?: string;
   duration_minutes: number;
   price: number;
   is_active?: boolean;
@@ -18,6 +19,7 @@ export interface CreateServiceInput {
 export interface UpdateServiceInput {
   name?: string;
   description?: string;
+  specialty?: string;
   duration_minutes?: number;
   price?: number;
   is_active?: boolean;
@@ -57,6 +59,7 @@ export class AdminBarbershopService {
     const payload: any = {
       name: input.name,
       description: input.description || '',
+      specialty: input.specialty || 'barber',
       duration_minutes: input.duration_minutes || 30,
       price: input.price,
       is_active: input.is_active !== undefined ? input.is_active : true,
@@ -89,6 +92,7 @@ export class AdminBarbershopService {
       } else if (error) {
         // Fallback for schema variance if subscription columns don't exist
         if (error.code === 'PGRST204') {
+          delete payload.specialty;
           delete payload.is_subscription;
           delete payload.plan_code;
           delete payload.billing_frequency;
@@ -139,6 +143,7 @@ export class AdminBarbershopService {
       const { data, error } = await admin.from('services').update(payload).eq('id', id).select().single();
       if (error) {
         if (error.code === 'PGRST204') {
+          delete payload.specialty;
           delete payload.is_subscription;
           delete payload.plan_code;
           const { data: fbData, error: fbError } = await admin.from('services').update(payload).eq('id', id).select().single();
@@ -279,6 +284,10 @@ export class AdminBarbershopService {
       bank_branch_code?: string | null;
       station_pin?: string | null;
       pos_terminal_id?: string | null;
+      working_days?: string[] | null;
+      work_start_hour?: number | null;
+      work_end_hour?: number | null;
+      blocked_dates?: string[] | null;
     },
     actor?: { email?: string; role?: string }
   ): Promise<{ success: boolean; staff?: any; error?: string }> {
@@ -295,6 +304,10 @@ export class AdminBarbershopService {
     if (input.phone) payload.phone = input.phone;
     if (input.avatar_url) payload.avatar_url = input.avatar_url;
     if (input.working_hours) payload.working_hours = input.working_hours;
+    if (input.working_days !== undefined) payload.working_days = input.working_days;
+    if (input.work_start_hour !== undefined) payload.work_start_hour = Number(input.work_start_hour);
+    if (input.work_end_hour !== undefined) payload.work_end_hour = Number(input.work_end_hour);
+    if (input.blocked_dates !== undefined) payload.blocked_dates = input.blocked_dates;
     if (input.commission_split_pct !== undefined) payload.commission_split_pct = Number(input.commission_split_pct);
     if (input.payfast_merchant_id !== undefined) {
       payload.payfast_merchant_id = StaffVaultService.encryptField(input.payfast_merchant_id);
@@ -327,6 +340,10 @@ export class AdminBarbershopService {
         delete payload.phone;
         delete payload.avatar_url;
         delete payload.working_hours;
+        delete payload.working_days;
+        delete payload.work_start_hour;
+        delete payload.work_end_hour;
+        delete payload.blocked_dates;
         delete payload.location_id;
         delete payload.commission_split_pct;
         delete payload.payfast_merchant_id;
@@ -396,6 +413,10 @@ export class AdminBarbershopService {
       phone?: string;
       avatar_url?: string;
       working_hours?: any;
+      working_days?: string[] | null;
+      work_start_hour?: number | null;
+      work_end_hour?: number | null;
+      blocked_dates?: string[] | null;
       is_active?: boolean;
       user_id?: string | null;
       location_id?: string | null;
@@ -421,6 +442,10 @@ export class AdminBarbershopService {
       if (input.phone !== undefined) payload.phone = input.phone;
       if (input.avatar_url !== undefined) payload.avatar_url = input.avatar_url;
       if (input.working_hours !== undefined) payload.working_hours = input.working_hours;
+      if (input.working_days !== undefined) payload.working_days = input.working_days;
+      if (input.work_start_hour !== undefined) payload.work_start_hour = Number(input.work_start_hour);
+      if (input.work_end_hour !== undefined) payload.work_end_hour = Number(input.work_end_hour);
+      if (input.blocked_dates !== undefined) payload.blocked_dates = input.blocked_dates;
       if (input.is_active !== undefined) payload.is_active = input.is_active;
       if (input.user_id !== undefined) payload.user_id = input.user_id;
       if (input.location_id !== undefined) payload.location_id = input.location_id;
@@ -458,6 +483,10 @@ export class AdminBarbershopService {
           delete payload.phone;
           delete payload.avatar_url;
           delete payload.working_hours;
+          delete payload.working_days;
+          delete payload.work_start_hour;
+          delete payload.work_end_hour;
+          delete payload.blocked_dates;
           delete payload.location_id;
           delete payload.commission_split_pct;
           delete payload.payfast_merchant_id;

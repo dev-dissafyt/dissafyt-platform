@@ -46,6 +46,7 @@ interface Service {
   id: string;
   name: string;
   description: string;
+  specialty?: 'barber' | 'nail_tech' | 'beautician' | string;
   duration_minutes: number;
   price: number;
   is_active: boolean;
@@ -148,6 +149,7 @@ export default function AdminBarbershopPage() {
   const [showAddServiceModal, setShowAddServiceModal] = useState(false);
   const [serviceName, setServiceName] = useState('');
   const [serviceDescription, setServiceDescription] = useState('');
+  const [serviceSpecialty, setServiceSpecialty] = useState<'barber' | 'nail_tech' | 'beautician'>('barber');
   const [serviceDuration, setServiceDuration] = useState('30');
   const [servicePrice, setServicePrice] = useState('');
   const [isSubscription, setIsSubscription] = useState(false);
@@ -189,6 +191,7 @@ export default function AdminBarbershopPage() {
   const [editingService, setEditingService] = useState<Service | null>(null);
   const [editServiceName, setEditServiceName] = useState('');
   const [editServiceDescription, setEditServiceDescription] = useState('');
+  const [editServiceSpecialty, setEditServiceSpecialty] = useState<'barber' | 'nail_tech' | 'beautician'>('barber');
   const [editServiceDuration, setEditServiceDuration] = useState('30');
   const [editServicePrice, setEditServicePrice] = useState('');
   const [editServiceIsSubscription, setEditServiceIsSubscription] = useState(false);
@@ -514,6 +517,7 @@ export default function AdminBarbershopPage() {
     setEditingService(service);
     setEditServiceName(service.name);
     setEditServiceDescription(service.description || '');
+    setEditServiceSpecialty((service.specialty as any) || 'barber');
     setEditServiceDuration(String(service.duration_minutes));
     setEditServicePrice(String(service.price));
     setEditServiceIsSubscription(Boolean(service.is_subscription));
@@ -533,6 +537,7 @@ export default function AdminBarbershopPage() {
         body: JSON.stringify({
           name: editServiceName,
           description: editServiceDescription,
+          specialty: editServiceSpecialty,
           duration_minutes: parseInt(editServiceDuration, 10) || 30,
           price: parseFloat(editServicePrice) || 0,
           is_subscription: editServiceIsSubscription,
@@ -567,6 +572,7 @@ export default function AdminBarbershopPage() {
         body: JSON.stringify({
           name: serviceName,
           description: serviceDescription,
+          specialty: serviceSpecialty,
           duration_minutes: parseInt(serviceDuration, 10) || 30,
           price: parseFloat(servicePrice),
           is_subscription: isSubscription,
@@ -581,6 +587,7 @@ export default function AdminBarbershopPage() {
         setStatusMsg('Service created successfully & logged to audit trail!');
         setServiceName('');
         setServiceDescription('');
+        setServiceSpecialty('barber');
         setServicePrice('');
         setShowAddServiceModal(false);
         loadServices();
@@ -1746,9 +1753,22 @@ export default function AdminBarbershopPage() {
                   <Input
                     value={serviceName}
                     onChange={(e) => setServiceName(e.target.value)}
-                    placeholder="e.g. Executive Fade & Beard or The Solo Membership"
+                    placeholder="e.g. Executive Fade, Gel Manicure, or Facial"
                     required
                   />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Specialty Category</Label>
+                  <select
+                    value={serviceSpecialty}
+                    onChange={(e) => setServiceSpecialty(e.target.value as any)}
+                    className="w-full h-10 rounded-md border border-stone-800 bg-stone-950 px-3 text-sm text-white"
+                  >
+                    <option value="barber">Barber (Haircuts & Grooming)</option>
+                    <option value="nail_tech">Nail Technician (Manicure, Pedicure, Gel)</option>
+                    <option value="beautician">Beautician (Facials, Lashes, Waxing)</option>
+                  </select>
                 </div>
 
                 <div className="space-y-1">
@@ -1858,7 +1878,7 @@ export default function AdminBarbershopPage() {
                   Edit Service: {editingService.name}
                 </CardTitle>
                 <CardDescription>
-                  Modify service pricing, duration, or membership tier. Changes are recorded in the audit trail.
+                  Modify service pricing, specialty category, duration, or membership tier. Changes are recorded in the audit trail.
                 </CardDescription>
               </CardHeader>
 
@@ -1871,6 +1891,19 @@ export default function AdminBarbershopPage() {
                     placeholder="e.g. Classic Haircut"
                     required
                   />
+                </div>
+
+                <div className="space-y-1">
+                  <Label>Specialty Category</Label>
+                  <select
+                    value={editServiceSpecialty}
+                    onChange={(e) => setEditServiceSpecialty(e.target.value as any)}
+                    className="w-full h-10 rounded-md border border-stone-800 bg-stone-950 px-3 text-sm text-white"
+                  >
+                    <option value="barber">Barber (Haircuts & Grooming)</option>
+                    <option value="nail_tech">Nail Technician (Manicure, Pedicure, Gel)</option>
+                    <option value="beautician">Beautician (Facials, Lashes, Waxing)</option>
+                  </select>
                 </div>
 
                 <div className="space-y-1">
@@ -2011,15 +2044,17 @@ export default function AdminBarbershopPage() {
                 <div className="space-y-3">
                   <div className="flex items-start justify-between">
                     <div>
-                      {service.is_subscription ? (
-                        <span className="rounded bg-amber-500/10 text-amber-400 text-[10px] font-bold px-2 py-0.5 uppercase tracking-wider border border-amber-500/20">
-                          Monthly Membership
-                        </span>
-                      ) : (
-                        <span className="rounded bg-stone-800 text-stone-300 text-[10px] font-bold px-2 py-0.5 uppercase tracking-wider">
-                          Standard Service
-                        </span>
-                      )}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        {service.is_subscription ? (
+                          <span className="rounded bg-amber-500/10 text-amber-400 text-[10px] font-bold px-2 py-0.5 uppercase tracking-wider border border-amber-500/20">
+                            Monthly Membership
+                          </span>
+                        ) : (
+                          <span className="rounded bg-stone-800 text-stone-300 text-[10px] font-bold px-2 py-0.5 uppercase tracking-wider">
+                            {SPECIALTY_LABELS[service.specialty || 'barber'] || 'Barber'} Service
+                          </span>
+                        )}
+                      </div>
                       <CardTitle className="text-xl text-white mt-1">{service.name}</CardTitle>
                     </div>
 

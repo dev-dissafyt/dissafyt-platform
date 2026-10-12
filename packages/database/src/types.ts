@@ -203,9 +203,12 @@ export type BookingStatus =
   | 'cancelled'
   | 'no_show';
 
+export type StaffSpecialty = 'barber' | 'nail_tech' | 'beautician';
+
 export interface BarberService {
   id: string;
   name: string;
+  specialty?: StaffSpecialty | string | null;
   description?: string | null;
   duration_minutes: number;
   price: number;
@@ -217,8 +220,6 @@ export interface BarberService {
   created_at: string;
 }
 
-export type StaffSpecialty = 'barber' | 'nail_tech' | 'beautician';
-
 export interface Staff {
   id: string;
   user_id?: string | null;
@@ -228,6 +229,10 @@ export interface Staff {
   phone?: string | null;
   avatar_url?: string | null;
   working_hours?: any;
+  working_days?: string[] | null;
+  work_start_hour?: number | null;
+  work_end_hour?: number | null;
+  blocked_dates?: string[] | null;
   location_id?: string | null;
   location?: BarbershopLocation | null;
   commission_split_pct?: number;

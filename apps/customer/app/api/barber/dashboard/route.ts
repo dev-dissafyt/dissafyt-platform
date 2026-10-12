@@ -152,6 +152,12 @@ export async function GET(request: NextRequest) {
     let paidTotal = 0;
     let pendingChairTotal = 0;
 
+    // True Cash vs. Online Settlement Math
+    let onlineGrossRevenue = 0;
+    let onlineSpecialistShare = 0;
+    let chairCashRevenue = 0;
+    let chairPlatformFeeOwed = 0;
+
     const cashflowPerClient = bookingList.map((b: any) => {
       const servicePrice = Number(b.service?.price || 0);
       const isSub = Boolean(b.is_subscription_covered || b.payment_status === 'membership_covered');
@@ -160,23 +166,31 @@ export async function GET(request: NextRequest) {
       const platformCut = Number((gross * (splitPct / 100)).toFixed(2));
       const barberPayout = Number((gross - platformCut).toFixed(2));
 
-      if (b.status !== 'cancelled') {
+      if (b.status !== 'cancelled' && b.status !== 'no_show') {
         grossTotal += gross;
         platformFeeTotal += platformCut;
         netBarberTotal += barberPayout;
 
         if (b.payment_status === 'paid_online' || isSub) {
           paidTotal += barberPayout;
+          onlineGrossRevenue += gross;
+          onlineSpecialistShare += barberPayout;
         } else if (b.payment_status === 'unpaid' || b.payment_status === 'paid_in_chair') {
           pendingChairTotal += barberPayout;
+          chairCashRevenue += gross;
+          chairPlatformFeeOwed += platformCut;
         }
       }
 
+      const rawName = b.customer?.full_name || 'Guest Client';
+      const rawEmail = b.customer?.email || null;
+      const rawPhone = b.customer?.phone || null;
+
       return {
         bookingId: b.id,
-        clientName: b.customer?.full_name || 'Guest Client',
-        clientEmail: b.customer?.email || null,
-        clientPhone: b.customer?.phone || null,
+        clientName: caller.isAdmin ? rawName : StaffVaultService.formatClientNameForSpecialist(rawName),
+        clientEmail: caller.isAdmin ? rawEmail : StaffVaultService.maskClientEmail(rawEmail),
+        clientPhone: caller.isAdmin ? rawPhone : StaffVaultService.maskClientPhone(rawPhone),
         serviceName: b.service?.name || 'Studio Session',
         startTime: b.start_time,
         endTime: b.end_time,
@@ -192,6 +206,7 @@ export async function GET(request: NextRequest) {
       };
     });
 
+    const netEftSettlement = Number((onlineSpecialistShare - chairPlatformFeeOwed).toFixed(2));
     const safeStaff = StaffVaultService.formatStaffForAuthorizedView(staffMember);
 
     return NextResponse.json(
@@ -215,6 +230,10 @@ export async function GET(request: NextRequest) {
           bank_account_hash: safeStaff.bank_account_hash || null,
           has_station_pin: Boolean(safeStaff.has_station_pin),
           pos_terminal_id: safeStaff.pos_terminal_id || null,
+          working_days: safeStaff.working_days || ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'],
+          work_start_hour: typeof safeStaff.work_start_hour === 'number' ? safeStaff.work_start_hour : 9,
+          work_end_hour: typeof safeStaff.work_end_hour === 'number' ? safeStaff.work_end_hour : 18,
+          blocked_dates: Array.isArray(safeStaff.blocked_dates) ? safeStaff.blocked_dates : [],
         },
         summary: {
           totalBookings: bookingList.length,
@@ -224,6 +243,11 @@ export async function GET(request: NextRequest) {
           netBarberPayout: Number(netBarberTotal.toFixed(2)),
           settledPayouts: Number(paidTotal.toFixed(2)),
           pendingChairCash: Number(pendingChairTotal.toFixed(2)),
+          onlineGrossRevenue: Number(onlineGrossRevenue.toFixed(2)),
+          onlineSpecialistShare: Number(onlineSpecialistShare.toFixed(2)),
+          chairCashRevenue: Number(chairCashRevenue.toFixed(2)),
+          chairPlatformFeeOwed: Number(chairPlatformFeeOwed.toFixed(2)),
+          netEftSettlement,
         },
         cashflow: cashflowPerClient,
       },
@@ -241,15 +265,15 @@ export async function GET(request: NextRequest) {
 
 /**
  * PATCH /api/barber/dashboard
- * Updates the specialist's payout settings with AES-256-GCM encryption, SHA-256 bank hashing,
- * and scrypt Station PIN verification.
+ * Updates the specialist's payout settings or availability schedule with AES-256-GCM encryption,
+ * SHA-256 bank hashing, and scrypt Station PIN verification.
  */
 export async function PATCH(request: NextRequest) {
   try {
     const caller = await resolveCallerContext(request);
     if (!caller || !caller.isStaff) {
       return NextResponse.json(
-        { error: 'Unauthorized: Valid specialist or admin session required to update payout details.' },
+        { error: 'Unauthorized: Valid specialist or admin session required to update station settings.' },
         { status: 401 }
       );
     }
@@ -266,6 +290,10 @@ export async function PATCH(request: NextRequest) {
       phone,
       station_pin,
       new_station_pin,
+      working_days,
+      work_start_hour,
+      work_end_hour,
+      blocked_dates,
     } = body;
 
     if (!staff_id) {
@@ -288,13 +316,21 @@ export async function PATCH(request: NextRequest) {
       (caller.email && existingStaff.bio?.toLowerCase().includes(caller.email));
     if (!caller.isAdmin && !isOwner) {
       return NextResponse.json(
-        { error: 'Forbidden: You may only modify your own station payout settings.' },
+        { error: 'Forbidden: You may only modify your own station settings.' },
         { status: 403 }
       );
     }
 
-    // Verify existing Station PIN if configured on this specialist profile
-    if (existingStaff.station_pin_hash && !caller.isAdmin) {
+    const isUpdatingBankingOrPin =
+      payfast_merchant_id !== undefined ||
+      bank_name !== undefined ||
+      bank_account_number !== undefined ||
+      bank_account_type !== undefined ||
+      bank_branch_code !== undefined ||
+      Boolean(new_station_pin);
+
+    // Verify existing Station PIN if configured on this specialist profile when modifying banking/PIN
+    if (isUpdatingBankingOrPin && existingStaff.station_pin_hash && !caller.isAdmin) {
       const pinValid = StaffVaultService.verifyStationPin(station_pin, existingStaff.station_pin_hash);
       if (!pinValid) {
         return NextResponse.json(
@@ -327,6 +363,18 @@ export async function PATCH(request: NextRequest) {
     if (new_station_pin && String(new_station_pin).trim().length >= 4) {
       updatePayload.station_pin_hash = StaffVaultService.hashStationPin(String(new_station_pin));
     }
+    if (Array.isArray(working_days)) {
+      updatePayload.working_days = working_days;
+    }
+    if (work_start_hour !== undefined) {
+      updatePayload.work_start_hour = Math.max(6, Math.min(22, Number(work_start_hour)));
+    }
+    if (work_end_hour !== undefined) {
+      updatePayload.work_end_hour = Math.max(7, Math.min(23, Number(work_end_hour)));
+    }
+    if (Array.isArray(blocked_dates)) {
+      updatePayload.blocked_dates = blocked_dates;
+    }
 
     const { data: updated, error } = await admin
       .from('staff')
@@ -353,6 +401,10 @@ export async function PATCH(request: NextRequest) {
         bank_account_masked: safeUpdated.bank_account_masked,
         bank_account_hash: safeUpdated.bank_account_hash,
         has_station_pin: safeUpdated.has_station_pin,
+        working_days: safeUpdated.working_days,
+        work_start_hour: safeUpdated.work_start_hour,
+        work_end_hour: safeUpdated.work_end_hour,
+        blocked_dates: safeUpdated.blocked_dates,
       },
     });
 

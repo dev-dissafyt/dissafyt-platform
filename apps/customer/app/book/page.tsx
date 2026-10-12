@@ -30,6 +30,7 @@ interface Service {
   id: string;
   name: string;
   description: string;
+  specialty?: 'barber' | 'nail_tech' | 'beautician' | string | null;
   duration_minutes: number;
   price: number;
   is_active: boolean;
@@ -40,10 +41,31 @@ interface Service {
 interface StaffMember {
   id: string;
   display_name: string;
+  specialty?: 'barber' | 'nail_tech' | 'beautician' | string | null;
   bio?: string | null;
   location_id?: string | null;
   is_active: boolean;
 }
+
+function resolveServiceSpecialty(service: Service | null): 'barber' | 'nail_tech' | 'beautician' {
+  if (!service) return 'barber';
+  const raw = String(service.specialty || '').toLowerCase();
+  if (raw === 'nail_tech' || raw === 'beautician' || raw === 'barber') return raw;
+  const text = `${service.name || ''} ${service.description || ''}`.toLowerCase();
+  if (text.includes('nail') || text.includes('manicure') || text.includes('pedicure') || text.includes('acrylic') || text.includes('gel')) {
+    return 'nail_tech';
+  }
+  if (text.includes('facial') || text.includes('wax') || text.includes('lash') || text.includes('brow') || text.includes('beauty') || text.includes('makeup')) {
+    return 'beautician';
+  }
+  return 'barber';
+}
+
+const SPECIALTY_BADGE: Record<string, string> = {
+  barber: 'Barber',
+  nail_tech: 'Nail Tech',
+  beautician: 'Beautician',
+};
 
 interface AvailableSlot {
   time: string;
@@ -94,6 +116,11 @@ function BookContent() {
       return { covered: false, reason: 'Monthly quota reached (0 cuts left)' };
     }
     if (!service) return { covered: false };
+
+    // Cross-specialty guard: Haircut memberships only cover barber services
+    if (resolveServiceSpecialty(service) !== 'barber') {
+      return { covered: false, reason: 'Nail & Beauty excluded from haircut plan' };
+    }
 
     const planCode = (subscriptionQuota?.plan_code || activeSubscription?.plan_code || 'solo').toLowerCase();
     if (planCode === 'executive') {
@@ -944,10 +971,20 @@ function BookContent() {
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {appointments.map((service) => {
                 const isSelected = selectedService?.id === service.id;
+                const svcSpecialty = resolveServiceSpecialty(service);
                 return (
                   <div
                     key={service.id}
-                    onClick={() => setSelectedService(service)}
+                    onClick={() => {
+                      setSelectedService(service);
+                      if (selectedStaffId !== 'any') {
+                        const chosenStaff = staffList.find((s) => s.id === selectedStaffId);
+                        const staffSpec = (chosenStaff?.specialty || 'barber').toLowerCase();
+                        if (staffSpec !== svcSpecialty) {
+                          setSelectedStaffId('any');
+                        }
+                      }
+                    }}
                     className={`cursor-pointer rounded-xl border p-4 transition-all duration-150 flex flex-col justify-between ${
                       isSelected
                         ? 'border-amber-500 bg-amber-500/10 shadow-lg shadow-amber-500/5'
@@ -955,9 +992,11 @@ function BookContent() {
                     }`}
                   >
                     <div>
-                      <div className="flex items-center justify-between">
+                      <div className="flex items-center justify-between gap-1.5">
                         <h3 className="text-base font-semibold text-white">{service.name}</h3>
-                        {isSelected && <CheckCircle className="h-4 w-4 text-amber-500" />}
+                        <span className="text-[9px] uppercase font-mono px-1.5 py-0.5 rounded bg-zinc-800 text-zinc-300 border border-zinc-700 shrink-0">
+                          {SPECIALTY_BADGE[svcSpecialty] || 'Barber'}
+                        </span>
                       </div>
                       <p className="text-xs text-zinc-400 mt-1 line-clamp-2">
                         {service.description || 'Master grooming treatment.'}
@@ -996,17 +1035,19 @@ function BookContent() {
             </div>
           </div>
 
-          {/* STEP 3: Choose Barber */}
+          {/* STEP 3: Choose Specialist */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-black text-xs font-bold">
                 3
               </span>
-              <h2 className="text-lg font-bold text-white">Select Master Barber</h2>
+              <h2 className="text-lg font-bold text-white">
+                Select {SPECIALTY_BADGE[resolveServiceSpecialty(selectedService)] || 'Specialist'}
+              </h2>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-              {/* Any Barber Option */}
+              {/* Any Specialist Option */}
               <div
                 onClick={() => setSelectedStaffId('any')}
                 className={`cursor-pointer rounded-xl border p-4 transition-all ${
@@ -1020,15 +1061,21 @@ function BookContent() {
                     <Sparkles className="h-5 w-5" />
                   </div>
                   <div>
-                    <div className="text-sm font-semibold text-white">Any Available Barber</div>
+                    <div className="text-sm font-semibold text-white">
+                      Any Available {SPECIALTY_BADGE[resolveServiceSpecialty(selectedService)] || 'Specialist'}
+                    </div>
                     <div className="text-xs text-zinc-400">Fastest availability</div>
                   </div>
                 </div>
               </div>
 
-              {/* Individual Barbers stationed at selected location */}
+              {/* Individual Specialists stationed at selected location matching service specialty */}
               {staffList
-                .filter((barber) => !barber.location_id || !selectedLocation || barber.location_id === selectedLocation.id)
+                .filter(
+                  (barber) =>
+                    (!barber.location_id || !selectedLocation || barber.location_id === selectedLocation.id) &&
+                    String(barber.specialty || 'barber').toLowerCase() === resolveServiceSpecialty(selectedService)
+                )
                 .map((barber) => {
                   const isSelected = selectedStaffId === barber.id;
                   return (
@@ -1050,7 +1097,7 @@ function BookContent() {
                             {barber.display_name}
                           </div>
                           <div className="text-xs text-zinc-400 truncate">
-                            {barber.bio || 'Master Barber'}
+                            {barber.bio || SPECIALTY_BADGE[String(barber.specialty || 'barber').toLowerCase()] || 'Specialist'}
                           </div>
                         </div>
                       </div>
