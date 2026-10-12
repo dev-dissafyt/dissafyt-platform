@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Search, X, Scissors, ShoppingBag, Loader2, Sparkles } from 'lucide-react';
+import { Search, X, Scissors, ShoppingBag, Loader2 } from 'lucide-react';
 
 export interface SearchResult {
   id: string;
@@ -223,15 +223,10 @@ export function SiteSearchModal() {
         </div>
 
         {/* Footer Shortcut Helper */}
-        <div className="flex items-center justify-between border-t border-zinc-800/80 bg-zinc-900/40 px-4 py-2.5 text-[11px] font-mono text-zinc-500">
-          <div className="flex items-center space-x-3">
-            <span>&uarr;&darr; Navigate</span>
-            <span>&crarr; Select</span>
-            <span>ESC Close</span>
-          </div>
-          <span className="text-amber-500/80 flex items-center gap-1">
-            <Sparkles className="h-3 w-3" /> CMS CATALOG SEARCH
-          </span>
+        <div className="flex items-center space-x-3 border-t border-zinc-800/80 bg-zinc-900/40 px-4 py-2.5 text-[11px] font-mono text-zinc-500">
+          <span>&uarr;&darr; Navigate</span>
+          <span>&crarr; Select</span>
+          <span>ESC Close</span>
         </div>
       </div>
     </div>
