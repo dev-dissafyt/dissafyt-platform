@@ -3146,254 +3146,209 @@ export default function AdminCommercePage() {
                 No survey feedback recorded yet. Share the survey link with prospects to collect data.
               </Card>
             ) : (
-              <div className="grid grid-cols-1 gap-6">
-                {surveyData.productInsights.map((insight) => {
-                  const p = insight.product;
-                  const isApplying = applyingPriceProductId === p.id;
-                  const currentPrice = Number(p.base_price);
-                  const isAtOptimal = Math.round(currentPrice) === Math.round(insight.optimalPrice);
+              <Card className="border-stone-800 bg-stone-900/60 overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-stone-800 bg-stone-950/60 text-[11px] font-mono text-stone-400 uppercase">
+                      <tr>
+                        <th className="py-3 px-4 min-w-[280px]">Product &amp; Economics</th>
+                        <th className="py-3 px-3 text-center min-w-[140px]">
+                          <div>Tier 1 (50% Margin)</div>
+                        </th>
+                        <th className="py-3 px-3 text-center min-w-[140px]">
+                          <div>Tier 2 (75% Margin)</div>
+                        </th>
+                        <th className="py-3 px-3 text-center min-w-[140px]">
+                          <div>Tier 3 (100% Margin)</div>
+                        </th>
+                        <th className="py-3 px-4 text-right min-w-[150px]">Optimal &amp; Sync</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-800/60">
+                      {surveyData.productInsights.map((insight) => {
+                        const p = insight.product;
+                        const isApplying = applyingPriceProductId === p.id;
+                        const currentPrice = Number(p.base_price);
+                        const isAtOptimal = Math.round(currentPrice) === Math.round(insight.optimalPrice);
 
-                  return (
-                    <Card
-                      key={p.id}
-                      className="border-stone-800 bg-stone-900/60 hover:border-stone-700 transition overflow-hidden"
-                    >
-                      <div className="p-5 sm:p-6 space-y-6">
-                        {/* Product Header Row */}
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-800/80">
-                          <div className="flex items-center space-x-3.5">
-                            <div className="relative h-14 w-14 rounded-xl overflow-hidden bg-stone-950 border border-stone-800 flex-shrink-0">
-                              {p.images && p.images[0] ? (
-                                <img
-                                  src={p.images[0]}
-                                  alt={p.name}
-                                  className="h-full w-full object-cover"
-                                />
-                              ) : (
-                                <div className="h-full w-full flex items-center justify-center text-stone-700 text-[10px] font-mono">
-                                  NO IMG
+                        return (
+                          <tr key={p.id} className="hover:bg-stone-800/30 transition-colors">
+                            {/* Product Info */}
+                            <td className="py-3.5 px-4 align-top">
+                              <div className="flex items-start space-x-3">
+                                <div className="relative h-12 w-12 rounded-lg overflow-hidden bg-stone-950 border border-stone-800 shrink-0 mt-0.5">
+                                  {p.images && p.images[0] ? (
+                                    <img
+                                      src={p.images[0]}
+                                      alt={p.name}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="h-full w-full flex items-center justify-center text-stone-700 text-[9px] font-mono">
+                                      NO IMG
+                                    </div>
+                                  )}
                                 </div>
-                              )}
-                            </div>
-                            <div>
-                              <h4 className="text-base font-bold text-white">{p.name}</h4>
-                              <div className="flex flex-wrap items-center gap-2 pt-1 text-xs font-mono text-stone-400">
-                                <span>
-                                  Current Catalog Price:{' '}
-                                  <strong className="text-white">R {currentPrice.toFixed(2)}</strong>
-                                </span>
-                                <span>&bull;</span>
-                                <span>
-                                  Cost Price:{' '}
-                                  <strong className="text-amber-400">
-                                    R {(Number(p.cost_price) || insight.tiers.cost).toFixed(2)}
-                                  </strong>
-                                </span>
-                                <span>&bull;</span>
-                                <span className="text-stone-400">
-                                  Total Votes: <strong className="text-white">{insight.totalVotes}</strong>
-                                </span>
+                                <div className="min-w-0">
+                                  <h4 className="text-sm font-bold text-white truncate">{p.name}</h4>
+                                  <div className="flex flex-wrap items-center gap-1.5 pt-0.5 text-[11px] font-mono text-stone-400">
+                                    <span>Catalog: <strong className="text-white">R {currentPrice.toFixed(0)}</strong></span>
+                                    <span>&bull;</span>
+                                    <span>Cost: <strong className="text-amber-400">R {(Number(p.cost_price) || insight.tiers.cost).toFixed(0)}</strong></span>
+                                    <span>&bull;</span>
+                                    <span className="text-stone-300 font-bold">{insight.totalVotes} votes</span>
+                                  </div>
+                                  <div className="flex items-start gap-1.5 mt-1 text-[11px] text-stone-300 max-w-sm">
+                                    <Sparkles className="h-3.5 w-3.5 text-amber-400 shrink-0 mt-0.5" />
+                                    <span className="leading-snug">{insight.recommendationReason}</span>
+                                  </div>
+                                  {insight.tierCounts.not_interested > 0 && (
+                                    <div className="text-[10px] font-mono text-stone-500 mt-0.5">
+                                      * {insight.tierCounts.not_interested} flagged above budget ({insight.tierPercentages.not_interested}%)
+                                    </div>
+                                  )}
+                                </div>
                               </div>
-                            </div>
-                          </div>
+                            </td>
 
-                          {/* Recommendation Badge & Action */}
-                          <div className="flex flex-col sm:items-end gap-1.5">
-                            <div className="flex items-center gap-2">
-                              <span className="text-xs font-mono text-stone-400">Optimal Price:</span>
-                              <span className="text-sm font-black text-amber-400 font-mono px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30">
-                                R {insight.optimalPrice.toFixed(0)}
-                              </span>
-                            </div>
-                            <Button
-                              size="sm"
-                              disabled={isApplying || isAtOptimal}
-                              onClick={() => handleApplySurveyPrice(p.id, insight.optimalPrice)}
-                              className={`text-xs font-bold ${
-                                isAtOptimal
-                                  ? 'bg-stone-800 text-stone-500 border border-stone-700 cursor-not-allowed'
-                                  : 'bg-amber-500 hover:bg-amber-400 text-black'
-                              }`}
-                            >
-                              {isApplying ? (
-                                'Applying...'
-                              ) : isAtOptimal ? (
-                                'Catalog Matched'
-                              ) : (
-                                `Apply R ${insight.optimalPrice.toFixed(0)} to Catalog`
-                              )}
-                            </Button>
-                          </div>
-                        </div>
-
-                        {/* Recommendation Reasoning Banner */}
-                        <div className="p-3 rounded-xl border border-stone-800 bg-stone-950/60 flex items-start gap-2.5 text-xs">
-                          <Sparkles className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
-                          <div>
-                            <span className="text-amber-400 font-bold block mb-0.5">
-                              Pricing Recommendation:
-                            </span>
-                            <p className="text-stone-300 leading-relaxed">
-                              {insight.recommendationReason}
-                            </p>
-                          </div>
-                        </div>
-
-                        {/* 3 Interval Brackets Comparison Grid */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                          {/* Tier 50% */}
-                          <div
-                            className={`p-3.5 rounded-xl border transition-all ${
-                              insight.optimalTier === 'tier_50'
-                                ? 'border-amber-500/60 bg-amber-500/5'
-                                : 'border-stone-800 bg-stone-950/40'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between text-xs mb-2">
-                              <span className="font-mono text-stone-400 uppercase text-[10px]">
-                                Tier 1 (50% Margin)
-                              </span>
-                              {insight.optimalTier === 'tier_50' && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-black font-mono">
-                                  BEST
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-lg font-black text-white font-mono">
-                              {insight.tiers.tiers[0].customerDisplay}
-                            </div>
-                            <div className="text-[11px] text-stone-400 font-mono mt-1">
-                              Unit Profit: R {insight.tiers.tiers[0].unitProfit.toFixed(0)}
-                            </div>
-
-                            {/* Vote share bar */}
-                            <div className="mt-3 space-y-1">
-                              <div className="flex justify-between text-[11px] font-mono text-stone-400">
-                                <span>{insight.tierCounts.tier_50} votes</span>
-                                <span className="text-white font-bold">{insight.tierPercentages.tier_50}%</span>
+                            {/* Tier 1 (50%) */}
+                            <td className={`py-3.5 px-3 align-top text-center ${insight.optimalTier === 'tier_50' ? 'bg-amber-500/5' : ''}`}>
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-center gap-1">
+                                  <span className="text-base font-black text-white font-mono">
+                                    {insight.tiers.tiers[0].customerDisplay}
+                                  </span>
+                                  {insight.optimalTier === 'tier_50' && (
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500 text-black font-mono">
+                                      BEST
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-stone-400 font-mono">
+                                  +{insight.tiers.tiers[0].unitProfit.toFixed(0)} / garment
+                                </div>
+                                <div className="mt-1 space-y-0.5 max-w-[110px] mx-auto">
+                                  <div className="flex justify-between text-[10px] font-mono text-stone-400">
+                                    <span>{insight.tierCounts.tier_50}v</span>
+                                    <span className="text-white font-bold">{insight.tierPercentages.tier_50}%</span>
+                                  </div>
+                                  <div className="w-full bg-stone-800 h-1.5 rounded-full overflow-hidden">
+                                    <div
+                                      className="bg-amber-500 h-full rounded-full"
+                                      style={{ width: `${insight.tierPercentages.tier_50}%` }}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="text-[10px] font-mono text-stone-500 pt-0.5">
+                                  Net R {insight.projectedProfitPerBatch.tier_50.toLocaleString()}
+                                </div>
                               </div>
-                              <div className="w-full bg-stone-800 h-1.5 rounded-full overflow-hidden">
-                                <div
-                                  className="bg-amber-500 h-full rounded-full"
-                                  style={{ width: `${insight.tierPercentages.tier_50}%` }}
-                                />
+                            </td>
+
+                            {/* Tier 2 (75%) */}
+                            <td className={`py-3.5 px-3 align-top text-center ${insight.optimalTier === 'tier_75' ? 'bg-amber-500/5' : ''}`}>
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-center gap-1">
+                                  <span className="text-base font-black text-white font-mono">
+                                    {insight.tiers.tiers[1].customerDisplay}
+                                  </span>
+                                  {insight.optimalTier === 'tier_75' && (
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500 text-black font-mono">
+                                      BEST
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-stone-400 font-mono">
+                                  +{insight.tiers.tiers[1].unitProfit.toFixed(0)} / garment
+                                </div>
+                                <div className="mt-1 space-y-0.5 max-w-[110px] mx-auto">
+                                  <div className="flex justify-between text-[10px] font-mono text-stone-400">
+                                    <span>{insight.tierCounts.tier_75}v</span>
+                                    <span className="text-white font-bold">{insight.tierPercentages.tier_75}%</span>
+                                  </div>
+                                  <div className="w-full bg-stone-800 h-1.5 rounded-full overflow-hidden">
+                                    <div
+                                      className="bg-amber-500 h-full rounded-full"
+                                      style={{ width: `${insight.tierPercentages.tier_75}%` }}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="text-[10px] font-mono text-stone-500 pt-0.5">
+                                  Net R {insight.projectedProfitPerBatch.tier_75.toLocaleString()}
+                                </div>
                               </div>
-                            </div>
+                            </td>
 
-                            <div className="mt-3 pt-2 border-t border-stone-800 text-[11px] font-mono text-stone-400 flex justify-between">
-                              <span>Projected Batch Net:</span>
-                              <span className="text-white font-bold">
-                                R {insight.projectedProfitPerBatch.tier_50.toLocaleString()}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Tier 75% */}
-                          <div
-                            className={`p-3.5 rounded-xl border transition-all ${
-                              insight.optimalTier === 'tier_75'
-                                ? 'border-amber-500/60 bg-amber-500/5'
-                                : 'border-stone-800 bg-stone-950/40'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between text-xs mb-2">
-                              <span className="font-mono text-stone-400 uppercase text-[10px]">
-                                Tier 2 (75% Margin)
-                              </span>
-                              {insight.optimalTier === 'tier_75' && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-black font-mono">
-                                  BEST
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-lg font-black text-white font-mono">
-                              {insight.tiers.tiers[1].customerDisplay}
-                            </div>
-                            <div className="text-[11px] text-stone-400 font-mono mt-1">
-                              Unit Profit: R {insight.tiers.tiers[1].unitProfit.toFixed(0)}
-                            </div>
-
-                            {/* Vote share bar */}
-                            <div className="mt-3 space-y-1">
-                              <div className="flex justify-between text-[11px] font-mono text-stone-400">
-                                <span>{insight.tierCounts.tier_75} votes</span>
-                                <span className="text-white font-bold">{insight.tierPercentages.tier_75}%</span>
+                            {/* Tier 3 (100%) */}
+                            <td className={`py-3.5 px-3 align-top text-center ${insight.optimalTier === 'tier_100' ? 'bg-amber-500/5' : ''}`}>
+                              <div className="space-y-1">
+                                <div className="flex items-center justify-center gap-1">
+                                  <span className="text-base font-black text-white font-mono">
+                                    {insight.tiers.tiers[2].customerDisplay}
+                                  </span>
+                                  {insight.optimalTier === 'tier_100' && (
+                                    <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500 text-black font-mono">
+                                      BEST
+                                    </span>
+                                  )}
+                                </div>
+                                <div className="text-[10px] text-stone-400 font-mono">
+                                  +{insight.tiers.tiers[2].unitProfit.toFixed(0)} / garment
+                                </div>
+                                <div className="mt-1 space-y-0.5 max-w-[110px] mx-auto">
+                                  <div className="flex justify-between text-[10px] font-mono text-stone-400">
+                                    <span>{insight.tierCounts.tier_100}v</span>
+                                    <span className="text-white font-bold">{insight.tierPercentages.tier_100}%</span>
+                                  </div>
+                                  <div className="w-full bg-stone-800 h-1.5 rounded-full overflow-hidden">
+                                    <div
+                                      className="bg-amber-500 h-full rounded-full"
+                                      style={{ width: `${insight.tierPercentages.tier_100}%` }}
+                                    />
+                                  </div>
+                                </div>
+                                <div className="text-[10px] font-mono text-stone-500 pt-0.5">
+                                  Net R {insight.projectedProfitPerBatch.tier_100.toLocaleString()}
+                                </div>
                               </div>
-                              <div className="w-full bg-stone-800 h-1.5 rounded-full overflow-hidden">
-                                <div
-                                  className="bg-amber-500 h-full rounded-full"
-                                  style={{ width: `${insight.tierPercentages.tier_75}%` }}
-                                />
+                            </td>
+
+                            {/* Optimal Price & Apply to Catalog Button */}
+                            <td className="py-3.5 px-4 align-top text-right whitespace-nowrap">
+                              <div className="flex flex-col items-end gap-1.5">
+                                <div className="flex items-center gap-1">
+                                  <span className="text-[10px] font-mono text-stone-400">Optimal:</span>
+                                  <span className="text-xs font-black text-amber-400 font-mono px-2 py-0.5 rounded bg-amber-500/10 border border-amber-500/30">
+                                    R {insight.optimalPrice.toFixed(0)}
+                                  </span>
+                                </div>
+                                <Button
+                                  size="sm"
+                                  disabled={isApplying || isAtOptimal}
+                                  onClick={() => handleApplySurveyPrice(p.id, insight.optimalPrice)}
+                                  className={`h-7 px-2.5 text-[11px] font-bold ${
+                                    isAtOptimal
+                                      ? 'bg-stone-800 text-stone-500 border border-stone-700 cursor-not-allowed'
+                                      : 'bg-amber-500 hover:bg-amber-400 text-black shadow-sm'
+                                  }`}
+                                >
+                                  {isApplying ? (
+                                    'Applying...'
+                                  ) : isAtOptimal ? (
+                                    'Catalog Matched'
+                                  ) : (
+                                    `Apply R ${insight.optimalPrice.toFixed(0)}`
+                                  )}
+                                </Button>
                               </div>
-                            </div>
-
-                            <div className="mt-3 pt-2 border-t border-stone-800 text-[11px] font-mono text-stone-400 flex justify-between">
-                              <span>Projected Batch Net:</span>
-                              <span className="text-white font-bold">
-                                R {insight.projectedProfitPerBatch.tier_75.toLocaleString()}
-                              </span>
-                            </div>
-                          </div>
-
-                          {/* Tier 100% */}
-                          <div
-                            className={`p-3.5 rounded-xl border transition-all ${
-                              insight.optimalTier === 'tier_100'
-                                ? 'border-amber-500/60 bg-amber-500/5'
-                                : 'border-stone-800 bg-stone-950/40'
-                            }`}
-                          >
-                            <div className="flex items-center justify-between text-xs mb-2">
-                              <span className="font-mono text-stone-400 uppercase text-[10px]">
-                                Tier 3 (100% Margin)
-                              </span>
-                              {insight.optimalTier === 'tier_100' && (
-                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-black font-mono">
-                                  BEST
-                                </span>
-                              )}
-                            </div>
-                            <div className="text-lg font-black text-white font-mono">
-                              {insight.tiers.tiers[2].customerDisplay}
-                            </div>
-                            <div className="text-[11px] text-stone-400 font-mono mt-1">
-                              Unit Profit: R {insight.tiers.tiers[2].unitProfit.toFixed(0)}
-                            </div>
-
-                            {/* Vote share bar */}
-                            <div className="mt-3 space-y-1">
-                              <div className="flex justify-between text-[11px] font-mono text-stone-400">
-                                <span>{insight.tierCounts.tier_100} votes</span>
-                                <span className="text-white font-bold">{insight.tierPercentages.tier_100}%</span>
-                              </div>
-                              <div className="w-full bg-stone-800 h-1.5 rounded-full overflow-hidden">
-                                <div
-                                  className="bg-amber-500 h-full rounded-full"
-                                  style={{ width: `${insight.tierPercentages.tier_100}%` }}
-                                />
-                              </div>
-                            </div>
-
-                            <div className="mt-3 pt-2 border-t border-stone-800 text-[11px] font-mono text-stone-400 flex justify-between">
-                              <span>Projected Batch Net:</span>
-                              <span className="text-white font-bold">
-                                R {insight.projectedProfitPerBatch.tier_100.toLocaleString()}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-
-                        {/* Below budget note if any */}
-                        {insight.tierCounts.not_interested > 0 && (
-                          <div className="text-[11px] font-mono text-stone-500">
-                            * {insight.tierCounts.not_interested} respondents ({insight.tierPercentages.not_interested}%) flagged this item as above their budget.
-                          </div>
-                        )}
-                      </div>
-                    </Card>
-                  );
-                })}
-              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </Card>
             )}
           </div>
 
