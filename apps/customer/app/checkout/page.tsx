@@ -63,7 +63,7 @@ export default function CheckoutPage() {
         setPromoCodeInput('firstbuy26');
         setAppliedPromoCode('firstbuy26');
         setPromoDiscount(20);
-        setPromoSuccessMsg('R20 voucher applied! (firstbuy26)');
+        setPromoSuccessMsg('R20 voucher applied successfully!');
       }
     }
   }, []);
@@ -78,7 +78,7 @@ export default function CheckoutPage() {
     if (trimmed === 'firstbuy26') {
       setAppliedPromoCode('firstbuy26');
       setPromoDiscount(20);
-      setPromoSuccessMsg('R20 voucher applied! (firstbuy26)');
+      setPromoSuccessMsg('R20 voucher applied successfully!');
     } else {
       setPromoError('Invalid promo code. Please check and try again.');
       setAppliedPromoCode(null);
@@ -639,7 +639,7 @@ export default function CheckoutPage() {
                             handleApplyPromo();
                           }
                         }}
-                        placeholder="e.g. firstbuy26"
+                        placeholder="Enter promo code"
                         className="h-9 text-xs bg-zinc-950 border-zinc-800 uppercase font-mono"
                       />
                       <Button
