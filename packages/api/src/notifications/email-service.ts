@@ -72,6 +72,16 @@ export interface TicketAcknowledgmentPayload {
   messagePreview: string;
 }
 
+export interface BatchUnlockedPaymentPayload {
+  orderNumber: string;
+  customerName: string;
+  customerEmail: string;
+  productName: string;
+  target: number;
+  totalAmount: number;
+  paymentUrl: string;
+}
+
 export interface AbandonedCartPayload {
   customerName: string;
   customerEmail: string;
@@ -955,6 +965,68 @@ export class EmailService {
         : `Drop Update &bull; Another blank claimed in ${payload.productName} (${claimed}/${target})`,
       html: this.renderShell(content, `Drop update for ${payload.productName}: ${claimed}/${target} claimed (${pct}% complete).`),
       tags: [{ name: 'category', value: 'preorder_drop_milestone' }],
+    });
+  }
+
+  /**
+   * Dispatched when a pre-order drop batch fills, giving backers the direct link
+   * to settle their reserved order (full payment or 50% deposit) via PayFast.
+   */
+  static async sendBatchUnlockedPaymentNotice(payload: BatchUnlockedPaymentPayload) {
+    const content = `
+      <div style="text-align:center;padding:10px 0 20px 0;">
+        <span style="display:inline-block;padding:6px 16px;border-radius:999px;background-color:rgba(34,197,94,0.15);border:1px solid rgba(34,197,94,0.3);color:#22c55e;font-size:11px;font-weight:800;letter-spacing:1.5px;text-transform:uppercase;">
+          &#10004; BATCH GOAL REACHED &bull; FACTORY UNLOCKED
+        </span>
+        <h2 style="font-size:24px;font-weight:900;color:#ffffff;margin:16px 0 8px 0;letter-spacing:-0.5px;">
+          Your Pre-Order is Ready for Production!
+        </h2>
+        <p style="font-size:14px;color:#a1a1aa;margin:0 auto;max-width:440px;line-height:1.5;">
+          Hey ${payload.customerName || 'there'}, incredible news! The drop for <strong style="color:#ffffff;">${payload.productName}</strong> has officially reached its goal of <strong style="color:#ff5500;">${payload.target} orders</strong>.
+        </p>
+      </div>
+
+      <!-- Order Summary Card -->
+      <div style="background-color:#18181b;border:1px solid #27272a;border-radius:10px;padding:20px;margin-bottom:24px;">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0" style="font-size:13px;">
+          <tr>
+            <td style="color:#71717a;padding-bottom:8px;">Order Reference:</td>
+            <td align="right" style="color:#ffffff;font-family:monospace;font-weight:700;padding-bottom:8px;">#${payload.orderNumber}</td>
+          </tr>
+          <tr>
+            <td style="color:#71717a;padding-bottom:8px;">Garment:</td>
+            <td align="right" style="color:#ffffff;font-weight:600;padding-bottom:8px;">${payload.productName}</td>
+          </tr>
+          <tr>
+            <td style="color:#71717a;padding-top:8px;border-top:1px solid #27272a;">Total Garment Value:</td>
+            <td align="right" style="color:#ff5500;font-family:monospace;font-weight:900;font-size:16px;padding-top:8px;border-top:1px solid #27272a;">R ${Number(payload.totalAmount).toFixed(2)}</td>
+          </tr>
+        </table>
+      </div>
+
+      <!-- Payment Callout & Flexibility -->
+      <div style="background-color:#0c0a09;border:1px solid #1f1f23;border-radius:8px;padding:16px 20px;margin-bottom:24px;font-size:12px;color:#d4d4d8;line-height:1.6;">
+        <p style="margin:0 0 8px 0;">
+          <strong style="color:#ffffff;">Flexible Settlement Options:</strong> You can pay the <strong>100% full balance</strong> upfront, or pay a <strong>50% production deposit</strong> (R ${(payload.totalAmount * 0.5).toFixed(2)}) with the rest payable on handover.
+        </p>
+        <p style="margin:0;color:#71717a;">
+          Production begins immediately once batches are settled. To ensure priority queue placement for your garment, please complete your checkout using the link below.
+        </p>
+      </div>
+
+      <!-- Action Button -->
+      <div style="text-align:center;padding:10px 0 20px 0;">
+        <a href="${payload.paymentUrl}" style="background-color:#ff5500;color:#09090b;text-decoration:none;padding:16px 36px;border-radius:8px;font-weight:900;font-size:14px;letter-spacing:1px;text-transform:uppercase;display:inline-block;box-shadow:0 6px 20px rgba(255,85,0,0.4);">
+          Settle Order with PayFast &rarr;
+        </a>
+      </div>
+    `;
+
+    return this.send({
+      to: payload.customerEmail,
+      subject: `[ACTION REQUIRED] Batch Goal Unlocked! Complete your ${payload.productName} Order #${payload.orderNumber}`,
+      html: this.renderShell(content, `Batch 01 for ${payload.productName} is ready! Settle your order #${payload.orderNumber} with PayFast.`),
+      tags: [{ name: 'category', value: 'batch_unlocked_payment' }],
     });
   }
 }

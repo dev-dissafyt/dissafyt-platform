@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input, Label } from '@dissafyt/ui';
-import { ShoppingBag, ArrowLeft, Trash2, ShieldCheck, Truck, Lock, Plus, Minus, Store, PackageCheck, Clock } from 'lucide-react';
+import { ShoppingBag, ArrowLeft, Trash2, ShieldCheck, Truck, Lock, Plus, Minus, Store, PackageCheck, Clock, UserCheck } from 'lucide-react';
 import { getSupabaseBrowserClient } from '@dissafyt/database';
 import { useCart } from '../context/cart-context';
 
@@ -20,8 +21,10 @@ const SA_PROVINCES = [
 ];
 
 export default function CheckoutPage() {
+  const router = useRouter();
   const { items: cart, subtotal, updateQuantity, removeItem, clearCart, isHydrated } = useCart();
   const [profileLoading, setProfileLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [fulfillmentChoice, setFulfillmentChoice] = useState<'courier' | 'studio_collection'>('courier');
@@ -36,17 +39,13 @@ export default function CheckoutPage() {
   const [province, setProvince] = useState('Western Cape');
   const [postalCode, setPostalCode] = useState('');
 
-  // Milestone Deposit Calculations
+  // Frictionless Pre-Order Accumulation & Payable Calculations
   const hasPreorderItems = cart.some((i) => i.isPreorder);
-  const depositDueToday = cart.reduce((acc, item) => {
-    if (item.isPreorder) {
-      const pct = item.preorderDepositPct ? Math.min(Math.max(item.preorderDepositPct, 10), 100) : 50;
-      return acc + (item.price * item.quantity * (pct / 100));
-    }
-    return acc + (item.price * item.quantity);
-  }, 0);
-  const balanceDueLater = Math.max(0, subtotal - depositDueToday);
-  const totalPayableToday = depositDueToday;
+  const inStockItems = cart.filter((i) => !i.isPreorder);
+  const preorderItems = cart.filter((i) => i.isPreorder);
+  const totalPayableToday = inStockItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  const preorderReservationValue = preorderItems.reduce((acc, item) => acc + (item.price * item.quantity), 0);
+  const isPurePreorder = hasPreorderItems && inStockItems.length === 0;
 
   useEffect(() => {
     // Prefill profile if user logged in
@@ -55,6 +54,7 @@ export default function CheckoutPage() {
         const supabase = getSupabaseBrowserClient();
         const { data } = await supabase.auth.getSession();
         if (data?.session) {
+          setIsAuthenticated(true);
           if (data.session.user?.email) {
             setRecipientEmail(data.session.user.email);
           }
@@ -68,6 +68,8 @@ export default function CheckoutPage() {
             if (profile.phone) setRecipientPhone(profile.phone);
             if (profile.email) setRecipientEmail(profile.email);
           }
+        } else {
+          setIsAuthenticated(false);
         }
       } catch (e) {
         console.error('Error fetching user profile for checkout:', e);
@@ -83,6 +85,11 @@ export default function CheckoutPage() {
   async function handleProceedToPayment(e: React.FormEvent) {
     e.preventDefault();
     if (cart.length === 0) return;
+
+    if (hasPreorderItems && !isAuthenticated) {
+      setErrorMsg('An authenticated customer account is required to reserve pre-order drop garments. Please sign in or register below.');
+      return;
+    }
 
     setSubmitting(true);
     setErrorMsg(null);
@@ -123,8 +130,21 @@ export default function CheckoutPage() {
       });
 
       const result = await res.json();
-      if (!res.ok || !result.payfast) {
+      if (!res.ok) {
         setErrorMsg(result.error || 'Failed to initialize order.');
+        setSubmitting(false);
+        return;
+      }
+
+      // If pure pre-order reservation, no PayFast redirect required
+      if (result.isPreorderReserved) {
+        clearCart();
+        router.push(result.redirectUrl || `/checkout/success?type=preorder&order=${result.order?.order_number}`);
+        return;
+      }
+
+      if (!result.payfast) {
+        setErrorMsg('Payment gateway configuration error.');
         setSubmitting(false);
         return;
       }
@@ -192,6 +212,32 @@ export default function CheckoutPage() {
         </div>
       )}
 
+      {hasPreorderItems && !isAuthenticated && (
+        <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-200 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-lg shadow-amber-500/5">
+          <div className="space-y-1">
+            <strong className="text-white flex items-center gap-1.5 text-sm">
+              <UserCheck className="h-4 w-4 text-amber-400" />
+              Account Required to Reserve Pre-Order Items
+            </strong>
+            <p className="text-zinc-300 text-xs">
+              Pre-orders lock in your garment at R0.00 upfront. We require an active Dissafyt account to tie the reserved blank to your profile and send drop batch notifications.
+            </p>
+          </div>
+          <div className="flex items-center gap-2 shrink-0 self-end sm:self-auto">
+            <Link href="/auth/login?redirect=/checkout">
+              <Button size="sm" variant="outline" className="border-amber-500/50 text-white hover:bg-amber-500/20 text-xs h-8">
+                Sign In
+              </Button>
+            </Link>
+            <Link href="/auth/register?redirect=/checkout">
+              <Button size="sm" className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-8">
+                Create Account
+              </Button>
+            </Link>
+          </div>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Shipping Form Column */}
         <div className="lg:col-span-2 space-y-6">
@@ -233,7 +279,7 @@ export default function CheckoutPage() {
                 </p>
                 {hasPreorderItems && (
                   <p className="mt-2 text-[11px] text-amber-400/90 font-medium border-t border-zinc-800/80 pt-2">
-                    &bull; Pay 50% deposit today. Settle balance (R {balanceDueLater.toFixed(2)}) at Studio POS counter via Card or Cash upon collection.
+                    &bull; Pre-order garments: R0.00 due today. Settle balance (R {preorderReservationValue.toFixed(2)}) via personal link once batch target is reached.
                   </p>
                 )}
               </div>
@@ -514,13 +560,13 @@ export default function CheckoutPage() {
 
                 {hasPreorderItems && (
                   <>
-                    <div className="flex justify-between text-sm text-emerald-400">
-                      <span>Production Deposit (e.g. 50%)</span>
-                      <span>- R {depositDueToday.toFixed(2)}</span>
+                    <div className="flex justify-between text-sm text-amber-400">
+                      <span>Pre-Order Batch Allocation</span>
+                      <span className="font-mono font-semibold">R {preorderReservationValue.toFixed(2)}</span>
                     </div>
                     <div className="flex justify-between text-xs text-zinc-400">
-                      <span>Balance Due Upon Handover</span>
-                      <span className="font-mono text-zinc-300">R {balanceDueLater.toFixed(2)}</span>
+                      <span>Batch Settlement Timing</span>
+                      <span className="text-zinc-300">Pay when batch unlocks &bull; R0.00 today</span>
                     </div>
                   </>
                 )}
@@ -533,25 +579,26 @@ export default function CheckoutPage() {
                 </div>
 
                 <div className="flex justify-between text-base font-bold text-white pt-2 border-t border-zinc-800">
-                  <span>{hasPreorderItems ? 'Deposit Due Today (ZAR)' : 'Total (ZAR)'}</span>
-                  <span className="text-amber-400 text-xl">R {totalPayableToday.toFixed(2)}</span>
+                  <span>Due Today (ZAR)</span>
+                  <span className="text-amber-400 text-xl font-mono">R {totalPayableToday.toFixed(2)}</span>
                 </div>
               </div>
 
               <Button
                 type="submit"
                 form="checkout-form"
-                disabled={submitting}
+                disabled={submitting || (hasPreorderItems && !isAuthenticated)}
                 className="w-full bg-amber-500 hover:bg-amber-400 text-black font-bold h-11 text-base mt-4"
               >
                 {submitting ? (
-                  'Connecting to PayFast...'
+                  'Processing...'
+                ) : isPurePreorder ? (
+                  <span className="flex items-center justify-center">
+                    <PackageCheck className="mr-2 h-4 w-4" /> Confirm Pre-Order Reservation (R 0.00 Today)
+                  </span>
                 ) : (
                   <span className="flex items-center justify-center">
-                    <Lock className="mr-2 h-4 w-4" />{' '}
-                    {hasPreorderItems
-                      ? `Pay Deposit with PayFast (R ${totalPayableToday.toFixed(2)})`
-                      : `Pay with PayFast (R ${totalPayableToday.toFixed(2)})`}
+                    <Lock className="mr-2 h-4 w-4" /> Pay with PayFast (R {totalPayableToday.toFixed(2)})
                   </span>
                 )}
               </Button>

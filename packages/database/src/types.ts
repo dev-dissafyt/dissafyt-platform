@@ -54,6 +54,10 @@ export interface Product {
   preorder_target?: number | null;
   preorder_deposit_pct?: number;
   preorder_claimed_count?: number;
+  cost_price?: number;
+  supplier_name?: string | null;
+  supplier_sku?: string | null;
+  batch_status?: 'accumulating' | 'batch_filled' | 'in_production' | 'dispatched' | 'completed';
   created_at: string;
   updated_at: string;
 }
@@ -130,6 +134,7 @@ export interface ProductVariant {
   name: string; // e.g. "Size L - Black" or "L"
   sku: string;
   price_override?: number | null;
+  cost_price_override?: number | null;
   stock_quantity: number;
   is_active: boolean;
   color?: string | null;
@@ -140,7 +145,10 @@ export interface ProductVariant {
 
 export type OrderStatus =
   | 'pending_payment'
+  | 'preorder_reserved'
+  | 'batch_payment_requested'
   | 'paid'
+  | 'deposit_paid'
   | 'processing'
   | 'fulfilled'
   | 'shipped'
@@ -167,6 +175,8 @@ export interface Order {
   customer_phone?: string | null;
   customer_name?: string | null;
   shipping_address?: Record<string, unknown> | null;
+  payment_link_token?: string | null;
+  batch_notified_at?: string | null;
   created_at: string;
   updated_at: string;
 }

@@ -99,16 +99,24 @@ export async function POST(request: NextRequest) {
     const order = result.order;
 
     // Calculate upfront amount to charge today:
-    // If order has balance_due, charge only the deposit today
     const balanceDue = Number(order.balance_due || 0);
     const amountToPayToday = balanceDue > 0
       ? Math.max(0, Number(order.total) - balanceDue)
       : Number(order.total);
 
-    const isPreorder = balanceDue > 0;
-    const itemName = isPreorder
-      ? `Dissafyt Pre-Order Deposit #${order.order_number}`
-      : `Dissafyt Order #${order.order_number}`;
+    // If order is pure pre-order reservation, no upfront payment is charged today
+    const isPreorderReserved = order.status === 'preorder_reserved' || amountToPayToday <= 0;
+    if (isPreorderReserved) {
+      return NextResponse.json({
+        order,
+        isPreorderReserved: true,
+        amountDueToday: 0,
+        balanceDue: Number(order.total),
+        redirectUrl: `/checkout/success?type=preorder&order=${order.order_number}`,
+      }, { status: 201 });
+    }
+
+    const itemName = `Dissafyt Order #${order.order_number}`;
 
     // Generate PayFast payload with MD5 signature
     const siteUrl = getCanonicalSiteUrl();

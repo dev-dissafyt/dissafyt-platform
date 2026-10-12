@@ -13,6 +13,7 @@ export interface ProductVariantInput {
   color_hex?: string | null;
   size?: string | null;
   image_url?: string | null;
+  cost_price_override?: number | null;
 }
 
 export interface CreateProductInput {
@@ -21,6 +22,10 @@ export interface CreateProductInput {
   description?: string;
   category_id?: string | null;
   base_price: number;
+  cost_price?: number;
+  supplier_name?: string | null;
+  supplier_sku?: string | null;
+  batch_status?: 'accumulating' | 'batch_filled' | 'in_production' | 'dispatched' | 'completed';
   is_active?: boolean;
   images?: string[];
   is_preorder?: boolean;
@@ -36,6 +41,10 @@ export interface UpdateProductInput {
   description?: string;
   category_id?: string | null;
   base_price?: number;
+  cost_price?: number;
+  supplier_name?: string | null;
+  supplier_sku?: string | null;
+  batch_status?: 'accumulating' | 'batch_filled' | 'in_production' | 'dispatched' | 'completed';
   is_active?: boolean;
   images?: string[];
   stock_quantity?: number;
@@ -124,6 +133,10 @@ export class AdminProductService {
           description: input.description || '',
           category_id: input.category_id || null,
           base_price: input.base_price,
+          cost_price: input.cost_price !== undefined ? Number(input.cost_price) : 0.00,
+          supplier_name: input.supplier_name || null,
+          supplier_sku: input.supplier_sku || null,
+          batch_status: input.batch_status || 'accumulating',
           is_active: input.is_active !== undefined ? input.is_active : true,
           images: input.images || [],
           is_preorder: Boolean(input.is_preorder),
@@ -147,6 +160,7 @@ export class AdminProductService {
             name: v.name || (v.color && v.size ? `${v.color} / ${v.size}` : v.size || 'Standard'),
             sku: v.sku?.trim() ? `${v.sku.trim()}-${Math.floor(100 + Math.random() * 900)}` : `${slug.toUpperCase().slice(0, 8)}-${(v.name || 'VAR').toUpperCase().replace(/[^A-Z0-9]/g, '')}-${Math.floor(100 + Math.random() * 900)}`,
             price_override: v.price_override || null,
+            cost_price_override: v.cost_price_override !== undefined ? v.cost_price_override : null,
             stock_quantity: v.stock_quantity ?? 10,
             is_active: v.is_active !== undefined ? v.is_active : true,
             color: v.color || null,
@@ -159,6 +173,7 @@ export class AdminProductService {
             name: 'Standard',
             sku: `${slug.toUpperCase().slice(0, 10)}-STD-${Math.floor(100 + Math.random() * 900)}`,
             price_override: null,
+            cost_price_override: null,
             stock_quantity: 10,
             is_active: true,
             color: null,
@@ -221,6 +236,18 @@ export class AdminProductService {
           ? Math.min(Math.max(Number(input.preorder_deposit_pct), 10), 100)
           : 50;
       }
+      if (input.cost_price !== undefined) {
+        updateData.cost_price = Number(input.cost_price);
+      }
+      if (input.supplier_name !== undefined) {
+        updateData.supplier_name = input.supplier_name || null;
+      }
+      if (input.supplier_sku !== undefined) {
+        updateData.supplier_sku = input.supplier_sku || null;
+      }
+      if (input.batch_status !== undefined) {
+        updateData.batch_status = input.batch_status;
+      }
 
       const { data, error } = await admin
         .from('products')
@@ -251,6 +278,7 @@ export class AdminProductService {
                 name: v.name,
                 stock_quantity: safeStock,
                 price_override: v.price_override || null,
+                cost_price_override: v.cost_price_override !== undefined ? v.cost_price_override : null,
                 is_active: v.is_active !== undefined ? v.is_active : true,
                 color: v.color || null,
                 color_hex: v.color_hex || null,

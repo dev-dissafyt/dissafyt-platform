@@ -3,6 +3,7 @@ import { StudioService } from '../studio/studio-service';
 import { BrandService } from '../studio/brand-service';
 import { AuditService } from '../audit/audit-service';
 import { EmailService } from '../notifications/email-service';
+import { getCanonicalSiteUrl } from '../config/domains.config';
 
 export interface ShippingAddress {
   recipient_name: string;
@@ -117,6 +118,15 @@ export class OrderService {
         }
       }
 
+      // Pre-orders strictly require an authenticated customer account
+      const hasPreorder = products.some((p) => p.is_preorder);
+      if (hasPreorder && (!userId || userId === GUEST_USER_ID)) {
+        return {
+          success: false,
+          error: 'An authenticated customer account is required to reserve pre-order drop garments. Please log in or register to secure your piece.',
+        };
+      }
+
       // Fetch variants if applicable
       const variantIds = input.items.filter((i) => i.variant_id).map((i) => i.variant_id);
       let variants: any[] = [];
@@ -183,11 +193,9 @@ export class OrderService {
         let balanceAmount = 0;
 
         if (isPreorder) {
-          const depositPct = product.preorder_deposit_pct
-            ? Math.min(Math.max(Number(product.preorder_deposit_pct), 10), 100)
-            : 50;
-          depositAmount = Math.round((totalPrice * (depositPct / 100)) * 100) / 100;
-          balanceAmount = Math.round((totalPrice - depositAmount) * 100) / 100;
+          // Zero upfront deposit for preorder accumulation
+          depositAmount = 0.00;
+          balanceAmount = totalPrice;
         }
 
         orderSubtotal += totalPrice;
@@ -211,6 +219,9 @@ export class OrderService {
       const shippingCost = fulfillmentChoice === 'studio_collection' ? 0 : (input.shipping_cost || 0);
       const orderTotal = orderSubtotal + shippingCost;
 
+      const isPurePreorder = hasPreorder && orderDepositTotal === 0;
+      const initialStatus = isPurePreorder ? 'preorder_reserved' : 'pending_payment';
+
       // 2. Insert into orders table with valid user_id
       const orderNumber = this.generateOrderNumber();
       let order: any = null;
@@ -221,11 +232,11 @@ export class OrderService {
           .insert({
             user_id: userId,
             order_number: orderNumber,
-            status: 'pending_payment',
+            status: initialStatus,
             subtotal: orderSubtotal,
             total: orderTotal,
             deposit_paid: 0.00,
-            balance_due: orderBalanceTotal,
+            balance_due: isPurePreorder ? orderTotal : orderBalanceTotal,
             deposit_status: 'none',
             fulfillment_choice: fulfillmentChoice,
             collection_location_id: input.collection_location_id || 'loc-cpt-flagship',
@@ -270,6 +281,30 @@ export class OrderService {
         }
       } catch (itemsEx) {
         console.error('Exception inserting order items:', itemsEx);
+      }
+
+      // Check if any preorder products have reached their batch goal
+      if (hasPreorder) {
+        for (const p of products) {
+          if (p.is_preorder) {
+            try {
+              const counts = await this.getPreorderClaimedCounts([p.id]);
+              const currentClaimed = counts[p.id] || 0;
+              const target = Number(p.preorder_target) || 50;
+              if (currentClaimed >= target) {
+                await admin
+                  .from('products')
+                  .update({ batch_status: 'batch_filled' })
+                  .eq('id', p.id);
+              }
+            } catch (batchErr) {
+              console.error('[OrderService] Error checking/updating batch status:', batchErr);
+            }
+          }
+        }
+        this.notifyDropBackersOnNewPreorder(order.id, insertedItems).catch((err) =>
+          console.warn('[OrderService] Warning notifying drop backers:', err)
+        );
       }
 
       return {
@@ -324,6 +359,39 @@ export class OrderService {
         });
       } else {
         return { success: false, error: `Balance underpaid: received R${amountPaid}, required R${balanceDue}` };
+      }
+    }
+
+    // If order was a pre-order reservation awaiting batch settlement (supports 100% full or >=50% deposit)
+    if (order.status === 'preorder_reserved' || order.status === 'batch_payment_requested') {
+      const total = Number(order.total);
+      const halfTotal = Math.round(total * 0.5 * 100) / 100;
+      if (amountPaid >= total - 0.05) {
+        await admin
+          .from('orders')
+          .update({
+            status: 'paid',
+            deposit_paid: amountPaid,
+            balance_due: 0.00,
+            deposit_status: 'fully_settled',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', orderId);
+        return { success: true };
+      } else if (amountPaid >= halfTotal - 0.05) {
+        await admin
+          .from('orders')
+          .update({
+            status: 'deposit_paid',
+            deposit_paid: amountPaid,
+            balance_due: Math.max(0, total - amountPaid),
+            deposit_status: 'deposit_paid',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', orderId);
+        return { success: true };
+      } else {
+        return { success: false, error: `Underpaid batch settlement: received R${amountPaid}, minimum deposit required is R${halfTotal}` };
       }
     }
 
@@ -661,7 +729,7 @@ export class OrderService {
       const { data: confirmedOrders, error: orderErr } = await admin
         .from('orders')
         .select('id')
-        .or('deposit_status.in.(deposit_paid,fully_settled),status.in.(processing,completed,shipped,paid)');
+        .or('deposit_status.in.(deposit_paid,fully_settled),status.in.(preorder_reserved,batch_payment_requested,processing,completed,shipped,paid,deposit_paid)');
 
       if (orderErr || !confirmedOrders || confirmedOrders.length === 0) {
         return {};
@@ -730,7 +798,7 @@ export class OrderService {
           .from('orders')
           .select('id, order_number, customer_email, customer_name, shipping_address')
           .neq('id', currentOrderId)
-          .or('deposit_status.in.(deposit_paid,fully_settled),status.in.(processing,completed,shipped,paid)');
+          .or('deposit_status.in.(deposit_paid,fully_settled),status.in.(preorder_reserved,batch_payment_requested,processing,completed,shipped,paid,deposit_paid)');
 
         if (!confirmedOrders || confirmedOrders.length === 0) continue;
 
@@ -977,5 +1045,196 @@ export class OrderService {
       customer_email: (order as any).shipping_address?.recipient_email || (order as any).profiles?.email,
       customer_name: (order as any).shipping_address?.recipient_name || (order as any).profiles?.full_name,
     };
+  }
+
+  /**
+   * Generates a direct WhatsApp link pre-filled with the order reference,
+   * product name, and secure payment link for customer outreach.
+   */
+  static generateWhatsAppLink(
+    order: { customer_phone?: string | null; customer_name?: string | null; order_number: string },
+    productName: string,
+    paymentUrl: string
+  ): string {
+    const rawPhone = (order.customer_phone || '').replace(/[^0-9]/g, '');
+    const cleanPhone = rawPhone.startsWith('0') ? `27${rawPhone.slice(1)}` : rawPhone;
+    const customerFirstName = (order.customer_name || 'there').split(' ')[0];
+    const message = `Hey ${customerFirstName}! Great news from Dissafyt: The batch drop for "${productName}" has reached its goal and is entering production! Settle your order #${order.order_number} here to lock in your priority dispatch: ${paymentUrl}`;
+    return `https://wa.me/${cleanPhone}?text=${encodeURIComponent(message)}`;
+  }
+
+  /**
+   * Fetches all batch pre-orders for a given product ID, complete with sizing matrix breakdown.
+   */
+  static async getBatchOrdersForProduct(productId: string): Promise<{
+    product: any;
+    orders: any[];
+    sizeBreakdown: Record<string, number>;
+    colorBreakdown: Record<string, number>;
+    totalUnits: number;
+    totalCommittedValue: number;
+    target: number;
+  }> {
+    const admin = getSupabaseAdminClient();
+    const { data: product } = await admin
+      .from('products')
+      .select('*')
+      .eq('id', productId)
+      .single();
+
+    if (!product) {
+      throw new Error('Product not found');
+    }
+
+    // Get all order items for this product that belong to active/reserved/paid orders
+    const { data: items } = await admin
+      .from('order_items')
+      .select('*, order:orders(*)')
+      .eq('product_id', productId);
+
+    const validItems = (items || []).filter((item: any) => {
+      const status = item.order?.status;
+      return [
+        'preorder_reserved',
+        'batch_payment_requested',
+        'paid',
+        'deposit_paid',
+        'processing',
+        'completed',
+        'shipped',
+      ].includes(status);
+    });
+
+    const sizeBreakdown: Record<string, number> = {};
+    const colorBreakdown: Record<string, number> = {};
+    const siteUrl = getCanonicalSiteUrl();
+
+    let totalUnits = 0;
+    let totalCommittedValue = 0;
+    const ordersMap = new Map<string, any>();
+
+    for (const item of validItems) {
+      const qty = Number(item.quantity) || 1;
+      totalUnits += qty;
+      totalCommittedValue += Number(item.total_price) || 0;
+
+      // Extract size & color from product_name (e.g. "Hoodie - Black / L" or "Hoodie - L")
+      const nameParts = (item.product_name || '').split(' - ');
+      const variantDesc = nameParts[1] || '';
+      if (variantDesc.includes('/')) {
+        const [color, size] = variantDesc.split('/').map((s: string) => s.trim());
+        if (size) sizeBreakdown[size] = (sizeBreakdown[size] || 0) + qty;
+        if (color) colorBreakdown[color] = (colorBreakdown[color] || 0) + qty;
+      } else if (variantDesc) {
+        sizeBreakdown[variantDesc] = (sizeBreakdown[variantDesc] || 0) + qty;
+      } else {
+        sizeBreakdown['Standard'] = (sizeBreakdown['Standard'] || 0) + qty;
+      }
+
+      if (item.order && !ordersMap.has(item.order.id)) {
+        const paymentUrl = `${siteUrl}/pay/preorder?order=${item.order.order_number}&token=${item.order.payment_link_token || item.order.id}`;
+        const whatsappLink = this.generateWhatsAppLink(item.order, product.name, paymentUrl);
+
+        ordersMap.set(item.order.id, {
+          ...item.order,
+          paymentUrl,
+          whatsappLink,
+          items: [item],
+        });
+      } else if (item.order) {
+        ordersMap.get(item.order.id).items.push(item);
+      }
+    }
+
+    return {
+      product,
+      orders: Array.from(ordersMap.values()),
+      sizeBreakdown,
+      colorBreakdown,
+      totalUnits,
+      totalCommittedValue,
+      target: Number(product.preorder_target) || 50,
+    };
+  }
+
+  /**
+   * Notifies all customers in a batch that the batch target has been reached,
+   * sending branded emails with their personal payment links and returning WhatsApp links.
+   */
+  static async notifyBatchCustomers(productId: string): Promise<{
+    success: boolean;
+    notifiedCount: number;
+    orders: any[];
+    error?: string;
+  }> {
+    const admin = getSupabaseAdminClient();
+    try {
+      const { product, orders, target } = await this.getBatchOrdersForProduct(productId);
+
+      let notifiedCount = 0;
+      const results: any[] = [];
+
+      for (const order of orders) {
+        // Skip already fully paid orders
+        if (order.status === 'paid' || order.deposit_status === 'fully_settled') {
+          results.push({ orderId: order.id, status: 'already_paid' });
+          continue;
+        }
+
+        const paymentUrl = order.paymentUrl;
+        const customerEmail = order.customer_email || (order.shipping_address as any)?.recipient_email;
+        const customerName = order.customer_name || (order.shipping_address as any)?.recipient_name || 'Collector';
+
+        if (customerEmail) {
+          try {
+            await EmailService.sendBatchUnlockedPaymentNotice({
+              orderNumber: order.order_number,
+              customerName,
+              customerEmail,
+              productName: product.name,
+              target,
+              totalAmount: Number(order.total),
+              paymentUrl,
+            });
+            notifiedCount++;
+          } catch (mailErr) {
+            console.error(`Failed to send batch email to ${customerEmail}:`, mailErr);
+          }
+        }
+
+        // Mark order as batch_payment_requested with notification timestamp
+        await admin
+          .from('orders')
+          .update({
+            status: 'batch_payment_requested',
+            batch_notified_at: new Date().toISOString(),
+          })
+          .eq('id', order.id);
+
+        results.push({
+          orderId: order.id,
+          orderNumber: order.order_number,
+          customerName,
+          customerEmail,
+          whatsappLink: order.whatsappLink,
+          status: 'notified',
+        });
+      }
+
+      // Update product batch_status to batch_filled
+      await admin
+        .from('products')
+        .update({ batch_status: 'batch_filled' })
+        .eq('id', productId);
+
+      return {
+        success: true,
+        notifiedCount,
+        orders: results,
+      };
+    } catch (err: any) {
+      console.error('Error in notifyBatchCustomers:', err);
+      return { success: false, notifiedCount: 0, orders: [], error: err.message };
+    }
   }
 }

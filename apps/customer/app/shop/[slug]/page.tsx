@@ -389,7 +389,7 @@ export default function ProductDetailPage() {
                 <div className="flex items-center gap-2 pt-1 text-[11px] text-amber-400/90 font-mono">
                   <ShieldCheck className="h-3.5 w-3.5 text-amber-400 shrink-0" />
                   <span>
-                    Pay only <strong>{product.preorder_deposit_pct || 50}% deposit</strong> today to secure your blank. Balance due upon studio collection or courier dispatch.
+                    <strong>R0.00 Due Today:</strong> Reserve your garment now. You will only be prompted to pay once our batch goal is reached and production unlocks.
                   </span>
                 </div>
               </div>
@@ -550,7 +550,7 @@ export default function ProductDetailPage() {
               className="w-full bg-amber-500 hover:bg-amber-400 text-black font-extrabold h-12 text-sm uppercase tracking-wider shadow-lg shadow-amber-500/10"
             >
               {isPreorder ? (
-                <span>Pre-order Now &bull; R {(effectivePrice * quantity).toFixed(2)}</span>
+                <span>Reserve Blank &bull; R0.00 Today (Value: R {(effectivePrice * quantity).toFixed(2)})</span>
               ) : (
                 <span>Checkout with PayFast &bull; R {(effectivePrice * quantity).toFixed(2)}</span>
               )}

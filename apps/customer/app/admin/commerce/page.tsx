@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input, Label } from '@dissafyt/ui';
-import { ShoppingBag, Plus, Trash2, CheckCircle, XCircle, Tag, Layers, RefreshCw, Package, Pencil, Copy, Check, ExternalLink, Share2, HelpCircle, Upload, Image as ImageIcon, Palette, Loader2, Sparkles, X } from 'lucide-react';
+import { ShoppingBag, Plus, Trash2, CheckCircle, XCircle, Tag, Layers, RefreshCw, Package, Pencil, Copy, Check, ExternalLink, Share2, HelpCircle, Upload, Image as ImageIcon, Palette, Loader2, Sparkles, X, MessageSquare, TrendingUp, Percent, AlertCircle, Phone, Send, DollarSign } from 'lucide-react';
 import { adminFetch } from '@/lib/operator';
 
 interface Variant {
@@ -25,6 +25,10 @@ interface Product {
   slug: string;
   description: string;
   base_price: number;
+  cost_price?: number | null;
+  supplier_name?: string | null;
+  supplier_sku?: string | null;
+  batch_status?: string | null;
   category_id?: string;
   category_name?: string;
   is_active: boolean;
@@ -35,6 +39,16 @@ interface Product {
   preorder_deposit_pct?: number | null;
   preorder_claimed_count?: number | null;
   variants: Variant[];
+}
+
+interface BatchOrderData {
+  product: Product;
+  orders: any[];
+  sizeBreakdown: Record<string, number>;
+  colorBreakdown: Record<string, number>;
+  totalUnits: number;
+  totalCommittedValue: number;
+  target: number;
 }
 
 interface Category {
@@ -72,6 +86,10 @@ export default function AdminCommercePage() {
   const [editSlug, setEditSlug] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editBasePrice, setEditBasePrice] = useState('');
+  const [editCostPrice, setEditCostPrice] = useState('');
+  const [editSupplierName, setEditSupplierName] = useState('');
+  const [editSupplierSku, setEditSupplierSku] = useState('');
+  const [editBatchStatus, setEditBatchStatus] = useState('accumulating');
   const [editCategoryId, setEditCategoryId] = useState('');
   const [editStockQuantity, setEditStockQuantity] = useState('25');
   const [editIsActive, setEditIsActive] = useState(true);
@@ -96,6 +114,9 @@ export default function AdminCommercePage() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [basePrice, setBasePrice] = useState('');
+  const [costPrice, setCostPrice] = useState('');
+  const [supplierName, setSupplierName] = useState('');
+  const [supplierSku, setSupplierSku] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [images, setImages] = useState<string[]>([]);
   const [manualUrl, setManualUrl] = useState('');
@@ -108,6 +129,15 @@ export default function AdminCommercePage() {
   const [preorderMessage, setPreorderMessage] = useState('Batch 01: Ships 2–3 weeks from drop close');
   const [preorderTarget, setPreorderTarget] = useState('50');
   const [preorderDepositPct, setPreorderDepositPct] = useState('50');
+
+  // Batch Orders & Sizing Drawer State
+  const [selectedBatchProduct, setSelectedBatchProduct] = useState<Product | null>(null);
+  const [batchData, setBatchData] = useState<BatchOrderData | null>(null);
+  const [batchLoading, setBatchLoading] = useState(false);
+  const [batchNotifying, setBatchNotifying] = useState(false);
+  const [batchNotifyMsg, setBatchNotifyMsg] = useState<string | null>(null);
+  const [copiedSizing, setCopiedSizing] = useState(false);
+  const [copiedLinkOrderId, setCopiedLinkOrderId] = useState<string | null>(null);
 
   // Colorways & Size Matrix (Add Product)
   const [selectedColorways, setSelectedColorways] = useState<StreetwearColorway[]>([]);
@@ -129,6 +159,108 @@ export default function AdminCommercePage() {
   const [categoryName, setCategoryName] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+
+  function getMarginMetrics(retailStr: string, costStr: string, targetStr: string) {
+    const retail = parseFloat(retailStr) || 0;
+    const cost = parseFloat(costStr) || 0;
+    const target = parseInt(targetStr, 10) || 50;
+
+    const unitGrossProfit = retail - cost;
+    const marginPct = retail > 0 ? Math.round((unitGrossProfit / retail) * 100) : 0;
+    const markupPct = cost > 0 ? Math.round((unitGrossProfit / cost) * 100) : 0;
+    const totalCapitalNeeded = cost * target;
+    const projectedGrossRevenue = retail * target;
+    const projectedNetProfit = unitGrossProfit * target;
+    const breakEvenUnits = retail > 0 ? Math.ceil(totalCapitalNeeded / retail) : 0;
+
+    return {
+      retail,
+      cost,
+      target,
+      unitGrossProfit,
+      marginPct,
+      markupPct,
+      totalCapitalNeeded,
+      projectedGrossRevenue,
+      projectedNetProfit,
+      breakEvenUnits,
+    };
+  }
+
+  async function openBatchModal(prod: Product) {
+    setSelectedBatchProduct(prod);
+    setBatchData(null);
+    setBatchNotifyMsg(null);
+    setBatchLoading(true);
+    try {
+      const res = await adminFetch(`/api/products/${prod.id}/batch`);
+      if (res.ok) {
+        const data = await res.json();
+        setBatchData(data);
+      } else {
+        const err = await res.json();
+        setBatchNotifyMsg(err.error || 'Failed to load batch data');
+      }
+    } catch {
+      setBatchNotifyMsg('Network error while loading batch');
+    } finally {
+      setBatchLoading(false);
+    }
+  }
+
+  async function handleNotifyBatchCustomers() {
+    if (!selectedBatchProduct || !batchData) return;
+    if (!confirm(`Dispatch batch unlock payment emails to all ${batchData.orders.length} customers in this drop?`)) return;
+    setBatchNotifying(true);
+    setBatchNotifyMsg(null);
+    try {
+      const res = await adminFetch(`/api/products/${selectedBatchProduct.id}/batch`, {
+        method: 'POST',
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setBatchNotifyMsg(`Sent unlock notification to ${data.notifiedCount} backer(s) with personal 100% full & 50% deposit payment links!`);
+        const refreshRes = await adminFetch(`/api/products/${selectedBatchProduct.id}/batch`);
+        if (refreshRes.ok) {
+          setBatchData(await refreshRes.json());
+        }
+      } else {
+        setBatchNotifyMsg(`Failed to notify: ${data.error || 'Unknown error'}`);
+      }
+    } catch (err: any) {
+      setBatchNotifyMsg(`Network error: ${err.message}`);
+    } finally {
+      setBatchNotifying(false);
+    }
+  }
+
+  function copySupplierSizing() {
+    if (!batchData) return;
+    const lines = [
+      `Dissafyt Supplier Procurement Order`,
+      `Product: ${batchData.product.name}`,
+      `Supplier: ${batchData.product.supplier_name || 'Unspecified'} | Blank SKU: ${batchData.product.supplier_sku || 'N/A'}`,
+      `Total Pre-ordered Units: ${batchData.totalUnits}`,
+      `Batch Drop Goal: ${batchData.target} units`,
+      ``,
+      `Size Breakdown for Blanks:`,
+      ...Object.entries(batchData.sizeBreakdown).map(([size, count]) => `  • Size ${size}: ${count} units`),
+      ...(Object.keys(batchData.colorBreakdown).length > 0 ? [
+        ``,
+        `Color Breakdown:`,
+        ...Object.entries(batchData.colorBreakdown).map(([color, count]) => `  • Color ${color}: ${count} units`)
+      ] : []),
+    ];
+    navigator.clipboard.writeText(lines.join('\n'));
+    setCopiedSizing(true);
+    setTimeout(() => setCopiedSizing(false), 2500);
+  }
+
+  function copyOrderPaymentLink(orderNumber: string, url: string) {
+    navigator.clipboard.writeText(url);
+    setCopiedLinkOrderId(orderNumber);
+    setTimeout(() => setCopiedLinkOrderId(null), 2500);
+  }
 
   // Meta Commerce Feed State
   const [copiedFeed, setCopiedFeed] = useState(false);
@@ -398,6 +530,10 @@ export default function AdminCommercePage() {
           name,
           description,
           base_price: parseFloat(basePrice),
+          cost_price: costPrice ? parseFloat(costPrice) : 0,
+          supplier_name: supplierName || null,
+          supplier_sku: supplierSku || null,
+          batch_status: isPreorder ? 'accumulating' : null,
           category_id: categoryId || null,
           images: images,
           is_active: true,
@@ -414,6 +550,9 @@ export default function AdminCommercePage() {
         setName('');
         setDescription('');
         setBasePrice('');
+        setCostPrice('');
+        setSupplierName('');
+        setSupplierSku('');
         setImages([]);
         setManualUrl('');
         setSelectedColorways([]);
@@ -460,6 +599,10 @@ export default function AdminCommercePage() {
     setEditSlug(prod.slug);
     setEditDescription(prod.description || '');
     setEditBasePrice(String(prod.base_price));
+    setEditCostPrice(prod.cost_price != null ? String(prod.cost_price) : '');
+    setEditSupplierName(prod.supplier_name || '');
+    setEditSupplierSku(prod.supplier_sku || '');
+    setEditBatchStatus(prod.batch_status || 'accumulating');
     const matchedCat = categories.find((c) => c.name === prod.category_name || c.id === prod.category_id);
     setEditCategoryId(matchedCat ? matchedCat.id : '');
     const stock = prod.variants?.reduce((acc, v) => acc + (v.stock_quantity || 0), 0) ?? 25;
@@ -521,6 +664,10 @@ export default function AdminCommercePage() {
           slug: editSlug,
           description: editDescription,
           base_price: parseFloat(editBasePrice) || 0,
+          cost_price: editCostPrice ? parseFloat(editCostPrice) : null,
+          supplier_name: editSupplierName || null,
+          supplier_sku: editSupplierSku || null,
+          batch_status: editIsPreorder ? editBatchStatus : null,
           category_id: editCategoryId || null,
           is_active: editIsActive,
           images: editImages,
@@ -692,7 +839,7 @@ export default function AdminCommercePage() {
             </div>
 
             <div className="space-y-1">
-              <Label>Base Price (ZAR - Rands)</Label>
+              <Label>Base Price (ZAR - Retail to Customer)</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -717,6 +864,104 @@ export default function AdminCommercePage() {
                   </option>
                 ))}
               </select>
+            </div>
+
+            {/* Supplier Cost & Live Economics Card */}
+            <div className="md:col-span-2 rounded-xl border border-stone-800 bg-stone-950/70 p-4 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-emerald-400" />
+                  <span className="text-sm font-bold text-white">Supplier Cost &amp; Profit Margin Economics</span>
+                </div>
+                <span className="text-xs text-stone-400">Unit margins, supplier procurement cost, &amp; batch returns</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-stone-300">Supplier Cost Price (ZAR)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={costPrice}
+                    onChange={(e) => setCostPrice(e.target.value)}
+                    placeholder="e.g. 185.00"
+                    className="bg-stone-900 border-stone-700 text-xs text-stone-100"
+                  />
+                  <p className="text-[10px] text-stone-400">Blank manufacturing / printing cost per unit</p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-stone-300">Supplier Name</Label>
+                  <Input
+                    value={supplierName}
+                    onChange={(e) => setSupplierName(e.target.value)}
+                    placeholder="e.g. Vic Bay / Amrod / Baron"
+                    className="bg-stone-900 border-stone-700 text-xs text-stone-100"
+                  />
+                  <p className="text-[10px] text-stone-400">Wholesale apparel manufacturer</p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-stone-300">Supplier Blank SKU</Label>
+                  <Input
+                    value={supplierSku}
+                    onChange={(e) => setSupplierSku(e.target.value)}
+                    placeholder="e.g. VB-HVY-300GSM-BLK"
+                    className="bg-stone-900 border-stone-700 text-xs font-mono text-stone-100"
+                  />
+                  <p className="text-[10px] text-stone-400">Manufacturer catalog reference</p>
+                </div>
+              </div>
+
+              {/* Real-time Margin Economics calculation banner */}
+              {(() => {
+                const metrics = getMarginMetrics(basePrice, costPrice, preorderTarget);
+                if (metrics.retail <= 0 && metrics.cost <= 0) return null;
+                return (
+                  <div className="rounded-xl border border-stone-800 bg-stone-900/80 p-3.5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div>
+                      <span className="text-stone-400 block text-[11px]">Unit Gross Profit</span>
+                      <span className={`text-base font-bold font-mono ${metrics.unitGrossProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        R {metrics.unitGrossProfit.toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-stone-400 block">per garment</span>
+                    </div>
+
+                    <div>
+                      <span className="text-stone-400 block text-[11px]">Gross Margin</span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold font-mono ${
+                          metrics.marginPct >= 60 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                          metrics.marginPct >= 40 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                          'bg-red-500/20 text-red-300 border border-red-500/30'
+                        }`}>
+                          {metrics.marginPct}%
+                        </span>
+                        {metrics.markupPct > 0 && (
+                          <span className="text-[10px] text-stone-400 font-mono">({metrics.markupPct}% markup)</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-stone-400 block text-[11px]">Batch Capital Needed</span>
+                      <span className="text-base font-bold font-mono text-amber-400">
+                        R {metrics.totalCapitalNeeded.toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-stone-400 block">Out-of-pocket for {metrics.target} units</span>
+                    </div>
+
+                    <div>
+                      <span className="text-stone-400 block text-[11px]">Projected Net Profit</span>
+                      <span className={`text-base font-bold font-mono ${metrics.projectedNetProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        R {metrics.projectedNetProfit.toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-stone-400 block">Break-even at {metrics.breakEvenUnits} units</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Product Media Dropzone & Lookbook Photos */}
@@ -887,12 +1132,12 @@ export default function AdminCommercePage() {
                   Mark as Pre-order Batch Product
                 </span>
                 <span className="text-xs text-stone-400">
-                  (Accepts customer preorders with batch manufacturing notification)
+                  (R0.00 upfront reservation &bull; Unlocks 100% full or 50% deposit link once batch filled)
                 </span>
               </label>
 
               {isPreorder && (
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-3 pt-2 border-t border-amber-500/20">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-3 pt-2 border-t border-amber-500/20">
                   <div className="space-y-1">
                     <Label className="text-xs text-stone-300">Estimated Dispatch Notice</Label>
                     <Input
@@ -903,7 +1148,7 @@ export default function AdminCommercePage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-stone-300">Batch Target Units (Drop Goal)</Label>
+                    <Label className="text-xs text-stone-300">Batch Target Units (Goal to Unlock Production)</Label>
                     <Input
                       type="number"
                       value={preorderTarget}
@@ -911,19 +1156,6 @@ export default function AdminCommercePage() {
                       placeholder="e.g. 50"
                       className="bg-stone-950 border-stone-700 text-xs"
                     />
-                  </div>
-                  <div className="space-y-1">
-                    <Label className="text-xs text-amber-400 font-bold">Milestone Deposit %</Label>
-                    <Input
-                      type="number"
-                      min={10}
-                      max={100}
-                      value={preorderDepositPct}
-                      onChange={(e) => setPreorderDepositPct(e.target.value)}
-                      placeholder="50"
-                      className="bg-stone-950 border-amber-500/40 text-amber-400 font-bold text-xs"
-                    />
-                    <p className="text-[10px] text-stone-400">Default 50% upfront deposit</p>
                   </div>
                 </div>
               )}
@@ -1230,7 +1462,7 @@ export default function AdminCommercePage() {
             </div>
 
             <div className="space-y-1">
-              <Label>Base Price (ZAR)</Label>
+              <Label>Base Price (ZAR - Retail to Customer)</Label>
               <Input
                 type="number"
                 step="0.01"
@@ -1264,6 +1496,104 @@ export default function AdminCommercePage() {
                   <span>Inactive (Draft / Hidden)</span>
                 </label>
               </div>
+            </div>
+
+            {/* Edit Supplier Cost & Live Economics Card */}
+            <div className="md:col-span-2 rounded-xl border border-stone-800 bg-stone-950/70 p-4 space-y-4">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1">
+                <div className="flex items-center gap-2">
+                  <TrendingUp className="h-4 w-4 text-emerald-400" />
+                  <span className="text-sm font-bold text-white">Supplier Cost &amp; Profit Margin Economics</span>
+                </div>
+                <span className="text-xs text-stone-400">Unit margins, supplier procurement cost, &amp; batch returns</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                <div className="space-y-1">
+                  <Label className="text-xs text-stone-300">Supplier Cost Price (ZAR)</Label>
+                  <Input
+                    type="number"
+                    step="0.01"
+                    min="0"
+                    value={editCostPrice}
+                    onChange={(e) => setEditCostPrice(e.target.value)}
+                    placeholder="e.g. 185.00"
+                    className="bg-stone-900 border-stone-700 text-xs text-stone-100"
+                  />
+                  <p className="text-[10px] text-stone-400">Blank manufacturing / printing cost per unit</p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-stone-300">Supplier Name</Label>
+                  <Input
+                    value={editSupplierName}
+                    onChange={(e) => setEditSupplierName(e.target.value)}
+                    placeholder="e.g. Vic Bay / Amrod / Baron"
+                    className="bg-stone-900 border-stone-700 text-xs text-stone-100"
+                  />
+                  <p className="text-[10px] text-stone-400">Wholesale apparel manufacturer</p>
+                </div>
+
+                <div className="space-y-1">
+                  <Label className="text-xs text-stone-300">Supplier Blank SKU</Label>
+                  <Input
+                    value={editSupplierSku}
+                    onChange={(e) => setEditSupplierSku(e.target.value)}
+                    placeholder="e.g. VB-HVY-300GSM-BLK"
+                    className="bg-stone-900 border-stone-700 text-xs font-mono text-stone-100"
+                  />
+                  <p className="text-[10px] text-stone-400">Manufacturer catalog reference</p>
+                </div>
+              </div>
+
+              {/* Real-time Margin Economics calculation banner */}
+              {(() => {
+                const metrics = getMarginMetrics(editBasePrice, editCostPrice, editPreorderTarget);
+                if (metrics.retail <= 0 && metrics.cost <= 0) return null;
+                return (
+                  <div className="rounded-xl border border-stone-800 bg-stone-900/80 p-3.5 grid grid-cols-2 sm:grid-cols-4 gap-3 text-xs">
+                    <div>
+                      <span className="text-stone-400 block text-[11px]">Unit Gross Profit</span>
+                      <span className={`text-base font-bold font-mono ${metrics.unitGrossProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        R {metrics.unitGrossProfit.toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-stone-400 block">per garment</span>
+                    </div>
+
+                    <div>
+                      <span className="text-stone-400 block text-[11px]">Gross Margin</span>
+                      <div className="flex items-center gap-1.5 mt-0.5">
+                        <span className={`px-2 py-0.5 rounded text-xs font-bold font-mono ${
+                          metrics.marginPct >= 60 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30' :
+                          metrics.marginPct >= 40 ? 'bg-amber-500/20 text-amber-300 border border-amber-500/30' :
+                          'bg-red-500/20 text-red-300 border border-red-500/30'
+                        }`}>
+                          {metrics.marginPct}%
+                        </span>
+                        {metrics.markupPct > 0 && (
+                          <span className="text-[10px] text-stone-400 font-mono">({metrics.markupPct}% markup)</span>
+                        )}
+                      </div>
+                    </div>
+
+                    <div>
+                      <span className="text-stone-400 block text-[11px]">Batch Capital Needed</span>
+                      <span className="text-base font-bold font-mono text-amber-400">
+                        R {metrics.totalCapitalNeeded.toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-stone-400 block">Out-of-pocket for {metrics.target} units</span>
+                    </div>
+
+                    <div>
+                      <span className="text-stone-400 block text-[11px]">Projected Net Profit</span>
+                      <span className={`text-base font-bold font-mono ${metrics.projectedNetProfit >= 0 ? 'text-emerald-400' : 'text-red-400'}`}>
+                        R {metrics.projectedNetProfit.toFixed(2)}
+                      </span>
+                      <span className="text-[10px] text-stone-400 block">Break-even at {metrics.breakEvenUnits} units</span>
+                    </div>
+                  </div>
+                );
+              })()}
             </div>
 
             {/* Edit Product Media Dropzone & Photos */}
@@ -1434,7 +1764,7 @@ export default function AdminCommercePage() {
                   Mark as Pre-order Batch Product
                 </span>
                 <span className="text-xs text-stone-400">
-                  (Accepts customer preorders with batch manufacturing notification)
+                  (R0.00 upfront reservation &bull; Unlocks 100% full or 50% deposit link once batch filled)
                 </span>
               </label>
 
@@ -1450,7 +1780,7 @@ export default function AdminCommercePage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-stone-300">Batch Target Units (Drop Goal)</Label>
+                    <Label className="text-xs text-stone-300">Batch Target Units (Goal)</Label>
                     <Input
                       type="number"
                       value={editPreorderTarget}
@@ -1460,17 +1790,17 @@ export default function AdminCommercePage() {
                     />
                   </div>
                   <div className="space-y-1">
-                    <Label className="text-xs text-amber-400 font-bold">Milestone Deposit %</Label>
-                    <Input
-                      type="number"
-                      min={10}
-                      max={100}
-                      value={editPreorderDepositPct}
-                      onChange={(e) => setEditPreorderDepositPct(e.target.value)}
-                      placeholder="50"
-                      className="bg-stone-950 border-amber-500/40 text-amber-400 font-bold text-xs"
-                    />
-                    <p className="text-[10px] text-stone-400">Default 50% upfront deposit</p>
+                    <Label className="text-xs text-amber-400 font-bold">Batch Production Status</Label>
+                    <select
+                      value={editBatchStatus}
+                      onChange={(e) => setEditBatchStatus(e.target.value)}
+                      className="w-full rounded-md border border-amber-500/40 bg-stone-950 px-2.5 py-2 text-xs text-amber-300 font-medium focus:outline-none"
+                    >
+                      <option value="accumulating">Accumulating (R0 Upfront)</option>
+                      <option value="batch_filled">Batch Filled (Payment Unlocked)</option>
+                      <option value="in_production">In Production / Sourcing</option>
+                      <option value="completed">Completed / Dispatched</option>
+                    </select>
                   </div>
                 </div>
               )}
@@ -1873,8 +2203,8 @@ export default function AdminCommercePage() {
                   <tr>
                     <th className="py-3 px-4">Item Name</th>
                     <th className="py-3 px-4">Category</th>
-                    <th className="py-3 px-4">Price (ZAR)</th>
-                    <th className="py-3 px-4">Stock</th>
+                    <th className="py-3 px-4">Pricing &amp; Margin</th>
+                    <th className="py-3 px-4">Stock &amp; Batch</th>
                     <th className="py-3 px-4">Status</th>
                     <th className="py-3 px-4 text-right">Actions</th>
                   </tr>
@@ -1917,11 +2247,39 @@ export default function AdminCommercePage() {
                         <td className="py-3 px-4 text-stone-400">
                           {product.category_name || 'Uncategorized'}
                         </td>
-                        <td className="py-3 px-4 font-bold text-amber-400">
-                          R {Number(product.base_price).toFixed(2)}
+                        <td className="py-3 px-4">
+                          <div className="font-bold text-amber-400">
+                            R {Number(product.base_price).toFixed(2)}
+                          </div>
+                          <div className="text-[11px] text-stone-400 font-mono mt-0.5 flex items-center gap-1.5 flex-wrap">
+                            {product.cost_price != null ? (
+                              <>
+                                <span>Cost: R{Number(product.cost_price).toFixed(2)}</span>
+                                {product.base_price > 0 && (() => {
+                                  const margin = Math.round(((product.base_price - product.cost_price) / product.base_price) * 100);
+                                  return (
+                                    <span className={`inline-block px-1.5 py-0.2 rounded text-[10px] font-mono font-bold ${
+                                      margin >= 60 ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30' :
+                                      margin >= 40 ? 'bg-amber-500/15 text-amber-400 border border-amber-500/30' :
+                                      'bg-red-500/15 text-red-400 border border-red-500/30'
+                                    }`}>
+                                      {margin}% margin
+                                    </span>
+                                  );
+                                })()}
+                              </>
+                            ) : (
+                              <span className="text-stone-500">Cost: —</span>
+                            )}
+                          </div>
+                          {product.supplier_name && (
+                            <div className="text-[10px] text-stone-500 font-mono truncate max-w-[120px]">
+                              {product.supplier_name}
+                            </div>
+                          )}
                         </td>
                         <td className="py-3 px-4">
-                          <div>
+                          <div className="flex items-center gap-2 flex-wrap">
                             <span
                               className={`rounded px-2 py-0.5 text-xs font-mono font-bold ${
                                 product.is_preorder
@@ -1935,7 +2293,42 @@ export default function AdminCommercePage() {
                                 ? `Drop: ${product.preorder_claimed_count || 0}/${product.preorder_target || 50} Claimed`
                                 : `${totalStock} in stock`}
                             </span>
+
+                            {product.is_preorder && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => openBatchModal(product)}
+                                className="h-6 px-2 text-[10px] border-amber-500/40 text-amber-300 hover:bg-amber-500/15 font-semibold"
+                                title="Open batch sizing matrix and customer reservation list"
+                              >
+                                <Package className="mr-1 h-3 w-3" /> Batch Orders
+                              </Button>
+                            )}
                           </div>
+
+                          {product.is_preorder && (
+                            <div className="mt-1 flex items-center gap-1.5">
+                              <span className={`text-[10px] font-mono px-1.5 py-0.5 rounded uppercase font-semibold ${
+                                product.batch_status === 'batch_filled'
+                                  ? 'bg-emerald-500/15 text-emerald-400 border border-emerald-500/30'
+                                  : product.batch_status === 'in_production'
+                                  ? 'bg-blue-500/15 text-blue-400 border border-blue-500/30'
+                                  : product.batch_status === 'completed'
+                                  ? 'bg-purple-500/15 text-purple-400 border border-purple-500/30'
+                                  : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                              }`}>
+                                {product.batch_status === 'batch_filled'
+                                  ? 'Target Reached 🎉'
+                                  : product.batch_status === 'in_production'
+                                  ? 'In Production 🧵'
+                                  : product.batch_status === 'completed'
+                                  ? 'Dispatched / Done'
+                                  : 'Accumulating'}
+                              </span>
+                            </div>
+                          )}
+
                           {/* Colorway badges */}
                           {(() => {
                             const colors = Array.from(
@@ -1997,6 +2390,17 @@ export default function AdminCommercePage() {
                           </button>
                         </td>
                         <td className="py-3 px-4 text-right space-x-1">
+                          {product.is_preorder && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => openBatchModal(product)}
+                              className="text-amber-400 hover:text-amber-300 hover:bg-amber-500/10"
+                              title="Manage Batch Orders & Sizing Matrix"
+                            >
+                              <Layers className="h-4 w-4" />
+                            </Button>
+                          )}
                           <Button
                             variant="ghost"
                             size="sm"
@@ -2025,6 +2429,323 @@ export default function AdminCommercePage() {
           )}
         </CardContent>
       </Card>
+
+      {/* Batch Orders & Supplier Sizing Drawer / Modal */}
+      {selectedBatchProduct && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+          <Card className="w-full max-w-4xl max-h-[90vh] overflow-y-auto border-amber-500/40 bg-stone-900 shadow-2xl p-6 space-y-6">
+            <div className="flex items-start justify-between pb-4 border-b border-stone-800">
+              <div className="flex items-center gap-3">
+                <div className="h-12 w-12 rounded-xl bg-stone-950 border border-stone-800 overflow-hidden flex-shrink-0 flex items-center justify-center">
+                  {selectedBatchProduct.images && selectedBatchProduct.images.length > 0 ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img
+                      src={selectedBatchProduct.images[0]}
+                      alt={selectedBatchProduct.name}
+                      className="h-full w-full object-cover"
+                    />
+                  ) : (
+                    <ShoppingBag className="h-6 w-6 text-stone-600" />
+                  )}
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-xl font-bold text-white">{selectedBatchProduct.name}</h2>
+                    <span className="rounded bg-amber-500/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wider text-amber-400 border border-amber-500/40">
+                      Batch Management
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-400 font-mono mt-0.5">
+                    Supplier: {selectedBatchProduct.supplier_name || 'Unspecified'} &bull; SKU: {selectedBatchProduct.supplier_sku || 'N/A'} &bull; Retail: R {Number(selectedBatchProduct.base_price).toFixed(2)} &bull; Cost: R {Number(selectedBatchProduct.cost_price || 0).toFixed(2)}
+                  </p>
+                </div>
+              </div>
+
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedBatchProduct(null)}
+                className="text-stone-400 hover:text-white"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+            </div>
+
+            {batchLoading ? (
+              <div className="py-16 text-center text-stone-400 flex flex-col items-center justify-center gap-2">
+                <Loader2 className="h-8 w-8 text-amber-400 animate-spin" />
+                <span>Aggregating customer pre-orders and sizing matrix...</span>
+              </div>
+            ) : batchData ? (
+              <>
+                {batchNotifyMsg && (
+                  <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-300 flex items-center justify-between">
+                    <span>{batchNotifyMsg}</span>
+                    <button onClick={() => setBatchNotifyMsg(null)} className="text-stone-400 hover:text-white ml-2">
+                      <X className="h-3.5 w-3.5" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Batch Progress & Capital Economics */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 bg-stone-950 p-4 rounded-xl border border-stone-800 text-xs">
+                  <div>
+                    <span className="text-stone-400 block text-[11px]">Batch Progress</span>
+                    <div className="flex items-baseline gap-1 mt-0.5">
+                      <span className="text-xl font-bold font-mono text-amber-400">
+                        {batchData.totalUnits}
+                      </span>
+                      <span className="text-stone-500 font-mono">/ {batchData.target} units</span>
+                    </div>
+                    <div className="w-full bg-stone-800 h-1.5 rounded-full mt-1.5 overflow-hidden">
+                      <div
+                        className="bg-amber-500 h-full rounded-full transition-all duration-500"
+                        style={{
+                          width: `${Math.min(100, Math.round((batchData.totalUnits / (batchData.target || 1)) * 100))}%`,
+                        }}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <span className="text-stone-400 block text-[11px]">Out-of-Pocket Production Capital</span>
+                    <span className="text-xl font-bold font-mono text-white mt-0.5 block">
+                      R {((Number(selectedBatchProduct.cost_price || 0)) * batchData.totalUnits).toFixed(2)}
+                    </span>
+                    <span className="text-[10px] text-stone-500">
+                      R {Number(selectedBatchProduct.cost_price || 0).toFixed(2)} &times; {batchData.totalUnits} units
+                    </span>
+                  </div>
+
+                  <div>
+                    <span className="text-stone-400 block text-[11px]">Total Customer Commitment</span>
+                    <span className="text-xl font-bold font-mono text-amber-400 mt-0.5 block">
+                      R {batchData.totalCommittedValue.toFixed(2)}
+                    </span>
+                    <span className="text-[10px] text-stone-500">Across {batchData.orders.length} reserved order(s)</span>
+                  </div>
+
+                  <div>
+                    <span className="text-stone-400 block text-[11px]">Projected Net Margin</span>
+                    <span className="text-xl font-bold font-mono text-emerald-400 mt-0.5 block">
+                      R {(batchData.totalCommittedValue - ((Number(selectedBatchProduct.cost_price || 0)) * batchData.totalUnits)).toFixed(2)}
+                    </span>
+                    <span className="text-[10px] text-stone-500">After 100% production cost recovery</span>
+                  </div>
+                </div>
+
+                {/* Sizing Matrix for Procurement */}
+                <div className="bg-stone-950/60 p-4 rounded-xl border border-stone-800 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                    <div>
+                      <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                        <Package className="h-4 w-4 text-amber-400" />
+                        <span>Supplier Blank Procurement Breakdown</span>
+                      </h3>
+                      <p className="text-xs text-stone-400">
+                        Exact counts to send your wholesale blank distributor.
+                      </p>
+                    </div>
+
+                    <Button
+                      size="sm"
+                      onClick={copySupplierSizing}
+                      className="bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs h-8"
+                    >
+                      {copiedSizing ? (
+                        <>
+                          <Check className="mr-1.5 h-3.5 w-3.5" /> Copied Sizing Order!
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="mr-1.5 h-3.5 w-3.5" /> Copy Sizing for Supplier
+                        </>
+                      )}
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-2 sm:grid-cols-6 gap-2 pt-2">
+                    {Object.keys(batchData.sizeBreakdown).length === 0 ? (
+                      <div className="col-span-6 text-center text-xs text-stone-500 py-3">
+                        No pre-orders recorded yet.
+                      </div>
+                    ) : (
+                      Object.entries(batchData.sizeBreakdown).map(([size, count]) => (
+                        <div key={size} className="bg-stone-900 border border-stone-800 rounded-lg p-2.5 text-center">
+                          <span className="text-xs font-mono font-bold text-amber-400 block">Size {size}</span>
+                          <span className="text-lg font-bold font-mono text-white mt-0.5 block">{count}</span>
+                          <span className="text-[10px] text-stone-500 font-mono">blanks</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+
+                  {Object.keys(batchData.colorBreakdown).length > 0 && (
+                    <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-stone-800/60 text-xs">
+                      <span className="text-stone-400 font-mono text-[11px]">Color totals:</span>
+                      {Object.entries(batchData.colorBreakdown).map(([color, count]) => (
+                        <span key={color} className="rounded bg-stone-900 px-2 py-0.5 font-mono text-stone-200 border border-stone-800">
+                          {color}: <strong className="text-amber-400">{count}</strong>
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Batch Notification Action Strip */}
+                <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                  <div>
+                    <h4 className="text-sm font-bold text-white flex items-center gap-2">
+                      <Send className="h-4 w-4 text-amber-400" />
+                      <span>Batch Settlement &amp; Payment Dispatch</span>
+                    </h4>
+                    <p className="text-xs text-stone-300 mt-0.5">
+                      Notify customers via email with their personal link to pay either 100% full amount or 50% deposit before production.
+                    </p>
+                  </div>
+
+                  <Button
+                    onClick={handleNotifyBatchCustomers}
+                    disabled={batchNotifying || batchData.orders.length === 0}
+                    className="bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs shrink-0"
+                  >
+                    {batchNotifying ? (
+                      <>
+                        <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                        Dispatching Emails...
+                      </>
+                    ) : (
+                      <>
+                        <Send className="mr-1.5 h-3.5 w-3.5" />
+                        Notify {batchData.orders.length} Batch Customers
+                      </>
+                    )}
+                  </Button>
+                </div>
+
+                {/* Customer Orders Table */}
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-bold text-white">
+                      Customer Pre-order Reservations ({batchData.orders.length})
+                    </h3>
+                    <span className="text-xs text-stone-400">
+                      Direct WhatsApp message links &bull; No Meta automation required
+                    </span>
+                  </div>
+
+                  <div className="overflow-x-auto rounded-xl border border-stone-800">
+                    <table className="w-full text-left text-xs text-stone-300">
+                      <thead className="bg-stone-950/80 text-[11px] uppercase text-stone-400 border-b border-stone-800">
+                        <tr>
+                          <th className="py-2.5 px-3">Order</th>
+                          <th className="py-2.5 px-3">Customer</th>
+                          <th className="py-2.5 px-3">Items &amp; Sizes</th>
+                          <th className="py-2.5 px-3">Total / Balance</th>
+                          <th className="py-2.5 px-3">Status</th>
+                          <th className="py-2.5 px-3 text-right">Outreach</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-800 bg-stone-900/40 font-mono">
+                        {batchData.orders.length === 0 ? (
+                          <tr>
+                            <td colSpan={6} className="py-8 text-center text-stone-500 font-sans">
+                              No pre-orders placed yet.
+                            </td>
+                          </tr>
+                        ) : (
+                          batchData.orders.map((order: any) => (
+                            <tr key={order.id} className="hover:bg-stone-800/50">
+                              <td className="py-2.5 px-3 font-bold text-amber-400">
+                                {order.order_number}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <div className="font-sans font-medium text-white text-xs">
+                                  {order.customer_name || 'Customer'}
+                                </div>
+                                <div className="text-[11px] text-stone-400 font-mono">
+                                  {order.customer_email || '—'}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3 text-stone-300">
+                                {order.items?.map((it: any, i: number) => (
+                                  <div key={i} className="text-[11px]">
+                                    {it.quantity}x {it.product_name || 'Item'}
+                                  </div>
+                                ))}
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <div className="text-white font-bold">
+                                  R {Number(order.total_price || 0).toFixed(2)}
+                                </div>
+                                <div className="text-[10px] text-stone-400">
+                                  Bal: R {Number(order.balance_due || order.total_price || 0).toFixed(2)}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3">
+                                <span className={`px-2 py-0.5 rounded text-[10px] font-sans font-bold uppercase tracking-wider ${
+                                  order.status === 'paid' || order.status === 'completed'
+                                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                                    : order.status === 'batch_payment_requested'
+                                    ? 'bg-blue-500/20 text-blue-400 border border-blue-500/30'
+                                    : order.status === 'deposit_paid'
+                                    ? 'bg-amber-500/20 text-amber-400 border border-amber-500/30'
+                                    : 'bg-stone-800 text-amber-400 border border-amber-500/30'
+                                }`}>
+                                  {order.status === 'preorder_reserved' ? 'Reserved (R0)' : order.status}
+                                </span>
+                                {order.batch_notified_at && (
+                                  <div className="text-[9px] text-stone-500 mt-0.5 font-sans">
+                                    Notified: {new Date(order.batch_notified_at).toLocaleDateString()}
+                                  </div>
+                                )}
+                              </td>
+                              <td className="py-2.5 px-3 text-right space-x-1.5 font-sans">
+                                {order.whatsappLink && (
+                                  <a
+                                    href={order.whatsappLink}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-semibold text-[11px] transition-colors shadow-sm"
+                                    title="Open WhatsApp chat with prefilled payment link"
+                                  >
+                                    <Phone className="h-3 w-3" />
+                                    <span>WhatsApp</span>
+                                  </a>
+                                )}
+                                {order.paymentUrl && (
+                                  <button
+                                    type="button"
+                                    onClick={() => copyOrderPaymentLink(order.order_number, order.paymentUrl)}
+                                    className="inline-flex items-center gap-1 px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white text-[11px] transition-colors border border-stone-700"
+                                    title="Copy customer payment link"
+                                  >
+                                    {copiedLinkOrderId === order.order_number ? (
+                                      <>
+                                        <Check className="h-3 w-3 text-emerald-400" />
+                                        <span>Copied!</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Copy className="h-3 w-3" />
+                                        <span>Link</span>
+                                      </>
+                                    )}
+                                  </button>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </>
+            ) : null}
+          </Card>
+        </div>
+      )}
     </div>
   );
 }
