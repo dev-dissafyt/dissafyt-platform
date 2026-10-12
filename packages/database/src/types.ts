@@ -423,3 +423,41 @@ export interface FounderPassRedemption {
   redeemed_at: string;
 }
 
+// Product Pricing Survey types
+export type SurveyTierType = 'tier_50' | 'tier_75' | 'tier_100' | 'not_interested' | 'custom';
+
+export interface ProductSurveyVote {
+  id: string;
+  response_id: string;
+  product_id: string;
+  selected_price: number;
+  tier_selected: SurveyTierType;
+  margin_percentage: number;
+  estimated_profit?: number;
+  feedback_note?: string | null;
+  created_at: string;
+  product?: Product;
+}
+
+export interface ProductSurveyResponse {
+  id: string;
+  respondent_name?: string | null;
+  respondent_email?: string | null;
+  respondent_phone?: string | null;
+  general_feedback?: string | null;
+  source?: string;
+  ip_address?: string | null;
+  user_agent?: string | null;
+  created_at: string;
+  votes?: ProductSurveyVote[];
+}
+
+export interface ProductSurveyPricingTier {
+  key: SurveyTierType;
+  label: string;
+  price: number;
+  marginPct: number;
+  estimatedProfit: number;
+}
+
+

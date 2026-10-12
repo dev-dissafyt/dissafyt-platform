@@ -3,7 +3,8 @@
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input, Label } from '@dissafyt/ui';
-import { ShoppingBag, Plus, Trash2, CheckCircle, XCircle, Tag, Layers, RefreshCw, Package, Pencil, Copy, Check, ExternalLink, Share2, HelpCircle, Upload, Image as ImageIcon, Palette, Loader2, Sparkles, X, MessageSquare, TrendingUp, Percent, AlertCircle, Phone, Send, DollarSign } from 'lucide-react';
+import { ShoppingBag, Plus, Trash2, CheckCircle, XCircle, Tag, Layers, RefreshCw, Package, Pencil, Copy, Check, ExternalLink, Share2, HelpCircle, Upload, Image as ImageIcon, Palette, Loader2, Sparkles, X, MessageSquare, TrendingUp, Percent, AlertCircle, Phone, Send, DollarSign, BarChart3, Vote } from 'lucide-react';
+
 import { adminFetch } from '@/lib/operator';
 
 interface Variant {
@@ -56,6 +57,74 @@ interface Category {
   name: string;
   slug: string;
 }
+
+interface SurveyTierData {
+  tierKey: string;
+  customerDisplay: string;
+  price: number;
+  marginPct: number;
+  markupPct: number;
+  unitProfit: number;
+}
+
+interface ProductSurveyInsight {
+  product: Product;
+  tiers: {
+    cost: number;
+    currentRetail: number;
+    tiers: SurveyTierData[];
+  };
+  totalVotes: number;
+  interestedVotes: number;
+  tierCounts: {
+    tier_50: number;
+    tier_75: number;
+    tier_100: number;
+    not_interested: number;
+  };
+  tierPercentages: {
+    tier_50: number;
+    tier_75: number;
+    tier_100: number;
+    not_interested: number;
+  };
+  averageWillingnessToPay: number;
+  optimalTier: 'tier_50' | 'tier_75' | 'tier_100';
+  optimalPrice: number;
+  recommendationReason: string;
+  projectedProfitPerBatch: {
+    tier_50: number;
+    tier_75: number;
+    tier_100: number;
+  };
+}
+
+interface SurveySubmission {
+  id: string;
+  respondent_name?: string | null;
+  respondent_email?: string | null;
+  respondent_phone?: string | null;
+  general_feedback?: string | null;
+  source?: string;
+  created_at: string;
+  votes?: {
+    id: string;
+    product_id: string;
+    selected_price: number;
+    tier_selected: string;
+    margin_percentage: number;
+    feedback_note?: string | null;
+    created_at: string;
+  }[];
+}
+
+interface SurveyAnalyticsSummary {
+  totalResponses: number;
+  totalVotesCast: number;
+  productInsights: ProductSurveyInsight[];
+  recentSubmissions: SurveySubmission[];
+}
+
 
 interface StreetwearColorway {
   name: string;
@@ -138,6 +207,14 @@ export default function AdminCommercePage() {
   const [batchNotifyMsg, setBatchNotifyMsg] = useState<string | null>(null);
   const [copiedSizing, setCopiedSizing] = useState(false);
   const [copiedLinkOrderId, setCopiedLinkOrderId] = useState<string | null>(null);
+
+  // Subtab Navigation ('catalog' | 'survey_feedback')
+  const [activeSubtab, setActiveSubtab] = useState<'catalog' | 'survey_feedback'>('catalog');
+  const [surveyLoading, setSurveyLoading] = useState(false);
+  const [surveyData, setSurveyData] = useState<SurveyAnalyticsSummary | null>(null);
+  const [applyingPriceProductId, setApplyingPriceProductId] = useState<string | null>(null);
+  const [copiedSurveyUrl, setCopiedSurveyUrl] = useState(false);
+
 
   // Colorways & Size Matrix (Add Product)
   const [selectedColorways, setSelectedColorways] = useState<StreetwearColorway[]>([]);
@@ -483,15 +560,58 @@ export default function AdminCommercePage() {
     );
   }
 
+  async function loadSurveyFeedback() {
+    setSurveyLoading(true);
+    try {
+      const res = await adminFetch('/api/products/survey');
+      if (res.ok) {
+        const data = await res.json();
+        setSurveyData(data);
+      }
+    } catch (err) {
+      console.error('Failed to load survey feedback:', err);
+    } finally {
+      setSurveyLoading(false);
+    }
+  }
+
+  async function handleApplySurveyPrice(productId: string, newPrice: number) {
+    if (!confirm(`Apply R ${newPrice.toFixed(2)} as the official base price in the catalog?`)) {
+      return;
+    }
+    setApplyingPriceProductId(productId);
+    try {
+      const res = await adminFetch('/api/products/survey/apply', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ productId, newPrice }),
+      });
+      if (res.ok) {
+        setStatusMsg(`Product price updated to R ${newPrice.toFixed(2)} based on survey feedback.`);
+        loadData();
+        loadSurveyFeedback();
+      } else {
+        const json = await res.json();
+        alert(json.error || 'Failed to update price');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error updating price');
+    } finally {
+      setApplyingPriceProductId(null);
+    }
+  }
+
   async function loadData() {
     setLoading(true);
     try {
-      const [prodRes, catRes] = await Promise.all([
+      const [prodRes, catRes, surveyRes] = await Promise.all([
         adminFetch('/api/products', { cache: 'no-store' }),
         adminFetch('/api/categories', { cache: 'no-store' }),
+        adminFetch('/api/products/survey', { cache: 'no-store' }).catch(() => null),
       ]);
       if (prodRes.ok) setProducts(await prodRes.json());
       if (catRes.ok) setCategories(await catRes.json());
+      if (surveyRes && surveyRes.ok) setSurveyData(await surveyRes.json());
     } catch (e) {
       console.error(e);
     } finally {
@@ -502,6 +622,7 @@ export default function AdminCommercePage() {
   useEffect(() => {
     loadData();
   }, []);
+
 
   async function handleCreateProduct(e: React.FormEvent) {
     e.preventDefault();
@@ -810,8 +931,44 @@ export default function AdminCommercePage() {
         </div>
       )}
 
-      {/* Category Modal */}
-      {showCategoryModal && (
+      {/* Subtab Navigation */}
+      <div className="flex flex-wrap gap-2 border-b border-stone-800 pb-1">
+        <button
+          onClick={() => setActiveSubtab('catalog')}
+          className={`flex items-center px-4 py-2 text-sm font-semibold rounded-t-lg transition-all border-b-2 ${
+            activeSubtab === 'catalog'
+              ? 'border-amber-500 text-amber-400 bg-stone-900/80'
+              : 'border-transparent text-stone-400 hover:text-stone-200'
+          }`}
+        >
+          <ShoppingBag className="mr-2 h-4 w-4" /> Live Catalog &amp; Inventory ({products.length})
+        </button>
+
+        <button
+          onClick={() => {
+            setActiveSubtab('survey_feedback');
+            loadSurveyFeedback();
+          }}
+          className={`flex items-center px-4 py-2 text-sm font-semibold rounded-t-lg transition-all border-b-2 ${
+            activeSubtab === 'survey_feedback'
+              ? 'border-amber-500 text-amber-400 bg-stone-900/80'
+              : 'border-transparent text-stone-400 hover:text-stone-200'
+          }`}
+        >
+          <BarChart3 className="mr-2 h-4 w-4 text-amber-500" /> Survey Feedback &amp; Pricing Insights
+          {surveyData?.totalResponses ? (
+            <span className="ml-2 rounded-full bg-amber-500/20 px-2 py-0.5 text-xs text-amber-300 font-mono">
+              {surveyData.totalResponses}
+            </span>
+          ) : null}
+        </button>
+      </div>
+
+      {activeSubtab === 'catalog' && (
+        <>
+          {/* Category Modal */}
+          {showCategoryModal && (
+
         <Card className="border-stone-700 bg-stone-900 p-6 max-w-md">
           <CardHeader className="p-0 mb-4">
             <CardTitle className="text-lg text-white">Create New Category</CardTitle>
@@ -2767,6 +2924,475 @@ export default function AdminCommercePage() {
           </Card>
         </div>
       )}
+        </>
+      )}
+
+      {/* Subtab 2: Survey Feedback & Pricing Insights */}
+      {activeSubtab === 'survey_feedback' && (
+        <div className="space-y-6">
+          {/* Survey Feedback Header & Quick Actions */}
+          <Card className="border-amber-500/20 bg-stone-900/60 shadow-xl">
+            <CardHeader className="border-b border-stone-800/60 pb-4">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+                <div className="flex items-center space-x-3">
+                  <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                    <BarChart3 className="h-6 w-6" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-lg text-white flex items-center gap-2">
+                      <span>Pricing Survey Feedback &amp; Demand Elasticity</span>
+                      <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 uppercase font-semibold">
+                        Blind Interval Engine (50% &bull; 75% &bull; 100%)
+                      </span>
+                    </CardTitle>
+                    <CardDescription className="text-xs text-stone-400 mt-1">
+                      Prospect responses test price sensitivity without revealing profit margin tiers. Review community votes and apply sweet-spot pricing before launching.
+                    </CardDescription>
+                  </div>
+                </div>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={loadSurveyFeedback}
+                    disabled={surveyLoading}
+                    className="border-stone-700 text-stone-300 hover:text-white hover:bg-stone-800 text-xs"
+                  >
+                    <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${surveyLoading ? 'animate-spin' : ''}`} />
+                    Refresh Feedback
+                  </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      const url =
+                        typeof window !== 'undefined'
+                          ? `${window.location.origin}/survey`
+                          : 'https://dissafyt.com/survey';
+                      navigator.clipboard.writeText(url);
+                      setCopiedSurveyUrl(true);
+                      setTimeout(() => setCopiedSurveyUrl(false), 2000);
+                    }}
+                    className="bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 text-xs font-semibold"
+                  >
+                    {copiedSurveyUrl ? (
+                      <>
+                        <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-400" />
+                        <span>Link Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="mr-1.5 h-3.5 w-3.5 text-amber-400" />
+                        <span>Copy Survey URL</span>
+                      </>
+                    )}
+                  </Button>
+                  <a
+                    href="/survey"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition"
+                  >
+                    <span>Open Survey Form</span>
+                    <ExternalLink className="h-3.5 w-3.5" />
+                  </a>
+                </div>
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-4">
+              {/* KPI Stats Bar */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
+                <div className="bg-stone-950/60 border border-stone-800/80 rounded-xl p-3">
+                  <span className="text-stone-500 block text-[11px]">Total Respondents:</span>
+                  <span className="text-white font-bold text-lg">{surveyData?.totalResponses || 0}</span>
+                </div>
+                <div className="bg-stone-950/60 border border-stone-800/80 rounded-xl p-3">
+                  <span className="text-stone-500 block text-[11px]">Total Item Votes:</span>
+                  <span className="text-amber-400 font-bold text-lg">{surveyData?.totalVotesCast || 0}</span>
+                </div>
+                <div className="bg-stone-950/60 border border-stone-800/80 rounded-xl p-3">
+                  <span className="text-stone-500 block text-[11px]">Survey Status:</span>
+                  <span className="text-emerald-400 font-bold text-sm">Active &amp; Collecting</span>
+                </div>
+                <div className="bg-stone-950/60 border border-stone-800/80 rounded-xl p-3">
+                  <span className="text-stone-500 block text-[11px]">Profit Intervals:</span>
+                  <span className="text-stone-300 font-bold text-sm">+25% (50% / 75% / 100%)</span>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Product-by-Product Insights */}
+          <div className="space-y-4">
+            <h3 className="text-base font-bold text-white uppercase tracking-wider flex items-center gap-2">
+              <span>Product Elasticity &amp; Sweet-Spot Pricing</span>
+              <span className="text-xs font-mono text-stone-500">
+                ({surveyData?.productInsights.length || 0} Products)
+              </span>
+            </h3>
+
+            {surveyLoading ? (
+              <div className="py-12 text-center text-stone-500 font-mono text-xs">
+                Loading pricing insights &amp; votes...
+              </div>
+            ) : !surveyData || surveyData.productInsights.length === 0 ? (
+              <Card className="border-stone-800 bg-stone-900/40 p-8 text-center text-stone-500">
+                No survey feedback recorded yet. Share the survey link with prospects to collect data.
+              </Card>
+            ) : (
+              <div className="grid grid-cols-1 gap-6">
+                {surveyData.productInsights.map((insight) => {
+                  const p = insight.product;
+                  const isApplying = applyingPriceProductId === p.id;
+                  const currentPrice = Number(p.base_price);
+                  const isAtOptimal = Math.round(currentPrice) === Math.round(insight.optimalPrice);
+
+                  return (
+                    <Card
+                      key={p.id}
+                      className="border-stone-800 bg-stone-900/60 hover:border-stone-700 transition overflow-hidden"
+                    >
+                      <div className="p-5 sm:p-6 space-y-6">
+                        {/* Product Header Row */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-800/80">
+                          <div className="flex items-center space-x-3.5">
+                            <div className="relative h-14 w-14 rounded-xl overflow-hidden bg-stone-950 border border-stone-800 flex-shrink-0">
+                              {p.images && p.images[0] ? (
+                                <img
+                                  src={p.images[0]}
+                                  alt={p.name}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <div className="h-full w-full flex items-center justify-center text-stone-700 text-[10px] font-mono">
+                                  NO IMG
+                                </div>
+                              )}
+                            </div>
+                            <div>
+                              <h4 className="text-base font-bold text-white">{p.name}</h4>
+                              <div className="flex flex-wrap items-center gap-2 pt-1 text-xs font-mono text-stone-400">
+                                <span>
+                                  Current Catalog Price:{' '}
+                                  <strong className="text-white">R {currentPrice.toFixed(2)}</strong>
+                                </span>
+                                <span>&bull;</span>
+                                <span>
+                                  Cost Price:{' '}
+                                  <strong className="text-amber-400">
+                                    R {(Number(p.cost_price) || insight.tiers.cost).toFixed(2)}
+                                  </strong>
+                                </span>
+                                <span>&bull;</span>
+                                <span className="text-stone-400">
+                                  Total Votes: <strong className="text-white">{insight.totalVotes}</strong>
+                                </span>
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* Recommendation Badge & Action */}
+                          <div className="flex flex-col sm:items-end gap-1.5">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xs font-mono text-stone-400">Optimal Price:</span>
+                              <span className="text-sm font-black text-amber-400 font-mono px-2.5 py-1 rounded-lg bg-amber-500/10 border border-amber-500/30">
+                                R {insight.optimalPrice.toFixed(0)}
+                              </span>
+                            </div>
+                            <Button
+                              size="sm"
+                              disabled={isApplying || isAtOptimal}
+                              onClick={() => handleApplySurveyPrice(p.id, insight.optimalPrice)}
+                              className={`text-xs font-bold ${
+                                isAtOptimal
+                                  ? 'bg-stone-800 text-stone-500 border border-stone-700 cursor-not-allowed'
+                                  : 'bg-amber-500 hover:bg-amber-400 text-black'
+                              }`}
+                            >
+                              {isApplying ? (
+                                'Applying...'
+                              ) : isAtOptimal ? (
+                                'Catalog Matched'
+                              ) : (
+                                `Apply R ${insight.optimalPrice.toFixed(0)} to Catalog`
+                              )}
+                            </Button>
+                          </div>
+                        </div>
+
+                        {/* Recommendation Reasoning Banner */}
+                        <div className="p-3 rounded-xl border border-stone-800 bg-stone-950/60 flex items-start gap-2.5 text-xs">
+                          <Sparkles className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
+                          <div>
+                            <span className="text-amber-400 font-bold block mb-0.5">
+                              Pricing Recommendation:
+                            </span>
+                            <p className="text-stone-300 leading-relaxed">
+                              {insight.recommendationReason}
+                            </p>
+                          </div>
+                        </div>
+
+                        {/* 3 Interval Brackets Comparison Grid */}
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                          {/* Tier 50% */}
+                          <div
+                            className={`p-3.5 rounded-xl border transition-all ${
+                              insight.optimalTier === 'tier_50'
+                                ? 'border-amber-500/60 bg-amber-500/5'
+                                : 'border-stone-800 bg-stone-950/40'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-xs mb-2">
+                              <span className="font-mono text-stone-400 uppercase text-[10px]">
+                                Tier 1 (50% Margin)
+                              </span>
+                              {insight.optimalTier === 'tier_50' && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-black font-mono">
+                                  BEST
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-lg font-black text-white font-mono">
+                              {insight.tiers.tiers[0].customerDisplay}
+                            </div>
+                            <div className="text-[11px] text-stone-400 font-mono mt-1">
+                              Unit Profit: R {insight.tiers.tiers[0].unitProfit.toFixed(0)}
+                            </div>
+
+                            {/* Vote share bar */}
+                            <div className="mt-3 space-y-1">
+                              <div className="flex justify-between text-[11px] font-mono text-stone-400">
+                                <span>{insight.tierCounts.tier_50} votes</span>
+                                <span className="text-white font-bold">{insight.tierPercentages.tier_50}%</span>
+                              </div>
+                              <div className="w-full bg-stone-800 h-1.5 rounded-full overflow-hidden">
+                                <div
+                                  className="bg-amber-500 h-full rounded-full"
+                                  style={{ width: `${insight.tierPercentages.tier_50}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="mt-3 pt-2 border-t border-stone-800 text-[11px] font-mono text-stone-400 flex justify-between">
+                              <span>Projected Batch Net:</span>
+                              <span className="text-white font-bold">
+                                R {insight.projectedProfitPerBatch.tier_50.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Tier 75% */}
+                          <div
+                            className={`p-3.5 rounded-xl border transition-all ${
+                              insight.optimalTier === 'tier_75'
+                                ? 'border-amber-500/60 bg-amber-500/5'
+                                : 'border-stone-800 bg-stone-950/40'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-xs mb-2">
+                              <span className="font-mono text-stone-400 uppercase text-[10px]">
+                                Tier 2 (75% Margin)
+                              </span>
+                              {insight.optimalTier === 'tier_75' && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-black font-mono">
+                                  BEST
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-lg font-black text-white font-mono">
+                              {insight.tiers.tiers[1].customerDisplay}
+                            </div>
+                            <div className="text-[11px] text-stone-400 font-mono mt-1">
+                              Unit Profit: R {insight.tiers.tiers[1].unitProfit.toFixed(0)}
+                            </div>
+
+                            {/* Vote share bar */}
+                            <div className="mt-3 space-y-1">
+                              <div className="flex justify-between text-[11px] font-mono text-stone-400">
+                                <span>{insight.tierCounts.tier_75} votes</span>
+                                <span className="text-white font-bold">{insight.tierPercentages.tier_75}%</span>
+                              </div>
+                              <div className="w-full bg-stone-800 h-1.5 rounded-full overflow-hidden">
+                                <div
+                                  className="bg-amber-500 h-full rounded-full"
+                                  style={{ width: `${insight.tierPercentages.tier_75}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="mt-3 pt-2 border-t border-stone-800 text-[11px] font-mono text-stone-400 flex justify-between">
+                              <span>Projected Batch Net:</span>
+                              <span className="text-white font-bold">
+                                R {insight.projectedProfitPerBatch.tier_75.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+
+                          {/* Tier 100% */}
+                          <div
+                            className={`p-3.5 rounded-xl border transition-all ${
+                              insight.optimalTier === 'tier_100'
+                                ? 'border-amber-500/60 bg-amber-500/5'
+                                : 'border-stone-800 bg-stone-950/40'
+                            }`}
+                          >
+                            <div className="flex items-center justify-between text-xs mb-2">
+                              <span className="font-mono text-stone-400 uppercase text-[10px]">
+                                Tier 3 (100% Margin)
+                              </span>
+                              {insight.optimalTier === 'tier_100' && (
+                                <span className="px-1.5 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-black font-mono">
+                                  BEST
+                                </span>
+                              )}
+                            </div>
+                            <div className="text-lg font-black text-white font-mono">
+                              {insight.tiers.tiers[2].customerDisplay}
+                            </div>
+                            <div className="text-[11px] text-stone-400 font-mono mt-1">
+                              Unit Profit: R {insight.tiers.tiers[2].unitProfit.toFixed(0)}
+                            </div>
+
+                            {/* Vote share bar */}
+                            <div className="mt-3 space-y-1">
+                              <div className="flex justify-between text-[11px] font-mono text-stone-400">
+                                <span>{insight.tierCounts.tier_100} votes</span>
+                                <span className="text-white font-bold">{insight.tierPercentages.tier_100}%</span>
+                              </div>
+                              <div className="w-full bg-stone-800 h-1.5 rounded-full overflow-hidden">
+                                <div
+                                  className="bg-amber-500 h-full rounded-full"
+                                  style={{ width: `${insight.tierPercentages.tier_100}%` }}
+                                />
+                              </div>
+                            </div>
+
+                            <div className="mt-3 pt-2 border-t border-stone-800 text-[11px] font-mono text-stone-400 flex justify-between">
+                              <span>Projected Batch Net:</span>
+                              <span className="text-white font-bold">
+                                R {insight.projectedProfitPerBatch.tier_100.toLocaleString()}
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Below budget note if any */}
+                        {insight.tierCounts.not_interested > 0 && (
+                          <div className="text-[11px] font-mono text-stone-500">
+                            * {insight.tierCounts.not_interested} respondents ({insight.tierPercentages.not_interested}%) flagged this item as above their budget.
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          {/* Recent Submissions Feed */}
+          <Card className="border-stone-800 bg-stone-900/50">
+            <CardHeader>
+              <CardTitle className="text-base text-white flex items-center justify-between">
+                <span>Recent Survey Submissions</span>
+                <span className="text-xs font-mono text-stone-400 font-normal">
+                  {surveyData?.recentSubmissions.length || 0} Submissions
+                </span>
+              </CardTitle>
+              <CardDescription className="text-xs text-stone-400">
+                Prospect contacts, their selected price votes, and comments.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              {!surveyData || surveyData.recentSubmissions.length === 0 ? (
+                <div className="py-8 text-center text-stone-500 text-xs">
+                  No submissions recorded yet. Share the survey form link with prospects.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-stone-800 text-[11px] font-mono text-stone-400 uppercase">
+                      <tr>
+                        <th className="py-3 px-4">Date</th>
+                        <th className="py-3 px-4">Prospect</th>
+                        <th className="py-3 px-4">Contact</th>
+                        <th className="py-3 px-4">Votes Cast</th>
+                        <th className="py-3 px-4">Comments / Wishlist</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-800/60 font-mono">
+                      {surveyData.recentSubmissions.map((sub) => {
+                        const dateStr = new Date(sub.created_at).toLocaleDateString('en-ZA', {
+                          month: 'short',
+                          day: 'numeric',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        });
+
+                        const cleanPhone = sub.respondent_phone
+                          ? sub.respondent_phone.replace(/[^0-9]/g, '')
+                          : '';
+                        const waPhone = cleanPhone.startsWith('0')
+                          ? '27' + cleanPhone.slice(1)
+                          : cleanPhone;
+
+                        return (
+                          <tr key={sub.id} className="hover:bg-stone-800/30">
+                            <td className="py-3 px-4 text-stone-400 whitespace-nowrap">{dateStr}</td>
+                            <td className="py-3 px-4 text-white font-sans font-medium">
+                              {sub.respondent_name || 'Anonymous Prospect'}
+                            </td>
+                            <td className="py-3 px-4 text-stone-300">
+                              <div>{sub.respondent_email || '—'}</div>
+                              {sub.respondent_phone && (
+                                <div className="text-[11px] text-stone-500">{sub.respondent_phone}</div>
+                              )}
+                            </td>
+                            <td className="py-3 px-4">
+                              <div className="flex flex-wrap gap-1">
+                                {(sub.votes || []).map((v) => (
+                                  <span
+                                    key={v.id}
+                                    className="px-1.5 py-0.5 rounded text-[10px] bg-stone-800 text-amber-300 border border-stone-700"
+                                  >
+                                    {v.selected_price > 0 ? `R ${v.selected_price}` : 'Budget'}
+                                  </span>
+                                ))}
+                              </div>
+                            </td>
+                            <td className="py-3 px-4 text-stone-400 font-sans max-w-xs truncate">
+                              {sub.general_feedback || '—'}
+                            </td>
+                            <td className="py-3 px-4 text-right whitespace-nowrap">
+                              {waPhone ? (
+                                <a
+                                  href={`https://wa.me/${waPhone}?text=${encodeURIComponent(
+                                    `Hi ${sub.respondent_name || 'there'}! Thank you for voting in the Dissafyt pricing survey. Here is your VIP drop link:`
+                                  )}`}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 text-[11px] font-sans hover:bg-emerald-600/30"
+                                >
+                                  <Phone className="h-3 w-3" /> WhatsApp
+                                </a>
+                              ) : (
+                                <span className="text-stone-600 text-[11px]">—</span>
+                              )}
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
     </div>
   );
 }
