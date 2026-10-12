@@ -71,7 +71,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { items, shippingAddress, fulfillmentChoice, collectionLocationId, promo_code, discount_amount } = body;
+    const { items, shippingAddress, fulfillmentChoice, collectionLocationId, promo_code } = body;
 
     if (!items || !items.length || !shippingAddress) {
       return NextResponse.json({ error: 'Items and shippingAddress are required' }, { status: 400 });
@@ -91,7 +91,6 @@ export async function POST(request: NextRequest) {
       fulfillment_choice: fulfillmentChoice || 'courier',
       collection_location_id: collectionLocationId || 'loc-cpt-flagship',
       promo_code: promo_code || null,
-      discount_amount: discount_amount || null,
     });
 
     if (!result.success || !result.order) {
@@ -107,7 +106,7 @@ export async function POST(request: NextRequest) {
       : Number(order.total);
 
     // If order is pure pre-order reservation, no upfront payment is charged today
-    const isPreorderReserved = order.status === 'preorder_reserved' || amountToPayToday <= 0;
+    const isPreorderReserved = order.status === 'preorder_reserved';
     if (isPreorderReserved) {
       return NextResponse.json({
         order,

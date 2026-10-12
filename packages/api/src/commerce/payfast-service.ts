@@ -185,21 +185,9 @@ export class PayfastService {
     const sigReceivedWithPass = this.generateSignature(payload, passphrase, false);
     if (sigReceivedWithPass.toLowerCase() === targetSig) return true;
 
-    // 2. Check in received order without passphrase (in case merchant dashboard has no passphrase set)
-    if (passphrase) {
-      const sigReceivedNoPass = this.generateSignature(payload, '', false);
-      if (sigReceivedNoPass.toLowerCase() === targetSig) return true;
-    }
-
-    // 3. Check in canonical order with configured passphrase
+    // 2. Check in canonical order with configured passphrase
     const sigCanonicalWithPass = this.generateSignature(payload, passphrase, true);
     if (sigCanonicalWithPass.toLowerCase() === targetSig) return true;
-
-    // 4. Check in canonical order without passphrase
-    if (passphrase) {
-      const sigCanonicalNoPass = this.generateSignature(payload, '', true);
-      if (sigCanonicalNoPass.toLowerCase() === targetSig) return true;
-    }
 
     return false;
   }

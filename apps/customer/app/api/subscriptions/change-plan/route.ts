@@ -73,8 +73,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // If sandbox demo mode, or activating directly
-    if (isSandboxDemo || !currentSub?.payfast_token || currentSub.payfast_token.startsWith('sandbox_') || currentSub.payfast_token.startsWith('PF_CONFIRM_')) {
+    const userEmail = (authCtx.email || '').toLowerCase();
+    const isAdmin =
+      userEmail === 'curtislee@dissafyt.com' ||
+      userEmail === 'dissafyt@gmail.com' ||
+      (authCtx.roles || []).includes('admin');
+
+    // Only platform admins explicitly requesting sandbox demo may bypass PayFast checkout
+    if (isSandboxDemo && isAdmin) {
       let updatedSub = null;
 
       if (currentSub) {

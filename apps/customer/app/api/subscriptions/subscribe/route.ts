@@ -92,8 +92,14 @@ export async function POST(request: NextRequest) {
     const startDate = new Date();
     const endDate = new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-    // If sandbox demo activation is requested (for instant staging/testing without external card swipe)
-    if (isSandboxDemo) {
+    const userEmail = (authCtx.email || '').toLowerCase();
+    const isAdmin =
+      userEmail === 'curtislee@dissafyt.com' ||
+      userEmail === 'dissafyt@gmail.com' ||
+      (authCtx.roles || []).includes('admin');
+
+    // Only platform administrators may trigger sandbox demo activation without PayFast checkout
+    if (isSandboxDemo && isAdmin) {
       let subRecord = null;
       try {
         const { data, error: subErr } = await admin

@@ -106,21 +106,31 @@ export async function GET(
       return NextResponse.json({ error: 'Unauthorized to view this appointment' }, { status: 403 });
     }
 
-    // If client returns from PayFast with ?paid=1 and booking is still pending, confirm it immediately
+    // If client returns from PayFast with ?paid=1 and booking is still pending, verify payment record before confirming
     const { searchParams } = new URL(request.url);
     if (searchParams.get('paid') === '1' && booking.status === 'pending') {
-      await adminClient
-        .from('bookings')
-        .update({
-          status: 'confirmed',
-          payment_status: 'paid_online',
-          notes: 'PayFast checkout completed',
-          updated_at: new Date().toISOString(),
-        })
-        .eq('id', booking.id);
+      const { data: verifiedPayment } = await adminClient
+        .from('payments')
+        .select('id, status, provider_reference')
+        .eq('related_id', booking.id)
+        .eq('status', 'paid')
+        .maybeSingle();
 
-      booking.status = 'confirmed';
-      booking.payment_status = 'paid_online';
+      if (verifiedPayment) {
+        await adminClient
+          .from('bookings')
+          .update({
+            status: 'confirmed',
+            payment_status: 'paid_online',
+            payment_id: verifiedPayment.id,
+            notes: 'PayFast checkout verified',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', booking.id);
+
+        booking.status = 'confirmed';
+        booking.payment_status = 'paid_online';
+      }
     }
 
     return NextResponse.json({ success: true, booking });

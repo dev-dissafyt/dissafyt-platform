@@ -220,13 +220,11 @@ export class OrderService {
       const fulfillmentChoice = input.fulfillment_choice === 'studio_collection' ? 'studio_collection' : 'courier';
       const shippingCost = fulfillmentChoice === 'studio_collection' ? 0 : (input.shipping_cost || 0);
 
-      // Validate promo code and calculate discount
+      // Validate promo code authoritatively on the server (never trust client-sent discount_amount)
       let discountAmount = 0;
       const normalizedPromo = (input.promo_code || '').trim().toLowerCase();
       if (normalizedPromo === 'firstbuy26') {
         discountAmount = 20.00; // Survey completion voucher: R20.00 OFF
-      } else if (input.discount_amount && Number(input.discount_amount) > 0) {
-        discountAmount = Number(input.discount_amount);
       }
 
       const grossTotal = orderSubtotal + shippingCost;

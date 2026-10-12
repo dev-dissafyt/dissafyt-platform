@@ -370,7 +370,7 @@ export default function AccountPage() {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ targetPlanCode: selectedChangePlanCode, isSandboxDemo: true }),
+        body: JSON.stringify({ targetPlanCode: selectedChangePlanCode }),
       });
       const data = await res.json();
       if (res.ok) {

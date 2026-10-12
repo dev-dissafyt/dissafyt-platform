@@ -77,9 +77,39 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // 2. If not found, provision active subscription in subscriptions & payments
-    const startDate = new Date();
-    const endDate = new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+    // 2. Verify that a legitimate paid subscription payment exists in public.payments
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { data: verifiedPayment } = await admin
+      .from('payments')
+      .select('*')
+      .eq('user_id', authCtx.userId)
+      .eq('status', 'paid')
+      .eq('related_type', 'subscription')
+      .gte('created_at', thirtyDaysAgo)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (
+      !verifiedPayment ||
+      !verifiedPayment.provider_reference ||
+      verifiedPayment.provider_reference.startsWith('PF_CONFIRM_') ||
+      verifiedPayment.provider_reference.startsWith('sandbox_')
+    ) {
+      return NextResponse.json(
+        {
+          success: false,
+          activated: false,
+          pendingWebhook: true,
+          message: 'Awaiting verified PayFast payment notification.',
+        },
+        { status: 202 }
+      );
+    }
+
+    // 3. Reconcile active subscription only when backed by a verified PayFast payment
+    const payDate = new Date(verifiedPayment.created_at);
+    const endDate = new Date(payDate.getTime() + 30 * 24 * 60 * 60 * 1000);
     let newSub = null;
 
     try {
@@ -89,11 +119,11 @@ export async function POST(request: NextRequest) {
           user_id: authCtx.userId,
           plan_code: planCode,
           plan_name: plan.name,
-          price: plan.price,
+          price: Number(verifiedPayment.amount) || plan.price,
           status: 'active',
-          current_period_start: startDate.toISOString(),
+          current_period_start: payDate.toISOString(),
           current_period_end: endDate.toISOString(),
-          payfast_token: `PF_CONFIRM_${Date.now()}`,
+          payfast_token: verifiedPayment.provider_reference,
         })
         .select()
         .single();
@@ -107,32 +137,10 @@ export async function POST(request: NextRequest) {
       console.warn('Subscriptions insert exception:', e);
     }
 
-    // Record in payments table
-    try {
-      await admin.from('payments').insert({
-        user_id: authCtx.userId,
-        provider: 'payfast',
-        provider_reference: `PF_CONFIRM_${Date.now()}`,
-        amount: plan.price,
-        currency: 'ZAR',
-        status: 'paid',
-        related_type: 'subscription',
-        related_id: newSub?.id || authCtx.userId,
-      });
-    } catch (payErr) {
-      console.warn('Payments record insert error:', payErr);
-    }
-
     return NextResponse.json({
       success: true,
-      activated: true,
-      subscription: newSub || {
-        user_id: authCtx.userId,
-        plan_code: planCode,
-        plan_name: plan.name,
-        price: plan.price,
-        status: 'active',
-      },
+      activated: Boolean(newSub),
+      subscription: newSub,
     });
   } catch (err: any) {
     console.error('Subscription confirmation error:', err);

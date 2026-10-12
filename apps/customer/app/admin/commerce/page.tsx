@@ -359,7 +359,7 @@ export default function AdminCommercePage() {
     for (let i = 0; i < files.length; i++) {
       formData.append('files', files[i]);
     }
-    const res = await fetch('/api/products/upload-image', {
+    const res = await adminFetch('/api/products/upload-image', {
       method: 'POST',
       body: formData,
     });

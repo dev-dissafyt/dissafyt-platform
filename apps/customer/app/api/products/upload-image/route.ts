@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdminClient } from '@dissafyt/database';
+import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 import sharp from 'sharp';
 
 export const dynamic = 'force-dynamic';
@@ -63,6 +64,9 @@ async function compressProductImage(inputBuffer: Buffer, fileName: string): Prom
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireAdminAuth(request, 'product:edit');
+  if (isAuthFailure(auth)) return auth;
+
   try {
     const formData = await request.formData();
     const files = formData.getAll('files') as File[];
