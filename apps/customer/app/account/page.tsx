@@ -726,57 +726,51 @@ export default function AccountPage() {
 
   return (
     <div className="container mx-auto max-w-5xl px-4 py-8 sm:py-10 space-y-6">
-      {/* Unified Identity Overview Hero Banner */}
-      <div className="rounded-2xl border border-zinc-800/90 bg-gradient-to-br from-zinc-900/90 via-zinc-950 to-zinc-950 p-5 sm:p-6 shadow-xl">
-        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <div className="h-14 w-14 rounded-2xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-lg font-mono shadow-inner flex-shrink-0">
+      {/* Unified Identity Overview Hero Banner (Mobile-Simplified) */}
+      <div className="rounded-2xl border border-zinc-800/90 bg-gradient-to-br from-zinc-900/90 via-zinc-950 to-zinc-950 p-3.5 sm:p-5 shadow-xl">
+        <div className="flex items-center justify-between gap-2.5 sm:gap-4">
+          <div className="flex items-center gap-3 min-w-0">
+            <div className="h-10 w-10 sm:h-12 sm:w-12 rounded-xl bg-amber-500/15 border border-amber-500/30 flex items-center justify-center text-amber-400 font-bold text-sm sm:text-base font-mono shadow-inner flex-shrink-0">
               {userInitials || 'DF'}
             </div>
-            <div className="space-y-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <h1 className="text-xl sm:text-2xl font-bold text-white tracking-tight">
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h1 className="text-base sm:text-xl font-bold text-white tracking-tight truncate">
                   {fullName || 'Dissafyt Member'}
                 </h1>
                 {subscription && (
-                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-[10px] font-mono font-bold uppercase text-amber-300">
+                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[9px] sm:text-[10px] font-mono font-bold uppercase text-amber-300 flex-shrink-0">
                     <Sparkles className="h-2.5 w-2.5 text-amber-400" />
-                    VIP Guild
+                    VIP
                   </span>
                 )}
-                {user?.roles?.map((role) => (
-                  <span
-                    key={role}
-                    className="rounded-full bg-zinc-800/90 border border-zinc-700/70 px-2 py-0.5 text-[10px] font-mono uppercase text-zinc-300"
-                  >
-                    {role}
-                  </span>
-                ))}
               </div>
-              <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-zinc-400">
-                <span>{user?.email}</span>
+              <div className="flex items-center gap-2 text-[11px] sm:text-xs text-zinc-400 truncate">
+                <span className="truncate">{user?.email}</span>
                 {phone && (
-                  <>
-                    <span className="text-zinc-700">&bull;</span>
-                    <span className="font-mono text-zinc-300">{phone}</span>
-                  </>
+                  <span className="hidden sm:inline font-mono text-zinc-300">
+                    &bull; {phone}
+                  </span>
                 )}
               </div>
             </div>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 self-start sm:self-center">
+          <div className="flex items-center gap-1.5 sm:gap-2 flex-shrink-0">
             <Link href="/book">
-              <Button size="sm" className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-8">
-                <Scissors className="mr-1.5 h-3.5 w-3.5" />
-                Book Cut
+              <Button
+                size="sm"
+                className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-8 px-2.5 sm:px-3"
+              >
+                <Scissors className="h-3.5 w-3.5 sm:mr-1.5" />
+                <span className="hidden xs:inline sm:inline ml-1 sm:ml-0">Book</span>
               </Button>
             </Link>
-            <Link href="/shop">
+            <Link href="/shop" className="hidden sm:block">
               <Button
                 variant="outline"
                 size="sm"
-                className="border-zinc-700 text-zinc-200 hover:bg-zinc-800 text-xs h-8"
+                className="border-zinc-700 text-zinc-200 hover:bg-zinc-800 text-xs h-8 px-3"
               >
                 <ShoppingBag className="mr-1.5 h-3.5 w-3.5 text-amber-400" />
                 Shop
@@ -786,40 +780,43 @@ export default function AccountPage() {
               variant="ghost"
               size="sm"
               onClick={handleLogout}
-              className="text-zinc-400 hover:text-white hover:bg-zinc-800/80 text-xs h-8 px-2.5"
+              title="Sign Out"
+              className="text-zinc-400 hover:text-white hover:bg-zinc-800/80 text-xs h-8 px-2 sm:px-2.5"
             >
-              <LogOut className="mr-1.5 h-3.5 w-3.5" />
-              Sign Out
+              <LogOut className="h-3.5 w-3.5 sm:mr-1.5" />
+              <span className="hidden sm:inline">Sign Out</span>
             </Button>
           </div>
         </div>
 
-        {/* 3 Interactive Sync Summary Tiles */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-4 mt-4 border-t border-zinc-800/80">
+        {/* Compact 3-Column Sync Strip (Single Row on Mobile & Desktop) */}
+        <div className="grid grid-cols-3 gap-2 sm:gap-3 pt-3 mt-3 border-t border-zinc-800/80">
           <button
             type="button"
             onClick={() => setActiveTab('barbershop')}
-            className={`text-left rounded-xl p-3 border transition-all ${
+            className={`text-left rounded-xl p-2 sm:p-3 border transition-all min-w-0 ${
               activeTab === 'barbershop'
                 ? 'bg-amber-500/10 border-amber-500/30'
                 : 'bg-zinc-900/50 border-zinc-800/80 hover:border-zinc-700'
             }`}
           >
-            <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-              <span className="font-mono uppercase tracking-wider flex items-center gap-1.5">
-                <Sparkles className="h-3 w-3 text-amber-500" />
-                VIP Chair Pass
+            <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-zinc-400 mb-0.5">
+              <span className="font-mono uppercase tracking-wider flex items-center gap-1 truncate">
+                <Sparkles className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500 flex-shrink-0" />
+                <span className="truncate">VIP Pass</span>
               </span>
               {subscriptionQuota && (
-                <span className="text-[10px] font-mono text-amber-400 font-bold">
+                <span className="hidden sm:inline text-[10px] font-mono text-amber-400 font-bold">
                   {subscriptionQuota.available_cuts}/{subscriptionQuota.total_cuts} left
                 </span>
               )}
             </div>
-            <div className="font-bold text-white text-xs truncate">
-              {subscription
-                ? subscriptionQuota?.plan_name || subscription.plan_name || 'Active VIP Membership'
-                : 'No Active Pass — Explore Plans'}
+            <div className="font-bold text-white text-[11px] sm:text-xs truncate">
+              {subscriptionQuota
+                ? `${subscriptionQuota.available_cuts}/${subscriptionQuota.total_cuts} cuts left`
+                : subscription
+                ? subscription.plan_name || 'Active VIP'
+                : 'No Pass'}
             </div>
           </button>
 
@@ -829,26 +826,25 @@ export default function AccountPage() {
               setActiveTab('barbershop');
               setShowBookingHistory(false);
             }}
-            className={`text-left rounded-xl p-3 border transition-all ${
+            className={`text-left rounded-xl p-2 sm:p-3 border transition-all min-w-0 ${
               activeTab === 'barbershop' && !showBookingHistory
                 ? 'bg-zinc-900/90 border-zinc-700'
                 : 'bg-zinc-900/50 border-zinc-800/80 hover:border-zinc-700'
             }`}
           >
-            <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-              <span className="font-mono uppercase tracking-wider flex items-center gap-1.5">
-                <Calendar className="h-3 w-3 text-amber-500" />
-                Next Grooming Cut
+            <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-zinc-400 mb-0.5">
+              <span className="font-mono uppercase tracking-wider flex items-center gap-1 truncate">
+                <Calendar className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500 flex-shrink-0" />
+                <span className="truncate">Next Cut</span>
               </span>
-              <span className="text-[10px] font-mono text-zinc-400">
+              <span className="hidden sm:inline text-[10px] font-mono text-zinc-400">
                 {upcomingBookings.length} upcoming
               </span>
             </div>
-            <div className="font-bold text-white text-xs truncate">
+            <div className="font-bold text-white text-[11px] sm:text-xs truncate">
               {nextAppointment
                 ? `${new Date(nextAppointment.start_time).toLocaleDateString('en-ZA', {
                     timeZone: 'Africa/Johannesburg',
-                    weekday: 'short',
                     day: 'numeric',
                     month: 'short',
                   })} • ${new Date(nextAppointment.start_time).toLocaleTimeString('en-ZA', {
@@ -857,30 +853,30 @@ export default function AccountPage() {
                     minute: '2-digit',
                     hour12: false,
                   })}`
-                : 'No upcoming session scheduled'}
+                : 'None scheduled'}
             </div>
           </button>
 
           <button
             type="button"
             onClick={() => setActiveTab('orders')}
-            className={`text-left rounded-xl p-3 border transition-all ${
+            className={`text-left rounded-xl p-2 sm:p-3 border transition-all min-w-0 ${
               activeTab === 'orders'
                 ? 'bg-amber-500/10 border-amber-500/30'
                 : 'bg-zinc-900/50 border-zinc-800/80 hover:border-zinc-700'
             }`}
           >
-            <div className="flex items-center justify-between text-[11px] text-zinc-400 mb-1">
-              <span className="font-mono uppercase tracking-wider flex items-center gap-1.5">
-                <Package className="h-3 w-3 text-amber-500" />
-                Apparel Orders
+            <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-zinc-400 mb-0.5">
+              <span className="font-mono uppercase tracking-wider flex items-center gap-1 truncate">
+                <Package className="h-2.5 w-2.5 sm:h-3 sm:w-3 text-amber-500 flex-shrink-0" />
+                <span className="truncate">Orders</span>
               </span>
-              <span className="text-[10px] font-mono text-zinc-400">{orders.length} total</span>
+              <span className="hidden sm:inline text-[10px] font-mono text-zinc-400">
+                {orders.length} total
+              </span>
             </div>
-            <div className="font-bold text-white text-xs truncate">
-              {latestOrder
-                ? `${latestOrder.order_number} • ${latestOrder.status.replace('_', ' ').toUpperCase()}`
-                : 'No streetwear orders yet'}
+            <div className="font-bold text-white text-[11px] sm:text-xs truncate">
+              {orders.length > 0 ? `${orders.length} order${orders.length === 1 ? '' : 's'}` : 'None yet'}
             </div>
           </button>
         </div>
@@ -900,18 +896,19 @@ export default function AccountPage() {
       )}
 
       {/* Segmented Navigation Bar */}
-      <div className="bg-zinc-900/80 border border-zinc-800/90 p-1.5 rounded-xl grid grid-cols-3 gap-1.5">
+      <div className="bg-zinc-900/80 border border-zinc-800/90 p-1 sm:p-1.5 rounded-xl grid grid-cols-3 gap-1 sm:gap-1.5">
         <button
           type="button"
           onClick={() => setActiveTab('barbershop')}
-          className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+          className={`flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2 sm:px-3 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
             activeTab === 'barbershop'
               ? 'bg-amber-500 text-black shadow-md shadow-amber-500/10'
               : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
           }`}
         >
-          <Scissors className="h-4 w-4 flex-shrink-0" />
-          <span className="truncate">Barbershop &amp; VIP Pass</span>
+          <Scissors className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+          <span className="sm:hidden">Haircuts</span>
+          <span className="hidden sm:inline truncate">Barbershop &amp; VIP Pass</span>
           <span
             className={`hidden sm:inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-mono ${
               activeTab === 'barbershop'
@@ -926,14 +923,15 @@ export default function AccountPage() {
         <button
           type="button"
           onClick={() => setActiveTab('orders')}
-          className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+          className={`flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2 sm:px-3 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
             activeTab === 'orders'
               ? 'bg-amber-500 text-black shadow-md shadow-amber-500/10'
               : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
           }`}
         >
-          <ShoppingBag className="h-4 w-4 flex-shrink-0" />
-          <span className="truncate">Apparel Orders</span>
+          <ShoppingBag className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+          <span className="sm:hidden">Orders</span>
+          <span className="hidden sm:inline truncate">Apparel Orders</span>
           <span
             className={`hidden sm:inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-mono ${
               activeTab === 'orders'
@@ -948,14 +946,15 @@ export default function AccountPage() {
         <button
           type="button"
           onClick={() => setActiveTab('settings')}
-          className={`flex items-center justify-center gap-2 py-2.5 px-3 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+          className={`flex items-center justify-center gap-1.5 sm:gap-2 py-2 sm:py-2.5 px-2 sm:px-3 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
             activeTab === 'settings'
               ? 'bg-amber-500 text-black shadow-md shadow-amber-500/10'
               : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
           }`}
         >
-          <User className="h-4 w-4 flex-shrink-0" />
-          <span className="truncate">Profile &amp; Settings</span>
+          <User className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
+          <span className="sm:hidden">Profile</span>
+          <span className="hidden sm:inline truncate">Profile &amp; Settings</span>
         </button>
       </div>
 
