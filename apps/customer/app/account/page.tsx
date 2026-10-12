@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { getSupabaseBrowserClient } from '@dissafyt/database';
 import { Button, Card, CardContent, CardDescription, CardHeader, CardTitle, Input, Label } from '@dissafyt/ui';
@@ -23,6 +23,9 @@ import {
   Sparkles,
   X,
   Flame,
+  ChevronLeft,
+  ChevronRight,
+  History,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -480,6 +483,103 @@ export default function AccountPage() {
     }
   }
 
+  // Barbershop Appointments View & Calendar State
+  const [showBookingHistory, setShowBookingHistory] = useState(false);
+  const [calendarDate, setCalendarDate] = useState(() => {
+    const d = new Date();
+    return new Date(d.getFullYear(), d.getMonth(), 1);
+  });
+  const [hoveredDateKey, setHoveredDateKey] = useState<string | null>(null);
+  const [selectedDateKey, setSelectedDateKey] = useState<string | null>(null);
+
+  // SAST timezone date key helper (YYYY-MM-DD)
+  function getSastDateKey(dInput: Date | string): string {
+    const d = typeof dInput === 'string' ? new Date(dInput) : dInput;
+    return new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Africa/Johannesburg',
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    }).format(d);
+  }
+
+  // When bookings load, if current calendar month has 0 bookings, auto-shift to next upcoming booking or latest booking's month
+  useEffect(() => {
+    if (bookings.length > 0) {
+      const curYear = calendarDate.getFullYear();
+      const curMonth = calendarDate.getMonth();
+      const hasBookingInCurrent = bookings.some((b) => {
+        if (!b.start_time) return false;
+        const d = new Date(b.start_time);
+        return d.getFullYear() === curYear && d.getMonth() === curMonth;
+      });
+      if (!hasBookingInCurrent) {
+        const upcoming = bookings.find((b) => new Date(b.start_time) >= new Date() && b.status !== 'cancelled' && b.status !== 'no_show');
+        const target = upcoming || bookings[0];
+        if (target?.start_time) {
+          const d = new Date(target.start_time);
+          setCalendarDate(new Date(d.getFullYear(), d.getMonth(), 1));
+        }
+      }
+    }
+  }, [bookings]);
+
+  // Group bookings by date key
+  const bookingsByDate = useMemo(() => {
+    const map: Record<string, BookingItem[]> = {};
+    for (const b of bookings) {
+      if (!b.start_time) continue;
+      const k = getSastDateKey(b.start_time);
+      if (!map[k]) map[k] = [];
+      map[k].push(b);
+    }
+    return map;
+  }, [bookings]);
+
+  // Categorize upcoming vs history
+  const { upcomingBookings, historyBookings } = useMemo(() => {
+    const now = new Date();
+    const upcoming: BookingItem[] = [];
+    const history: BookingItem[] = [];
+
+    for (const b of bookings) {
+      const start = new Date(b.start_time);
+      if (start >= now && b.status !== 'cancelled' && b.status !== 'no_show') {
+        upcoming.push(b);
+      } else {
+        history.push(b);
+      }
+    }
+
+    upcoming.sort((a, b) => new Date(a.start_time).getTime() - new Date(b.start_time).getTime());
+    history.sort((a, b) => new Date(b.start_time).getTime() - new Date(a.start_time).getTime());
+
+    return { upcomingBookings: upcoming, historyBookings: history };
+  }, [bookings]);
+
+  const calYear = calendarDate.getFullYear();
+  const calMonth = calendarDate.getMonth();
+  const calMonthLabel = calendarDate.toLocaleDateString('en-ZA', { month: 'long', year: 'numeric' });
+  const todayKey = getSastDateKey(new Date());
+
+  const firstDayWeekday = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+
+  const calendarCells = useMemo(() => {
+    const cells: Array<{ day: number; dateKey: string } | null> = [];
+    for (let i = 0; i < firstDayWeekday; i++) {
+      cells.push(null);
+    }
+    for (let d = 1; d <= daysInMonth; d++) {
+      const dateKey = `${calYear}-${String(calMonth + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+      cells.push({ day: d, dateKey });
+    }
+    return cells;
+  }, [calYear, calMonth, firstDayWeekday, daysInMonth]);
+
+  const activeHoverDateKey = hoveredDateKey || selectedDateKey;
+  const activeHoverBookings = activeHoverDateKey ? bookingsByDate[activeHoverDateKey] || [] : [];
+
   async function handleLogout() {
     const supabase = getSupabaseBrowserClient();
     await supabase.auth.signOut();
@@ -840,7 +940,7 @@ export default function AccountPage() {
 
           {/* Barbershop Appointments */}
           <Card className="border-zinc-800 bg-zinc-900/60">
-            <CardHeader className="flex flex-row items-center justify-between">
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <CardTitle className="text-xl text-white flex items-center">
                   <Scissors className="mr-2 h-5 w-5 text-amber-500" />
@@ -848,11 +948,33 @@ export default function AccountPage() {
                 </CardTitle>
                 <CardDescription>Ace of Fyt grooming sessions and schedules</CardDescription>
               </div>
-              <Link href="/book">
-                <Button variant="ghost" size="sm" className="text-amber-400 hover:text-amber-300">
-                  Book Session <ExternalLink className="ml-1 h-3.5 w-3.5" />
-                </Button>
-              </Link>
+              <div className="flex items-center gap-2 flex-wrap">
+                {bookings.length > 0 && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowBookingHistory(!showBookingHistory)}
+                    className="border-zinc-700 text-zinc-300 hover:text-white text-xs h-8"
+                  >
+                    {showBookingHistory ? (
+                      <>
+                        <Calendar className="mr-1.5 h-3.5 w-3.5 text-amber-500" />
+                        <span>Calendar View</span>
+                      </>
+                    ) : (
+                      <>
+                        <History className="mr-1.5 h-3.5 w-3.5 text-amber-500" />
+                        <span>Past Haircuts ({historyBookings.length})</span>
+                      </>
+                    )}
+                  </Button>
+                )}
+                <Link href="/book">
+                  <Button variant="ghost" size="sm" className="text-amber-400 hover:text-amber-300 h-8 text-xs">
+                    Book Session <ExternalLink className="ml-1 h-3.5 w-3.5" />
+                  </Button>
+                </Link>
+              </div>
             </CardHeader>
             <CardContent>
               {bookings.length === 0 ? (
@@ -860,127 +982,529 @@ export default function AccountPage() {
                   <Clock className="mx-auto h-8 w-8 text-zinc-600" />
                   <p>You haven&apos;t booked any grooming appointments yet.</p>
                 </div>
-              ) : (
-                <div className="space-y-4">
-                  {bookings.map((booking) => {
-                    const startDate = new Date(booking.start_time);
-                    const isPast = startDate < new Date();
-                    const isModifiable =
-                      (booking.status === 'confirmed' || booking.status === 'pending') && !isPast;
-
-                    return (
-                      <div
-                        key={booking.id}
-                        className="border border-zinc-800/80 rounded-lg p-4 bg-zinc-950/40 space-y-3"
+              ) : showBookingHistory ? (
+                /* Scrollable Account Haircut History Section */
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between pb-2.5 border-b border-zinc-800 text-xs">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setShowBookingHistory(false)}
+                        className="border-zinc-700 text-zinc-300 hover:text-white h-7 px-2.5 text-xs"
                       >
-                        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-2">
-                          <div>
-                            <span className="font-bold text-white text-sm">
-                              {booking.service?.name || 'Grooming Service'}
-                            </span>
-                            <span className="text-xs text-zinc-400 ml-2">
-                              with {booking.staff?.display_name || 'Master Barber'}
-                            </span>
-                          </div>
-                          <div className="flex items-center space-x-2">
-                            <span
-                              className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${
-                                booking.status === 'confirmed'
-                                  ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
-                                  : booking.status === 'completed'
-                                  ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
-                                  : booking.status === 'cancelled'
-                                  ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
-                                  : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
-                              }`}
-                            >
-                              {booking.status}
-                            </span>
-                            {Number(booking.total_amount) === 0 || (booking as any).is_subscription_covered || (booking as any).payment_status === 'membership_covered' ? (
-                              <span className="font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
-                                Included in Membership (R0.00)
-                              </span>
-                            ) : (booking as any).payment_status === 'paid_online' ? (
-                              <span className="font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
-                                Paid Online (R {Number(booking.total_amount).toFixed(2)})
-                              </span>
-                            ) : (booking as any).payment_status === 'paid_in_chair' ? (
-                              <span className="font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
-                                Paid in Chair (R {Number(booking.total_amount).toFixed(2)})
-                              </span>
-                            ) : booking.status === 'pending' ? (
-                              <span className="font-bold text-yellow-400 text-xs bg-yellow-500/10 px-2 py-0.5 rounded border border-yellow-500/20 whitespace-nowrap">
-                                Payment Pending (R {Number(booking.total_amount).toFixed(2)})
-                              </span>
-                            ) : (
-                              <span className="font-bold text-amber-400 text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 whitespace-nowrap">
-                                Due in Chair (R {Number(booking.total_amount).toFixed(2)})
-                              </span>
+                        &larr; Back to Calendar
+                      </Button>
+                      <span className="font-mono uppercase text-zinc-300 font-bold">
+                        Account Haircut History ({historyBookings.length})
+                      </span>
+                    </div>
+                    <span className="text-[11px] text-zinc-500 hidden sm:inline">
+                      Scroll to browse past grooming sessions
+                    </span>
+                  </div>
+
+                  <div className="max-h-[440px] overflow-y-auto pr-1 space-y-3">
+                    {historyBookings.length === 0 ? (
+                      <div className="py-8 text-center text-xs text-zinc-500">
+                        No past haircut records found yet.
+                      </div>
+                    ) : (
+                      historyBookings.map((booking) => {
+                        const startDate = new Date(booking.start_time);
+                        const isPast = startDate < new Date();
+                        const isModifiable =
+                          (booking.status === 'confirmed' || booking.status === 'pending') && !isPast;
+
+                        return (
+                          <div
+                            key={booking.id}
+                            className="border border-zinc-800/80 rounded-lg p-3.5 bg-zinc-950/40 space-y-2.5"
+                          >
+                            <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-2">
+                              <div>
+                                <span className="font-bold text-white text-sm">
+                                  {booking.service?.name || 'Grooming Service'}
+                                </span>
+                                <span className="text-xs text-zinc-400 ml-2">
+                                  with {booking.staff?.display_name || 'Master Barber'}
+                                </span>
+                              </div>
+                              <div className="flex items-center space-x-2">
+                                <span
+                                  className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${
+                                    booking.status === 'confirmed'
+                                      ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                      : booking.status === 'completed'
+                                      ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                      : booking.status === 'cancelled'
+                                      ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                                      : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                  }`}
+                                >
+                                  {booking.status}
+                                </span>
+                                {Number(booking.total_amount) === 0 || (booking as any).is_subscription_covered || (booking as any).payment_status === 'membership_covered' ? (
+                                  <span className="font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
+                                    Included in Membership (R0.00)
+                                  </span>
+                                ) : (booking as any).payment_status === 'paid_online' ? (
+                                  <span className="font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
+                                    Paid Online (R {Number(booking.total_amount).toFixed(2)})
+                                  </span>
+                                ) : (booking as any).payment_status === 'paid_in_chair' ? (
+                                  <span className="font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
+                                    Paid in Chair (R {Number(booking.total_amount).toFixed(2)})
+                                  </span>
+                                ) : booking.status === 'pending' ? (
+                                  <span className="font-bold text-yellow-400 text-xs bg-yellow-500/10 px-2 py-0.5 rounded border border-yellow-500/20 whitespace-nowrap">
+                                    Payment Pending (R {Number(booking.total_amount).toFixed(2)})
+                                  </span>
+                                ) : (
+                                  <span className="font-bold text-amber-400 text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 whitespace-nowrap">
+                                    Due in Chair (R {Number(booking.total_amount).toFixed(2)})
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex flex-wrap items-center justify-between text-xs text-zinc-400 pt-0.5 gap-2">
+                              <div className="flex flex-wrap items-center gap-3">
+                                <span className="flex items-center text-zinc-200">
+                                  <Clock className="mr-1 h-3.5 w-3.5 text-amber-500" />
+                                  {startDate.toLocaleDateString('en-ZA', {
+                                    timeZone: 'Africa/Johannesburg',
+                                    weekday: 'short',
+                                    month: 'short',
+                                    day: 'numeric',
+                                  })}{' '}
+                                  at{' '}
+                                  {startDate.toLocaleTimeString('en-ZA', {
+                                    timeZone: 'Africa/Johannesburg',
+                                    hour: '2-digit',
+                                    minute: '2-digit',
+                                    hour12: false,
+                                  })}
+                                </span>
+                                <span className="flex items-center text-zinc-300">
+                                  <MapPin className="mr-1 h-3.5 w-3.5 text-amber-500" />
+                                  {booking.location?.name || 'Dissafyt Studio - Bernie'}
+                                </span>
+                                {booking.service?.duration_minutes && (
+                                  <span className="text-zinc-500">
+                                    ({booking.service.duration_minutes} mins)
+                                  </span>
+                                )}
+                              </div>
+
+                              {isModifiable && (
+                                <div className="flex items-center gap-2">
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => openRescheduleModal(booking)}
+                                    className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 text-xs h-7 px-2"
+                                  >
+                                    <Calendar className="mr-1 h-3 w-3" />
+                                    Reschedule
+                                  </Button>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    disabled={cancellingBookingId === booking.id}
+                                    onClick={() => handleCancelBooking(booking.id)}
+                                    className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs h-7 px-2"
+                                  >
+                                    {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel'}
+                                  </Button>
+                                </div>
+                              )}
+                            </div>
+
+                            {booking.notes && (
+                              <div className="text-[11px] text-zinc-500 italic">
+                                Notes: &ldquo;{booking.notes}&rdquo;
+                              </div>
                             )}
                           </div>
-                        </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </div>
+              ) : (
+                /* Default Mode: Compact Calendar View with Hover Modal + Upcoming Appointments Below */
+                <div className="space-y-5">
+                  {/* Small Calendar Widget */}
+                  <div className="relative max-w-sm mx-auto bg-zinc-950/70 border border-zinc-800/90 rounded-2xl p-4 shadow-inner">
+                    {/* Calendar Header */}
+                    <div className="flex items-center justify-between pb-3 border-b border-zinc-800/80">
+                      <div className="flex items-center gap-1">
+                        <button
+                          type="button"
+                          onClick={() => setCalendarDate(new Date(calYear, calMonth - 1, 1))}
+                          className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition"
+                          title="Previous month"
+                        >
+                          <ChevronLeft className="h-4 w-4" />
+                        </button>
+                        <span className="text-xs sm:text-sm font-bold text-white font-mono min-w-[120px] text-center">
+                          {calMonthLabel}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => setCalendarDate(new Date(calYear, calMonth + 1, 1))}
+                          className="p-1 rounded-md text-zinc-400 hover:text-white hover:bg-zinc-800/80 transition"
+                          title="Next month"
+                        >
+                          <ChevronRight className="h-4 w-4" />
+                        </button>
+                      </div>
 
-                        <div className="flex flex-wrap items-center justify-between text-xs text-zinc-400 pt-1 gap-2">
-                          <div className="flex flex-wrap items-center gap-3">
-                            <span className="flex items-center text-zinc-200">
-                              <Clock className="mr-1 h-3.5 w-3.5 text-amber-500" />
-                              {startDate.toLocaleDateString('en-ZA', {
+                      <div className="flex items-center gap-2 text-[10px] font-mono">
+                        <span className="flex items-center gap-1 text-amber-400">
+                          <span className="h-2 w-2 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50" />
+                          <span>Booked</span>
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const now = new Date();
+                            setCalendarDate(new Date(now.getFullYear(), now.getMonth(), 1));
+                          }}
+                          className="px-1.5 py-0.5 rounded bg-zinc-800 hover:bg-zinc-700 text-zinc-300 text-[10px]"
+                        >
+                          Today
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Weekday Headers */}
+                    <div className="grid grid-cols-7 gap-1 pt-2.5 pb-1 text-center font-mono text-[10px] text-zinc-500">
+                      <span>Su</span>
+                      <span>Mo</span>
+                      <span>Tu</span>
+                      <span>We</span>
+                      <span>Th</span>
+                      <span>Fr</span>
+                      <span>Sa</span>
+                    </div>
+
+                    {/* Days Grid */}
+                    <div className="grid grid-cols-7 gap-1 text-center font-mono">
+                      {calendarCells.map((cell, idx) => {
+                        if (!cell) {
+                          return <div key={`blank-${idx}`} className="h-8 w-8 sm:h-9 sm:w-9 mx-auto" />;
+                        }
+
+                        const dayBookings = bookingsByDate[cell.dateKey] || [];
+                        const hasBookings = dayBookings.length > 0;
+                        const hasActiveBookings = dayBookings.some(
+                          (b) => b.status !== 'cancelled' && b.status !== 'no_show'
+                        );
+                        const isToday = cell.dateKey === todayKey;
+                        const isSelected = activeHoverDateKey === cell.dateKey;
+
+                        return (
+                          <button
+                            type="button"
+                            key={cell.dateKey}
+                            onMouseEnter={() => {
+                              if (hasBookings) setHoveredDateKey(cell.dateKey);
+                            }}
+                            onMouseLeave={() => setHoveredDateKey(null)}
+                            onClick={() => {
+                              if (hasBookings) {
+                                setSelectedDateKey((prev) => (prev === cell.dateKey ? null : cell.dateKey));
+                              }
+                            }}
+                            className={`h-8 w-8 sm:h-9 sm:w-9 mx-auto rounded-lg flex flex-col items-center justify-center text-xs relative transition-all ${
+                              isSelected
+                                ? 'ring-2 ring-amber-400 bg-amber-500/30 text-white font-bold'
+                                : hasActiveBookings
+                                ? 'bg-amber-500/20 text-amber-300 font-bold border border-amber-500/40 hover:bg-amber-500/30'
+                                : hasBookings
+                                ? 'bg-zinc-800/60 text-zinc-300 border border-zinc-700/60 hover:bg-zinc-800'
+                                : isToday
+                                ? 'border border-amber-500/40 text-amber-400 font-semibold'
+                                : 'text-zinc-400 hover:bg-zinc-800/40 hover:text-white'
+                            }`}
+                          >
+                            <span>{cell.day}</span>
+                            {hasActiveBookings && (
+                              <span className="h-1 w-1 rounded-full bg-amber-400 shadow-sm shadow-amber-400/50" />
+                            )}
+                            {!hasActiveBookings && hasBookings && (
+                              <span className="h-1 w-1 rounded-full bg-zinc-500" />
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {/* Hover Modal / Popover Overlay */}
+                    {activeHoverBookings.length > 0 && (
+                      <div
+                        className="absolute inset-x-2 sm:inset-x-3 top-11 z-30 bg-zinc-950/95 border border-amber-500/40 shadow-2xl rounded-xl p-3.5 backdrop-blur-md animate-in fade-in zoom-in-95 duration-150 space-y-2.5"
+                        onMouseEnter={() => setHoveredDateKey(activeHoverDateKey)}
+                        onMouseLeave={() => setHoveredDateKey(null)}
+                      >
+                        <div className="flex items-center justify-between pb-2 border-b border-zinc-800">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-amber-500" />
+                            <span className="font-bold text-xs text-white">
+                              {new Date(activeHoverBookings[0].start_time).toLocaleDateString('en-ZA', {
                                 timeZone: 'Africa/Johannesburg',
                                 weekday: 'short',
                                 month: 'short',
                                 day: 'numeric',
-                              })}{' '}
-                              at{' '}
-                              {startDate.toLocaleTimeString('en-ZA', {
-                                timeZone: 'Africa/Johannesburg',
-                                hour: '2-digit',
-                                minute: '2-digit',
-                                hour12: false,
                               })}
                             </span>
-                            <span className="flex items-center text-zinc-300">
-                              <MapPin className="mr-1 h-3.5 w-3.5 text-amber-500" />
-                              {booking.location?.name || 'Dissafyt Studio - Bernie'}
+                            <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                              {activeHoverBookings.length} {activeHoverBookings.length === 1 ? 'cut' : 'cuts'}
                             </span>
-                            {booking.service?.duration_minutes && (
-                              <span className="text-zinc-500">
-                                ({booking.service.duration_minutes} mins)
-                              </span>
-                            )}
                           </div>
-
-                          {isModifiable && (
-                            <div className="flex items-center gap-2">
-                              <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => openRescheduleModal(booking)}
-                                className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 text-xs h-7 px-2"
-                              >
-                                <Calendar className="mr-1 h-3 w-3" />
-                                Reschedule
-                              </Button>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                disabled={cancellingBookingId === booking.id}
-                                onClick={() => handleCancelBooking(booking.id)}
-                                className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs h-7 px-2"
-                              >
-                                {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel'}
-                              </Button>
-                            </div>
-                          )}
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setHoveredDateKey(null);
+                              setSelectedDateKey(null);
+                            }}
+                            className="text-zinc-400 hover:text-white p-1 rounded-md"
+                          >
+                            <X className="h-3.5 w-3.5" />
+                          </button>
                         </div>
 
-                        {booking.notes && (
-                          <div className="text-[11px] text-zinc-500 italic">
-                            Notes: &ldquo;{booking.notes}&rdquo;
-                          </div>
-                        )}
+                        <div className="max-h-48 overflow-y-auto pr-1 space-y-2">
+                          {activeHoverBookings.map((b) => {
+                            const bStart = new Date(b.start_time);
+                            const bIsPast = bStart < new Date();
+                            const bModifiable = (b.status === 'confirmed' || b.status === 'pending') && !bIsPast;
+
+                            return (
+                              <div
+                                key={b.id}
+                                className="p-2.5 rounded-lg bg-zinc-900/90 border border-zinc-800 space-y-1.5 text-xs text-left"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <div>
+                                    <div className="font-bold text-white text-xs">
+                                      {b.service?.name || 'Grooming Service'}
+                                    </div>
+                                    <div className="text-[11px] text-zinc-400">
+                                      with {b.staff?.display_name || 'Master Barber'}
+                                    </div>
+                                  </div>
+                                  <span
+                                    className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider ${
+                                      b.status === 'confirmed'
+                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                        : b.status === 'completed'
+                                        ? 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
+                                        : b.status === 'cancelled'
+                                        ? 'bg-rose-500/10 text-rose-400 border border-rose-500/20'
+                                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                    }`}
+                                  >
+                                    {b.status}
+                                  </span>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-1.5 text-[11px] text-zinc-400">
+                                  <span className="flex items-center text-zinc-200">
+                                    <Clock className="mr-1 h-3 w-3 text-amber-500" />
+                                    {bStart.toLocaleTimeString('en-ZA', {
+                                      timeZone: 'Africa/Johannesburg',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                      hour12: false,
+                                    })}
+                                  </span>
+                                  <span>&bull;</span>
+                                  <span>{b.location?.name || 'Dissafyt Studio'}</span>
+                                  {b.service?.duration_minutes && (
+                                    <>
+                                      <span>&bull;</span>
+                                      <span>{b.service.duration_minutes}m</span>
+                                    </>
+                                  )}
+                                </div>
+
+                                {bModifiable && (
+                                  <div className="flex items-center gap-2 pt-1 border-t border-zinc-800/80">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openRescheduleModal(b)}
+                                      className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 text-[11px] h-6 px-2"
+                                    >
+                                      Reschedule
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      disabled={cancellingBookingId === b.id}
+                                      onClick={() => handleCancelBooking(b.id)}
+                                      className="text-rose-400 hover:text-rose-300 text-[11px] h-6 px-2"
+                                    >
+                                      {cancellingBookingId === b.id ? 'Cancelling...' : 'Cancel'}
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
                       </div>
-                    );
-                  })}
+                    )}
+                  </div>
+
+                  {/* Upcoming Appointments List Below Calendar */}
+                  <div className="pt-3 border-t border-zinc-800/80 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <h4 className="text-xs font-bold font-mono uppercase tracking-wider text-zinc-300 flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 text-amber-500" />
+                        Upcoming Appointments ({upcomingBookings.length})
+                      </h4>
+                      {historyBookings.length > 0 && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => setShowBookingHistory(true)}
+                          className="text-xs text-zinc-400 hover:text-amber-400 hover:bg-zinc-800/60 h-7 px-2"
+                        >
+                          <History className="mr-1 h-3.5 w-3.5" />
+                          View Past Haircuts ({historyBookings.length})
+                        </Button>
+                      )}
+                    </div>
+
+                    {upcomingBookings.length === 0 ? (
+                      <div className="p-4 rounded-xl bg-zinc-950/40 border border-zinc-800/60 text-center space-y-2">
+                        <p className="text-xs text-zinc-400">No upcoming grooming appointments scheduled.</p>
+                        <Link href="/book">
+                          <Button size="sm" className="bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold h-7">
+                            Book Next Session
+                          </Button>
+                        </Link>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        {upcomingBookings.map((booking) => {
+                          const startDate = new Date(booking.start_time);
+                          const isPast = startDate < new Date();
+                          const isModifiable =
+                            (booking.status === 'confirmed' || booking.status === 'pending') && !isPast;
+
+                          return (
+                            <div
+                              key={booking.id}
+                              className="border border-zinc-800/80 rounded-lg p-3.5 bg-zinc-950/40 space-y-2.5"
+                            >
+                              <div className="flex flex-wrap items-center justify-between gap-2 border-b border-zinc-800/80 pb-2">
+                                <div>
+                                  <span className="font-bold text-white text-sm">
+                                    {booking.service?.name || 'Grooming Service'}
+                                  </span>
+                                  <span className="text-xs text-zinc-400 ml-2">
+                                    with {booking.staff?.display_name || 'Master Barber'}
+                                  </span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                  <span
+                                    className={`rounded-full px-2.5 py-0.5 text-xs font-semibold uppercase tracking-wider ${
+                                      booking.status === 'confirmed'
+                                        ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                                        : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                                    }`}
+                                  >
+                                    {booking.status}
+                                  </span>
+                                  {Number(booking.total_amount) === 0 || (booking as any).is_subscription_covered || (booking as any).payment_status === 'membership_covered' ? (
+                                    <span className="font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
+                                      Included in Membership (R0.00)
+                                    </span>
+                                  ) : (booking as any).payment_status === 'paid_online' ? (
+                                    <span className="font-bold text-emerald-400 text-xs bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 whitespace-nowrap">
+                                      Paid Online (R {Number(booking.total_amount).toFixed(2)})
+                                    </span>
+                                  ) : booking.status === 'pending' ? (
+                                    <span className="font-bold text-yellow-400 text-xs bg-yellow-500/10 px-2 py-0.5 rounded border border-yellow-500/20 whitespace-nowrap">
+                                      Payment Pending (R {Number(booking.total_amount).toFixed(2)})
+                                    </span>
+                                  ) : (
+                                    <span className="font-bold text-amber-400 text-xs bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20 whitespace-nowrap">
+                                      Due in Chair (R {Number(booking.total_amount).toFixed(2)})
+                                    </span>
+                                  )}
+                                </div>
+                              </div>
+
+                              <div className="flex flex-wrap items-center justify-between text-xs text-zinc-400 pt-0.5 gap-2">
+                                <div className="flex flex-wrap items-center gap-3">
+                                  <span className="flex items-center text-zinc-200">
+                                    <Clock className="mr-1 h-3.5 w-3.5 text-amber-500" />
+                                    {startDate.toLocaleDateString('en-ZA', {
+                                      timeZone: 'Africa/Johannesburg',
+                                      weekday: 'short',
+                                      month: 'short',
+                                      day: 'numeric',
+                                    })}{' '}
+                                    at{' '}
+                                    {startDate.toLocaleTimeString('en-ZA', {
+                                      timeZone: 'Africa/Johannesburg',
+                                      hour: '2-digit',
+                                      minute: '2-digit',
+                                      hour12: false,
+                                    })}
+                                  </span>
+                                  <span className="flex items-center text-zinc-300">
+                                    <MapPin className="mr-1 h-3.5 w-3.5 text-amber-500" />
+                                    {booking.location?.name || 'Dissafyt Studio - Bernie'}
+                                  </span>
+                                  {booking.service?.duration_minutes && (
+                                    <span className="text-zinc-500">
+                                      ({booking.service.duration_minutes} mins)
+                                    </span>
+                                  )}
+                                </div>
+
+                                {isModifiable && (
+                                  <div className="flex items-center gap-2">
+                                    <Button
+                                      variant="outline"
+                                      size="sm"
+                                      onClick={() => openRescheduleModal(booking)}
+                                      className="border-amber-500/40 text-amber-400 hover:bg-amber-500/10 text-xs h-7 px-2"
+                                    >
+                                      <Calendar className="mr-1 h-3 w-3" />
+                                      Reschedule
+                                    </Button>
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      disabled={cancellingBookingId === booking.id}
+                                      onClick={() => handleCancelBooking(booking.id)}
+                                      className="text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 text-xs h-7 px-2"
+                                    >
+                                      {cancellingBookingId === booking.id ? 'Cancelling...' : 'Cancel'}
+                                    </Button>
+                                  </div>
+                                )}
+                              </div>
+
+                              {booking.notes && (
+                                <div className="text-[11px] text-zinc-500 italic">
+                                  Notes: &ldquo;{booking.notes}&rdquo;
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
                 </div>
               )}
             </CardContent>
