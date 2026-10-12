@@ -601,6 +601,19 @@ export default function AdminCommercePage() {
     }
   }
 
+  function getStorefrontSurveyUrl(): string {
+    if (typeof window === 'undefined') return 'https://www.dissafyt.com/survey';
+    const { protocol, host, port } = window.location;
+    if (host.startsWith('admin.')) {
+      return `${protocol}//${host.replace(/^admin\./, 'www.')}/survey`;
+    }
+    if (port === '3001') {
+      return `${protocol}//${window.location.hostname}:3000/survey`;
+    }
+    return `${protocol}//${host}/survey`;
+  }
+
+
   async function loadData() {
     setLoading(true);
     try {
@@ -2964,10 +2977,7 @@ export default function AdminCommercePage() {
                   <Button
                     size="sm"
                     onClick={() => {
-                      const url =
-                        typeof window !== 'undefined'
-                          ? `${window.location.origin}/survey`
-                          : 'https://dissafyt.com/survey';
+                      const url = getStorefrontSurveyUrl();
                       navigator.clipboard.writeText(url);
                       setCopiedSurveyUrl(true);
                       setTimeout(() => setCopiedSurveyUrl(false), 2000);
@@ -2987,7 +2997,7 @@ export default function AdminCommercePage() {
                     )}
                   </Button>
                   <a
-                    href="/survey"
+                    href={getStorefrontSurveyUrl()}
                     target="_blank"
                     rel="noopener noreferrer"
                     className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition"
@@ -2995,6 +3005,7 @@ export default function AdminCommercePage() {
                     <span>Open Survey Form</span>
                     <ExternalLink className="h-3.5 w-3.5" />
                   </a>
+
                 </div>
               </div>
             </CardHeader>
