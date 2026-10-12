@@ -148,6 +148,7 @@ export default function AdminCommercePage() {
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [showCategoryModal, setShowCategoryModal] = useState(false);
+  const [showMetaSyncModal, setShowMetaSyncModal] = useState(false);
 
   // Edit Product State
   const [editingProduct, setEditingProduct] = useState<Product | null>(null);
@@ -912,6 +913,14 @@ export default function AdminCommercePage() {
               <Package className="mr-2 h-4 w-4" /> View Customer Orders
             </Button>
           </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => setShowMetaSyncModal(true)}
+            className="border-amber-500/40 text-amber-300 hover:text-white hover:bg-amber-500/10 font-medium"
+          >
+            <Share2 className="mr-2 h-4 w-4 text-amber-400" /> Meta Sync
+          </Button>
           <Button
             variant="outline"
             size="sm"
@@ -2235,134 +2244,167 @@ export default function AdminCommercePage() {
       )}
 
 
-      {/* Meta Commerce Manager & WhatsApp Catalog Data Feed Card */}
-      <Card className="border-amber-500/20 bg-stone-900/60 shadow-xl overflow-hidden">
-        <CardHeader className="border-b border-stone-800/60 pb-4">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
-            <div className="flex items-center space-x-2.5">
-              <div className="p-2 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
-                <Share2 className="h-5 w-5" />
-              </div>
-              <div>
-                <CardTitle className="text-base text-white flex items-center gap-2">
-                  <span>Meta Commerce & WhatsApp Catalog Feed</span>
-                  <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 uppercase font-semibold">
-                    Live Sync Ready
-                  </span>
-                </CardTitle>
-                <CardDescription className="text-xs text-stone-400 mt-0.5">
-                  Automated scheduled data feed link for Facebook Shops, Instagram Shopping, and WhatsApp Product Catalog.
-                </CardDescription>
-              </div>
-            </div>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={() => setShowFeedGuide(!showFeedGuide)}
-              className="border-stone-700 text-stone-300 hover:text-white hover:bg-stone-800 text-xs shrink-0 flex items-center gap-1.5"
-            >
-              <HelpCircle className="h-3.5 w-3.5 text-amber-400" />
-              <span>{showFeedGuide ? 'Hide Setup Guide' : 'Meta Setup Instructions'}</span>
-            </Button>
-          </div>
-        </CardHeader>
-        <CardContent className="pt-4 space-y-4 text-xs">
-          {/* Feed URL Display & Copy Actions */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-stone-400 text-xs">
-              <span className="font-medium text-stone-300">Scheduled Data Feed URL (XML / RSS 2.0 Standard):</span>
-              <span className="font-mono text-[11px] text-amber-400">Updates dynamically on each fetch</span>
-            </div>
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
-              <div className="flex-1 bg-stone-950 border border-stone-800 rounded-xl px-3.5 py-2.5 font-mono text-xs text-amber-300 truncate select-all">
-                {typeof window !== 'undefined'
-                  ? `${window.location.origin}/api/catalog/meta-feed`
-                  : 'https://admin.dissafyt.com/api/catalog/meta-feed'}
+      {/* Meta Commerce & WhatsApp Catalog Sync Modal */}
+      {showMetaSyncModal && (
+        <div
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowMetaSyncModal(false);
+          }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto"
+        >
+          <Card className="w-full max-w-2xl max-h-[90vh] overflow-y-auto border-amber-500/30 bg-stone-900 shadow-2xl p-6 space-y-5">
+            <div className="flex items-start justify-between pb-4 border-b border-stone-800">
+              <div className="flex items-center space-x-3">
+                <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
+                  <Share2 className="h-6 w-6" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-white">Meta Commerce & WhatsApp Catalog Feed</h2>
+                    <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 uppercase font-semibold">
+                      Live Sync Ready
+                    </span>
+                  </div>
+                  <p className="text-xs text-stone-400 mt-0.5">
+                    Automated scheduled data feed link for Facebook Shops, Instagram Shopping, and WhatsApp Product Catalog.
+                  </p>
+                </div>
               </div>
               <Button
+                variant="ghost"
                 size="sm"
-                onClick={() => copyFeedUrl('xml')}
-                className="bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs shrink-0 flex items-center gap-1.5"
+                onClick={() => setShowMetaSyncModal(false)}
+                className="text-stone-400 hover:text-white p-1 h-8 w-8"
               >
-                {copiedFeed ? (
-                  <>
-                    <Check className="h-3.5 w-3.5" />
-                    <span>Copied!</span>
-                  </>
-                ) : (
-                  <>
-                    <Copy className="h-3.5 w-3.5" />
-                    <span>Copy Feed Link</span>
-                  </>
-                )}
+                <X className="h-5 w-5" />
               </Button>
-              <a
-                href="/api/catalog/meta-feed"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center px-3 py-2 rounded-xl border border-stone-700 bg-stone-800/80 hover:bg-stone-800 text-stone-200 text-xs font-medium transition shrink-0 gap-1.5"
-              >
-                <ExternalLink className="h-3.5 w-3.5 text-stone-400" />
-                <span>Preview XML</span>
-              </a>
-              <a
-                href="/api/catalog/meta-feed?format=csv"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center justify-center px-3 py-2 rounded-xl border border-stone-700 bg-stone-800/80 hover:bg-stone-800 text-stone-200 text-xs font-medium transition shrink-0 gap-1.5"
-              >
-                <ExternalLink className="h-3.5 w-3.5 text-stone-400" />
-                <span>CSV Feed</span>
-              </a>
             </div>
-          </div>
 
-          {/* Quick Stats Banner */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-stone-800/60 font-mono text-[11px] text-stone-400">
-            <div className="bg-stone-950/60 border border-stone-800/80 rounded-lg p-2.5">
-              <span className="text-stone-500 block">Active Products Synced:</span>
-              <span className="text-white font-bold text-sm">{products.filter((p) => p.is_active).length} Products</span>
-            </div>
-            <div className="bg-stone-950/60 border border-stone-800/80 rounded-lg p-2.5">
-              <span className="text-stone-500 block">Catalog Currency:</span>
-              <span className="text-emerald-400 font-bold text-sm">ZAR (South African Rand)</span>
-            </div>
-            <div className="bg-stone-950/60 border border-stone-800/80 rounded-lg p-2.5">
-              <span className="text-stone-500 block">Supported Channels:</span>
-              <span className="text-amber-400 font-bold text-sm">WhatsApp • IG • FB Shop</span>
-            </div>
-          </div>
+            {/* Modal Body: Feed URL, Actions, Metrics & Setup Guide */}
+            <div className="space-y-4 text-xs">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between text-stone-400 text-xs">
+                  <span className="font-medium text-stone-300">Scheduled Data Feed URL (XML / RSS 2.0 Standard):</span>
+                  <span className="font-mono text-[11px] text-amber-400">Updates dynamically on each fetch</span>
+                </div>
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+                  <div className="flex-1 bg-stone-950 border border-stone-800 rounded-xl px-3.5 py-2.5 font-mono text-xs text-amber-300 truncate select-all">
+                    {typeof window !== 'undefined'
+                      ? `${window.location.origin}/api/catalog/meta-feed`
+                      : 'https://admin.dissafyt.com/api/catalog/meta-feed'}
+                  </div>
+                  <Button
+                    size="sm"
+                    onClick={() => copyFeedUrl('xml')}
+                    className="bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs shrink-0 flex items-center gap-1.5"
+                  >
+                    {copiedFeed ? (
+                      <>
+                        <Check className="h-3.5 w-3.5" />
+                        <span>Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="h-3.5 w-3.5" />
+                        <span>Copy Feed Link</span>
+                      </>
+                    )}
+                  </Button>
+                  <a
+                    href="/api/catalog/meta-feed"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center px-3 py-2 rounded-xl border border-stone-700 bg-stone-800/80 hover:bg-stone-800 text-stone-200 text-xs font-medium transition shrink-0 gap-1.5"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 text-stone-400" />
+                    <span>Preview XML</span>
+                  </a>
+                  <a
+                    href="/api/catalog/meta-feed?format=csv"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center justify-center px-3 py-2 rounded-xl border border-stone-700 bg-stone-800/80 hover:bg-stone-800 text-stone-200 text-xs font-medium transition shrink-0 gap-1.5"
+                  >
+                    <ExternalLink className="h-3.5 w-3.5 text-stone-400" />
+                    <span>CSV Feed</span>
+                  </a>
+                </div>
+              </div>
 
-          {/* Step-by-Step Meta Setup Guide (Collapsible) */}
-          {showFeedGuide && (
-            <div className="pt-3 border-t border-stone-800/80 space-y-2 text-stone-300 bg-stone-950/40 p-3.5 rounded-xl">
-              <p className="font-semibold text-amber-400 flex items-center gap-1.5">
-                <span>Connecting to Meta Commerce Manager (Step-by-Step):</span>
-              </p>
-              <ol className="list-decimal list-inside space-y-1.5 text-stone-400 text-xs leading-relaxed">
-                <li>
-                  Open <a href="https://business.facebook.com/commerce" target="_blank" rel="noopener noreferrer" className="text-amber-400 underline">Meta Commerce Manager</a> and select your Dissafyt catalog.
-                </li>
-                <li>
-                  In the left navigation, go to <strong className="text-white">Catalog</strong> &rarr; <strong className="text-white">Data Sources</strong> &rarr; click <strong className="text-white">Add Items</strong>.
-                </li>
-                <li>
-                  Select <strong className="text-white">Data Feed</strong> &rarr; <strong className="text-white">Set a schedule</strong>.
-                </li>
-                <li>
-                  Paste the <strong className="text-amber-400 font-mono">Scheduled Data Feed URL</strong> above into the feed URL field.
-                </li>
-                <li>
-                  Set the schedule to <strong className="text-white">Hourly</strong> or <strong className="text-white">Daily</strong>, and confirm the default currency is <strong className="text-white">ZAR</strong>.
-                </li>
-                <li>
-                  Click <strong className="text-white">Save and Upload</strong>. Meta will fetch all products, prices, images, and live inventory directly from your database!
-                </li>
-              </ol>
+              {/* Quick Stats Banner */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-2 border-t border-stone-800/60 font-mono text-[11px] text-stone-400">
+                <div className="bg-stone-950/60 border border-stone-800/80 rounded-lg p-2.5">
+                  <span className="text-stone-500 block">Active Products Synced:</span>
+                  <span className="text-white font-bold text-sm">{products.filter((p) => p.is_active).length} Products</span>
+                </div>
+                <div className="bg-stone-950/60 border border-stone-800/80 rounded-lg p-2.5">
+                  <span className="text-stone-500 block">Catalog Currency:</span>
+                  <span className="text-emerald-400 font-bold text-sm">ZAR (South African Rand)</span>
+                </div>
+                <div className="bg-stone-950/60 border border-stone-800/80 rounded-lg p-2.5">
+                  <span className="text-stone-500 block">Supported Channels:</span>
+                  <span className="text-amber-400 font-bold text-sm">WhatsApp • IG • FB Shop</span>
+                </div>
+              </div>
+
+              {/* Setup Guide Accordion / Toggle */}
+              <div className="pt-2">
+                <div className="flex items-center justify-between pb-2">
+                  <span className="font-semibold text-stone-300">Integration Instructions:</span>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setShowFeedGuide(!showFeedGuide)}
+                    className="text-stone-400 hover:text-white text-xs h-7 px-2 flex items-center gap-1"
+                  >
+                    <HelpCircle className="h-3.5 w-3.5 text-amber-400" />
+                    <span>{showFeedGuide ? 'Hide Instructions' : 'View Instructions'}</span>
+                  </Button>
+                </div>
+
+                {showFeedGuide && (
+                  <div className="border border-stone-800 bg-stone-950/60 p-4 rounded-xl space-y-2 text-stone-300">
+                    <p className="font-semibold text-amber-400 flex items-center gap-1.5">
+                      <span>Connecting to Meta Commerce Manager (Step-by-Step):</span>
+                    </p>
+                    <ol className="list-decimal list-inside space-y-1.5 text-stone-400 text-xs leading-relaxed">
+                      <li>
+                        Open <a href="https://business.facebook.com/commerce" target="_blank" rel="noopener noreferrer" className="text-amber-400 underline">Meta Commerce Manager</a> and select your Dissafyt catalog.
+                      </li>
+                      <li>
+                        In the left navigation, go to <strong className="text-white">Catalog</strong> &rarr; <strong className="text-white">Data Sources</strong> &rarr; click <strong className="text-white">Add Items</strong>.
+                      </li>
+                      <li>
+                        Select <strong className="text-white">Data Feed</strong> &rarr; <strong className="text-white">Set a schedule</strong>.
+                      </li>
+                      <li>
+                        Paste the <strong className="text-amber-400 font-mono">Scheduled Data Feed URL</strong> above into the feed URL field.
+                      </li>
+                      <li>
+                        Set the schedule to <strong className="text-white">Hourly</strong> or <strong className="text-white">Daily</strong>, and confirm the default currency is <strong className="text-white">ZAR</strong>.
+                      </li>
+                      <li>
+                        Click <strong className="text-white">Save and Upload</strong>. Meta will fetch all products, prices, images, and live inventory directly from your database!
+                      </li>
+                    </ol>
+                  </div>
+                )}
+              </div>
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            <div className="flex justify-end pt-4 border-t border-stone-800">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowMetaSyncModal(false)}
+                className="border-stone-700 text-stone-300 hover:bg-stone-800"
+              >
+                Close
+              </Button>
+            </div>
+          </Card>
+        </div>
+      )}
 
       {/* Products Table */}
       <Card className="border-stone-800 bg-stone-900/50">
