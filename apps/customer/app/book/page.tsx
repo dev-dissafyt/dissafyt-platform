@@ -41,6 +41,7 @@ interface StaffMember {
   id: string;
   display_name: string;
   bio?: string | null;
+  location_id?: string | null;
   is_active: boolean;
 }
 
@@ -60,6 +61,8 @@ interface LocationOption {
   is_flagship: boolean;
   phone?: string | null;
   operating_hours_display?: string;
+  google_maps_url?: string | null;
+  google_maps_embed_url?: string | null;
 }
 
 function BookContent() {
@@ -372,8 +375,9 @@ function BookContent() {
 
       try {
         const staffParam = selectedStaffId ? `&staffId=${selectedStaffId}` : '';
+        const locParam = selectedLocation?.id ? `&locationId=${selectedLocation.id}` : '';
         const res = await fetch(
-          `/api/bookings/availability?date=${selectedDate}&serviceId=${selectedService!.id}${staffParam}`
+          `/api/bookings/availability?date=${selectedDate}&serviceId=${selectedService!.id}${staffParam}${locParam}`
         );
 
         if (res.ok) {
@@ -393,7 +397,7 @@ function BookContent() {
     }
 
     fetchAvailability();
-  }, [selectedService?.id, selectedStaffId, selectedDate]);
+  }, [selectedService?.id, selectedStaffId, selectedDate, selectedLocation?.id]);
 
   // Quick Inline Auth Handler
   async function handleInlineAuth(e: React.FormEvent) {
@@ -584,8 +588,54 @@ function BookContent() {
             </div>
           </div>
 
+          {/* Embedded Google Map & Turn-by-Turn Directions */}
+          <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-4 space-y-3 text-left">
+            <div className="flex items-center justify-between">
+              <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                <MapPin className="h-4 w-4 text-amber-500" />
+                <span>Studio Location &amp; Directions</span>
+              </div>
+              <span className="text-[10px] font-mono text-zinc-400">
+                {selectedLocation?.city || 'Cape Town'}
+              </span>
+            </div>
+
+            <div className="text-xs text-zinc-300">
+              {selectedLocation?.address || '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570'}
+            </div>
+
+            <div className="rounded-lg overflow-hidden border border-zinc-800 bg-zinc-950 aspect-[16/9] w-full max-h-48 relative">
+              <iframe
+                title="Studio Location Map"
+                src={
+                  selectedLocation?.google_maps_embed_url ||
+                  `https://maps.google.com/maps?q=${encodeURIComponent((selectedLocation?.address || '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570') + ', South Africa')}&t=&z=15&ie=UTF8&iwloc=&output=embed`
+                }
+                width="100%"
+                height="100%"
+                style={{ border: 0 }}
+                loading="lazy"
+                allowFullScreen
+                className="w-full h-full"
+              />
+            </div>
+
+            <a
+              href={
+                selectedLocation?.google_maps_url ||
+                `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((selectedLocation?.address || '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570') + ', South Africa')}`
+              }
+              target="_blank"
+              rel="noopener noreferrer"
+              className="w-full inline-flex items-center justify-center rounded-lg bg-amber-500 hover:bg-amber-400 text-black px-4 py-2.5 text-xs font-bold transition-all shadow-md shadow-amber-500/20"
+            >
+              <MapPin className="mr-2 h-4 w-4" />
+              🗺️ Open Directions in Google Maps
+            </a>
+          </div>
+
           {confirmedBooking.start_time && (
-            <div className="pt-2">
+            <div className="pt-1">
               <a
                 href={`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`Ace of Fyt: ${confirmedBooking.serviceName}`)}&dates=${new Date(confirmedBooking.start_time).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}/${new Date(confirmedBooking.end_time || new Date(new Date(confirmedBooking.start_time).getTime() + 30 * 60000)).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')}&details=${encodeURIComponent(`Appointment with Ace of Fyt Barbershop.\nService: ${confirmedBooking.serviceName}\nStudio: ${selectedLocation?.name || 'Dissafyt Studio - Bernie'}\nAddress: ${selectedLocation?.address || '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570'}`)}&location=${encodeURIComponent(selectedLocation?.address || '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570')}`}
                 target="_blank"
@@ -799,13 +849,94 @@ function BookContent() {
 
       {/* Main Interactive Booking Layout */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left 8 Cols: Steps 1, 2, 3 */}
+        {/* Left 8 Cols: Steps 1, 2, 3, 4 */}
         <div className="lg:col-span-8 space-y-8">
-          {/* STEP 1: Select Grooming Service */}
+          {/* STEP 1: Choose Studio Location */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-black text-xs font-bold">
                 1
+              </span>
+              <h2 className="text-lg font-bold text-white">Choose Studio Location</h2>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              {locations.map((loc) => {
+                const isSelected = selectedLocation?.id === loc.id;
+                return (
+                  <div
+                    key={loc.id}
+                    onClick={() => {
+                      setSelectedLocation(loc);
+                      // If currently chosen barber doesn't belong to this location, reset to 'any'
+                      if (selectedStaffId !== 'any') {
+                        const curStaff = staffList.find((s) => s.id === selectedStaffId);
+                        if (curStaff?.location_id && curStaff.location_id !== loc.id) {
+                          setSelectedStaffId('any');
+                        }
+                      }
+                    }}
+                    className={`cursor-pointer rounded-xl border p-4 transition-all duration-150 flex flex-col justify-between ${
+                      isSelected
+                        ? 'border-amber-500 bg-amber-500/10 shadow-lg shadow-amber-500/5'
+                        : 'border-zinc-800 bg-zinc-900/60 hover:border-zinc-700'
+                    }`}
+                  >
+                    <div>
+                      <div className="flex items-start justify-between">
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="text-base font-semibold text-white">{loc.name}</h3>
+                            {loc.is_flagship && (
+                              <span className="rounded bg-amber-500/10 text-amber-400 text-[10px] font-bold px-1.5 py-0.5 border border-amber-500/20 uppercase tracking-wider">
+                                Flagship
+                              </span>
+                            )}
+                          </div>
+                          <p className="text-xs text-zinc-400 mt-1 flex items-start gap-1">
+                            <MapPin className="h-3.5 w-3.5 text-amber-500 shrink-0 mt-0.5" />
+                            <span>{loc.address}, {loc.city}</span>
+                          </p>
+                        </div>
+                        {isSelected && <CheckCircle className="h-4 w-4 text-amber-500 shrink-0" />}
+                      </div>
+
+                      {loc.operating_hours_display && (
+                        <p className="text-[11px] text-zinc-500 mt-2 flex items-center gap-1">
+                          <Clock className="h-3 w-3 text-zinc-400" />
+                          <span>{loc.operating_hours_display}</span>
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="mt-3 pt-3 border-t border-zinc-800/80 flex items-center justify-between text-xs">
+                      <span className="text-[11px] text-zinc-400">
+                        {loc.phone || '+27 81 808 2570'}
+                      </span>
+                      <a
+                        href={
+                          loc.google_maps_url ||
+                          `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc.address + ', ' + loc.city + ', South Africa')}`
+                        }
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-amber-400 hover:text-amber-300 font-semibold text-[11px] flex items-center hover:underline"
+                      >
+                        Directions &rarr;
+                      </a>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+
+          {/* STEP 2: Select Grooming Service */}
+          <div className="space-y-4">
+            <div className="flex items-center space-x-2">
+              <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-black text-xs font-bold">
+                2
               </span>
               <h2 className="text-lg font-bold text-white">Choose Service</h2>
             </div>
@@ -865,11 +996,11 @@ function BookContent() {
             </div>
           </div>
 
-          {/* STEP 2: Choose Barber */}
+          {/* STEP 3: Choose Barber */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-black text-xs font-bold">
-                2
+                3
               </span>
               <h2 className="text-lg font-bold text-white">Select Master Barber</h2>
             </div>
@@ -895,43 +1026,45 @@ function BookContent() {
                 </div>
               </div>
 
-              {/* Individual Barbers */}
-              {staffList.map((barber) => {
-                const isSelected = selectedStaffId === barber.id;
-                return (
-                  <div
-                    key={barber.id}
-                    onClick={() => setSelectedStaffId(barber.id)}
-                    className={`cursor-pointer rounded-xl border p-4 transition-all ${
-                      isSelected
-                        ? 'border-amber-500 bg-amber-500/10'
-                        : 'border-zinc-800 bg-zinc-900/60 hover:border-zinc-700'
-                    }`}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 text-white font-bold text-sm">
-                        {barber.display_name.charAt(0)}
-                      </div>
-                      <div className="truncate">
-                        <div className="text-sm font-semibold text-white truncate">
-                          {barber.display_name}
+              {/* Individual Barbers stationed at selected location */}
+              {staffList
+                .filter((barber) => !barber.location_id || !selectedLocation || barber.location_id === selectedLocation.id)
+                .map((barber) => {
+                  const isSelected = selectedStaffId === barber.id;
+                  return (
+                    <div
+                      key={barber.id}
+                      onClick={() => setSelectedStaffId(barber.id)}
+                      className={`cursor-pointer rounded-xl border p-4 transition-all ${
+                        isSelected
+                          ? 'border-amber-500 bg-amber-500/10'
+                          : 'border-zinc-800 bg-zinc-900/60 hover:border-zinc-700'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 text-white font-bold text-sm">
+                          {barber.display_name.charAt(0)}
                         </div>
-                        <div className="text-xs text-zinc-400 truncate">
-                          {barber.bio || 'Master Barber'}
+                        <div className="truncate">
+                          <div className="text-sm font-semibold text-white truncate">
+                            {barber.display_name}
+                          </div>
+                          <div className="text-xs text-zinc-400 truncate">
+                            {barber.bio || 'Master Barber'}
+                          </div>
                         </div>
                       </div>
                     </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           </div>
 
-          {/* STEP 3: Select Date & Available Time Slots */}
+          {/* STEP 4: Select Date & Available Time Slots */}
           <div className="space-y-4">
             <div className="flex items-center space-x-2">
               <span className="flex h-6 w-6 items-center justify-center rounded-full bg-amber-500 text-black text-xs font-bold">
-                3
+                4
               </span>
               <h2 className="text-lg font-bold text-white">Pick Date & Time</h2>
             </div>
@@ -1041,11 +1174,27 @@ function BookContent() {
                 <span className="text-zinc-400">Time</span>
                 <span className="text-amber-400 font-bold">{selectedSlot?.time || 'Not chosen'}</span>
               </div>
-              <div className="flex justify-between items-center">
-                <span className="text-zinc-400">Location</span>
-                <span className="text-white font-medium flex items-center">
-                  <MapPin className="h-3 w-3 mr-1 text-amber-500" /> {selectedLocation?.name || 'Dissafyt Studio - Bernie'}
-                </span>
+              <div className="flex justify-between items-start pt-1">
+                <span className="text-zinc-400">Studio</span>
+                <div className="text-right">
+                  <span className="text-white font-medium flex items-center justify-end">
+                    <MapPin className="h-3 w-3 mr-1 text-amber-500" /> {selectedLocation?.name || 'Dissafyt Studio - Bernie'}
+                  </span>
+                  <div className="text-[10px] text-zinc-400 max-w-[190px] truncate">
+                    {selectedLocation?.address || '1 Norwalk Way, Kraaifontein'}
+                  </div>
+                  <a
+                    href={
+                      selectedLocation?.google_maps_url ||
+                      `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent((selectedLocation?.address || '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570') + ', South Africa')}`
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-[10px] text-amber-400 hover:text-amber-300 font-semibold inline-block hover:underline"
+                  >
+                    🗺️ Directions &rarr;
+                  </a>
+                </div>
               </div>
             </div>
 

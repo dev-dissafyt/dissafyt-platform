@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { WhatsAppService, AuditService } from '@dissafyt/api';
+import { WhatsAppService, EmailService, BarbershopService, AuditService } from '@dissafyt/api';
 import { getSupabaseAdminClient } from '@dissafyt/database';
 
 export const dynamic = 'force-dynamic';
 
 /**
  * GET /api/cron/reminders
- * Automated cron worker that dispatches 2-hour pre-appointment WhatsApp reminders.
+ * Automated cron worker that dispatches 2-hour pre-appointment WhatsApp and Email reminders
+ * with studio address and prefilled Google Maps turn-by-turn directions.
  * Can be called by Vercel Cron or external scheduler every 15 minutes.
  */
 export async function GET(request: NextRequest) {
@@ -25,6 +26,9 @@ export async function GET(request: NextRequest) {
     const windowStart = new Date(now.getTime() + 100 * 60 * 1000).toISOString();
     const windowEnd = new Date(now.getTime() + 140 * 60 * 1000).toISOString();
 
+    // Fetch locations to resolve studio addresses and directions
+    const locations = await BarbershopService.listLocations().catch(() => []);
+
     // Fetch confirmed bookings starting in this window
     const { data: upcomingBookings, error: bErr } = await admin
       .from('bookings')
@@ -33,14 +37,15 @@ export async function GET(request: NextRequest) {
         customer_id,
         service_id,
         staff_id,
+        location_id,
         start_time,
         total_amount,
         status,
         is_subscription_covered,
         notes,
         service:services(name),
-        staff:staff(display_name),
-        customer:profiles(full_name, phone)
+        staff:staff(display_name, location_id),
+        customer:profiles(full_name, phone, email)
       `)
       .eq('status', 'confirmed')
       .gte('start_time', windowStart)
@@ -63,24 +68,37 @@ export async function GET(request: NextRequest) {
     const results: any[] = [];
 
     for (const booking of upcomingBookings) {
-      // 1. Resolve phone number from customer profile or booking notes
+      // 1. Resolve studio location and directions
+      const bookingLocId =
+        (booking as any).location_id ||
+        (booking.staff as any)?.location_id ||
+        'loc-cpt-flagship';
+      const loc = locations.find((l) => l.id === bookingLocId) || locations[0];
+      const locationName = loc?.name || 'Dissafyt Studio - Bernie';
+      const locationAddress = loc?.address || '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570';
+      const googleMapsUrl =
+        loc?.google_maps_url ||
+        `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(locationAddress + ', South Africa')}`;
+
+      // 2. Resolve phone number and email
       let phone = (booking.customer as any)?.phone;
       if (!phone && booking.notes) {
         const match = booking.notes.match(/(?:27|0)\d{9}/);
         if (match) phone = match[0];
       }
+      const customerEmail = (booking.customer as any)?.email;
 
-      if (!phone) {
-        results.push({ bookingId: booking.id, status: 'skipped_no_phone' });
+      if (!phone && !customerEmail) {
+        results.push({ bookingId: booking.id, status: 'skipped_no_contact' });
         continue;
       }
 
-      // 2. Prevent duplicate reminders for the same booking
+      // 3. Prevent duplicate reminders for the same booking
       const { data: alreadySent } = await admin
         .from('audit_logs')
         .select('id')
         .eq('entity_id', booking.id)
-        .eq('action', 'whatsapp.booking_reminder_sent')
+        .eq('action', 'booking.reminder_sent')
         .maybeSingle();
 
       if (alreadySent) {
@@ -88,7 +106,7 @@ export async function GET(request: NextRequest) {
         continue;
       }
 
-      // 3. Format SAST appointment time
+      // 4. Format SAST appointment time
       const startTime = new Date(booking.start_time);
       const timeFormatted = startTime.toLocaleTimeString('en-ZA', {
         hour: '2-digit',
@@ -101,37 +119,75 @@ export async function GET(request: NextRequest) {
       const serviceName = (booking.service as any)?.name || 'Classic Haircut';
       const barberName = (booking.staff as any)?.display_name || 'Master Barber';
 
-      // 4. Dispatch WhatsApp reminder
-      const sendResult = await WhatsAppService.sendBookingReminder(phone, {
-        id: booking.id,
-        customerName,
-        serviceName,
-        barberName,
-        timeFormatted,
-        amount: Number(booking.total_amount || 0),
-        isSubscriptionCovered: Boolean(booking.is_subscription_covered),
-      });
+      let waDispatched = false;
+      let emailDispatched = false;
 
-      if (sendResult.success) {
+      // 5. Dispatch WhatsApp reminder if phone exists
+      if (phone) {
+        const sendResult = await WhatsAppService.sendBookingReminder(phone, {
+          id: booking.id,
+          customerName,
+          serviceName,
+          barberName,
+          timeFormatted,
+          amount: Number(booking.total_amount || 0),
+          isSubscriptionCovered: Boolean(booking.is_subscription_covered),
+          locationName,
+          locationAddress,
+          directionsUrl: googleMapsUrl,
+          googleMapsUrl,
+        });
+        if (sendResult.success) waDispatched = true;
+      }
+
+      // 6. Dispatch Email reminder with directions if email exists
+      if (customerEmail) {
+        try {
+          await EmailService.sendBookingReminder({
+            bookingId: booking.id,
+            customerName,
+            customerEmail,
+            serviceName,
+            staffName: barberName,
+            startTime: booking.start_time,
+            totalAmount: Number(booking.total_amount || 0),
+            paymentStatus: booking.is_subscription_covered ? 'Covered by Membership' : 'Confirmed',
+            locationName,
+            locationAddress,
+            googleMapsUrl,
+            directionsUrl: googleMapsUrl,
+          });
+          emailDispatched = true;
+        } catch (e) {
+          console.warn(`Email reminder failed for booking ${booking.id}:`, e);
+        }
+      }
+
+      if (waDispatched || emailDispatched) {
         remindersDispatched++;
 
-        // 5. Record idempotent audit log
+        // 7. Record idempotent audit log
         await AuditService.recordLog({
           actor_email: 'cron@dissafyt.com',
           actor_role: 'system',
-          action: 'whatsapp.booking_reminder_sent',
+          action: 'booking.reminder_sent',
           entity_type: 'booking',
           entity_id: booking.id,
           changes: {
             phone,
+            customerEmail,
             start_time: booking.start_time,
-            messageId: sendResult.messageId,
+            locationName,
+            locationAddress,
+            googleMapsUrl,
+            waDispatched,
+            emailDispatched,
           },
         });
 
-        results.push({ bookingId: booking.id, status: 'sent', phone });
+        results.push({ bookingId: booking.id, status: 'sent', waDispatched, emailDispatched });
       } else {
-        results.push({ bookingId: booking.id, status: 'error', error: sendResult.error });
+        results.push({ bookingId: booking.id, status: 'failed_dispatch' });
       }
     }
 

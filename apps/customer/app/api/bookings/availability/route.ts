@@ -16,6 +16,7 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date');
     const serviceId = searchParams.get('serviceId');
     const staffId = searchParams.get('staffId');
+    const locationId = searchParams.get('locationId');
 
     if (!date || !serviceId) {
       return NextResponse.json(
@@ -28,6 +29,7 @@ export async function GET(request: NextRequest) {
       date,
       serviceId,
       staffId: staffId || undefined,
+      locationId: locationId || undefined,
     });
 
     if (result.error) {

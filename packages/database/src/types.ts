@@ -227,6 +227,13 @@ export interface Staff {
   working_hours?: any;
   location_id?: string | null;
   location?: BarbershopLocation | null;
+  commission_split_pct?: number;
+  payfast_merchant_id?: string | null;
+  bank_name?: string | null;
+  bank_account_number?: string | null;
+  bank_account_type?: string | null;
+  bank_branch_code?: string | null;
+  pos_terminal_id?: string | null;
   is_active: boolean;
   created_at: string;
 }
@@ -302,6 +309,11 @@ export interface BarbershopLocation {
   is_active: boolean;
   capacity_chairs: number;
   operating_hours_display: string;
+  google_maps_url?: string | null;
+  google_maps_embed_url?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  pos_terminal_id?: string | null;
   created_at?: string;
   updated_at?: string;
 }

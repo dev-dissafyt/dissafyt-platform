@@ -55,6 +55,14 @@ export interface UpdateProductInput {
   variants?: ProductVariantInput[];
 }
 
+export function generateVariantSku(prefix: string, color?: string | null, size?: string | null): string {
+  const p = (prefix || 'DROP').toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 6) || 'DROP';
+  const c = color ? color.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4) || 'COL' : 'STD';
+  const s = size ? size.toUpperCase().replace(/[^A-Z0-9]/g, '').slice(0, 4) || 'STD' : 'STD';
+  const r = Math.floor(1000 + Math.random() * 9000);
+  return `${p}-${c}-${s}-${r}`;
+}
+
 const SIZE_SORT_ORDER = ['XS', 'S', 'M', 'L', 'XL', '2XL', '3XL', 'Standard'];
 
 function sortVariants(a: ProductVariant, b: ProductVariant) {
@@ -158,7 +166,7 @@ export class AdminProductService {
         ? input.variants.map((v, idx) => ({
             product_id: product.id,
             name: v.name || (v.color && v.size ? `${v.color} / ${v.size}` : v.size || 'Standard'),
-            sku: v.sku?.trim() ? `${v.sku.trim()}-${Math.floor(100 + Math.random() * 900)}` : `${slug.toUpperCase().slice(0, 8)}-${(v.name || 'VAR').toUpperCase().replace(/[^A-Z0-9]/g, '')}-${Math.floor(100 + Math.random() * 900)}`,
+            sku: v.sku?.trim() ? `${v.sku.trim()}-${Math.floor(100 + Math.random() * 900)}` : generateVariantSku(slug, v.color, v.size || v.name),
             price_override: v.price_override || null,
             cost_price_override: v.cost_price_override !== undefined ? v.cost_price_override : null,
             stock_quantity: v.stock_quantity ?? 10,
@@ -171,7 +179,7 @@ export class AdminProductService {
         : [{
             product_id: product.id,
             name: 'Standard',
-            sku: `${slug.toUpperCase().slice(0, 10)}-STD-${Math.floor(100 + Math.random() * 900)}`,
+            sku: generateVariantSku(slug, null, 'STD'),
             price_override: null,
             cost_price_override: null,
             stock_quantity: 10,
@@ -182,7 +190,11 @@ export class AdminProductService {
             image_url: null,
           }];
 
-      await admin.from('product_variants').insert(variantsToInsert);
+      const { error: varError } = await admin.from('product_variants').insert(variantsToInsert);
+      if (varError) {
+        console.error('[AdminProductService.createProduct] Variants insert error:', varError);
+        return { success: false, error: `Product saved but variant creation failed: ${varError.message}` };
+      }
 
       // Invisible Audit Trail
       await AuditService.recordLog({
@@ -268,11 +280,13 @@ export class AdminProductService {
           .eq('product_id', id);
 
         const currentVars = existingVariants || [];
+        const retainedIds = new Set<string>();
 
         for (const v of variants) {
           const safeStock = Math.max(0, v.stock_quantity ?? 0);
           if (v.id) {
-            await admin
+            retainedIds.add(v.id);
+            const { error: updErr } = await admin
               .from('product_variants')
               .update({
                 name: v.name,
@@ -286,11 +300,16 @@ export class AdminProductService {
                 image_url: v.image_url || null,
               })
               .eq('id', v.id);
+
+            if (updErr) {
+              console.warn('[AdminProductService.updateProduct] Warning updating variant:', updErr.message);
+            }
           } else {
             // Check if variant with same name exists for this product
             const match = currentVars.find((cv) => cv.name.toLowerCase() === v.name.toLowerCase());
             if (match) {
-              await admin
+              retainedIds.add(match.id);
+              const { error: updMatchErr } = await admin
                 .from('product_variants')
                 .update({
                   stock_quantity: safeStock,
@@ -302,25 +321,49 @@ export class AdminProductService {
                   image_url: v.image_url || null,
                 })
                 .eq('id', match.id);
+
+              if (updMatchErr) {
+                console.warn('[AdminProductService.updateProduct] Warning updating matching variant:', updMatchErr.message);
+              }
             } else {
-              // Insert new variant
+              // Insert new variant with guaranteed unique SKU
               const sku = v.sku?.trim()
                 ? `${v.sku.trim()}-${Math.floor(100 + Math.random() * 900)}`
-                : `${(data.slug || id).toUpperCase().slice(0, 8)}-${v.name.toUpperCase().replace(/[^A-Z0-9]/g, '')}-${Math.floor(100 + Math.random() * 900)}`;
+                : generateVariantSku(data.slug || id, v.color, v.size || v.name);
 
-              await admin.from('product_variants').insert({
-                product_id: id,
-                name: v.name,
-                sku,
-                stock_quantity: safeStock,
-                price_override: v.price_override || null,
-                is_active: true,
-                color: v.color || null,
-                color_hex: v.color_hex || null,
-                size: v.size || v.name || null,
-                image_url: v.image_url || null,
-              });
+              const { data: insVar, error: insErr } = await admin
+                .from('product_variants')
+                .insert({
+                  product_id: id,
+                  name: v.name,
+                  sku,
+                  stock_quantity: safeStock,
+                  price_override: v.price_override || null,
+                  is_active: true,
+                  color: v.color || null,
+                  color_hex: v.color_hex || null,
+                  size: v.size || v.name || null,
+                  image_url: v.image_url || null,
+                })
+                .select('id')
+                .single();
+
+              if (insErr) {
+                console.error('[AdminProductService.updateProduct] Error inserting variant:', insErr.message);
+              } else if (insVar) {
+                retainedIds.add(insVar.id);
+              }
             }
+          }
+        }
+
+        // Deactivate variants that are no longer part of this product configuration
+        for (const existing of currentVars) {
+          if (!retainedIds.has(existing.id) && existing.is_active) {
+            await admin
+              .from('product_variants')
+              .update({ is_active: false })
+              .eq('id', existing.id);
           }
         }
       } else if (stock_quantity !== undefined) {

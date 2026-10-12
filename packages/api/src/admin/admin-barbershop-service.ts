@@ -268,6 +268,13 @@ export class AdminBarbershopService {
       user_id?: string | null;
       is_active?: boolean;
       location_id?: string | null;
+      commission_split_pct?: number;
+      payfast_merchant_id?: string | null;
+      bank_name?: string | null;
+      bank_account_number?: string | null;
+      bank_account_type?: string | null;
+      bank_branch_code?: string | null;
+      pos_terminal_id?: string | null;
     },
     actor?: { email?: string; role?: string }
   ): Promise<{ success: boolean; staff?: any; error?: string }> {
@@ -283,6 +290,13 @@ export class AdminBarbershopService {
     if (input.phone) payload.phone = input.phone;
     if (input.avatar_url) payload.avatar_url = input.avatar_url;
     if (input.working_hours) payload.working_hours = input.working_hours;
+    if (input.commission_split_pct !== undefined) payload.commission_split_pct = Number(input.commission_split_pct);
+    if (input.payfast_merchant_id !== undefined) payload.payfast_merchant_id = input.payfast_merchant_id || null;
+    if (input.bank_name !== undefined) payload.bank_name = input.bank_name || null;
+    if (input.bank_account_number !== undefined) payload.bank_account_number = input.bank_account_number || null;
+    if (input.bank_account_type !== undefined) payload.bank_account_type = input.bank_account_type || 'cheque';
+    if (input.bank_branch_code !== undefined) payload.bank_branch_code = input.bank_branch_code || null;
+    if (input.pos_terminal_id !== undefined) payload.pos_terminal_id = input.pos_terminal_id || null;
 
     let createdStaff: any = null;
     const { data, error } = await admin
@@ -298,6 +312,13 @@ export class AdminBarbershopService {
         delete payload.avatar_url;
         delete payload.working_hours;
         delete payload.location_id;
+        delete payload.commission_split_pct;
+        delete payload.payfast_merchant_id;
+        delete payload.bank_name;
+        delete payload.bank_account_number;
+        delete payload.bank_account_type;
+        delete payload.bank_branch_code;
+        delete payload.pos_terminal_id;
 
         const { data: fbData, error: fbError } = await admin
           .from('staff')
@@ -314,6 +335,13 @@ export class AdminBarbershopService {
           avatar_url: input.avatar_url || null,
           working_hours: input.working_hours || null,
           location_id: resolvedLocationId,
+          commission_split_pct: input.commission_split_pct || 15,
+          payfast_merchant_id: input.payfast_merchant_id || null,
+          bank_name: input.bank_name || null,
+          bank_account_number: input.bank_account_number || null,
+          bank_account_type: input.bank_account_type || 'cheque',
+          bank_branch_code: input.bank_branch_code || null,
+          pos_terminal_id: input.pos_terminal_id || null,
         };
       } else {
         return { success: false, error: error.message };
@@ -345,7 +373,23 @@ export class AdminBarbershopService {
    */
   static async updateStaff(
     id: string,
-    input: { display_name?: string; bio?: string; phone?: string; avatar_url?: string; working_hours?: any; is_active?: boolean; user_id?: string | null; location_id?: string | null },
+    input: {
+      display_name?: string;
+      bio?: string;
+      phone?: string;
+      avatar_url?: string;
+      working_hours?: any;
+      is_active?: boolean;
+      user_id?: string | null;
+      location_id?: string | null;
+      commission_split_pct?: number;
+      payfast_merchant_id?: string | null;
+      bank_name?: string | null;
+      bank_account_number?: string | null;
+      bank_account_type?: string | null;
+      bank_branch_code?: string | null;
+      pos_terminal_id?: string | null;
+    },
     actor?: { email?: string; role?: string }
   ): Promise<{ success: boolean; staff?: any; error?: string }> {
     const admin = getSupabaseAdminClient();
@@ -362,13 +406,20 @@ export class AdminBarbershopService {
         .single();
 
       if (error) {
-        // Gracefully handle missing columns in schema cache (e.g. phone, avatar_url, working_hours, location_id)
+        // Gracefully handle missing columns in schema cache
         if (error.code === 'PGRST204' || error.message?.includes('column') || error.message?.includes('schema cache')) {
           console.warn('Staff update fallback: schema column missing, stripping pending columns:', error.message);
           delete payload.phone;
           delete payload.avatar_url;
           delete payload.working_hours;
           delete payload.location_id;
+          delete payload.commission_split_pct;
+          delete payload.payfast_merchant_id;
+          delete payload.bank_name;
+          delete payload.bank_account_number;
+          delete payload.bank_account_type;
+          delete payload.bank_branch_code;
+          delete payload.pos_terminal_id;
 
           const { data: fbData, error: fbError } = await admin
             .from('staff')
@@ -388,6 +439,13 @@ export class AdminBarbershopService {
             avatar_url: input.avatar_url !== undefined ? input.avatar_url : beforeData?.avatar_url,
             working_hours: input.working_hours !== undefined ? input.working_hours : beforeData?.working_hours,
             location_id: input.location_id !== undefined ? input.location_id : (beforeData?.location_id || 'loc-cpt-flagship'),
+            commission_split_pct: input.commission_split_pct !== undefined ? input.commission_split_pct : beforeData?.commission_split_pct,
+            payfast_merchant_id: input.payfast_merchant_id !== undefined ? input.payfast_merchant_id : beforeData?.payfast_merchant_id,
+            bank_name: input.bank_name !== undefined ? input.bank_name : beforeData?.bank_name,
+            bank_account_number: input.bank_account_number !== undefined ? input.bank_account_number : beforeData?.bank_account_number,
+            bank_account_type: input.bank_account_type !== undefined ? input.bank_account_type : beforeData?.bank_account_type,
+            bank_branch_code: input.bank_branch_code !== undefined ? input.bank_branch_code : beforeData?.bank_branch_code,
+            pos_terminal_id: input.pos_terminal_id !== undefined ? input.pos_terminal_id : beforeData?.pos_terminal_id,
           };
         } else {
           return { success: false, error: error.message };

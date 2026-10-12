@@ -54,6 +54,13 @@ interface StaffMember {
   location_id?: string | null;
   location?: BarbershopLocation | null;
   is_active: boolean;
+  commission_split_pct?: number | null;
+  payfast_merchant_id?: string | null;
+  bank_name?: string | null;
+  bank_account_number?: string | null;
+  bank_account_type?: string | null;
+  bank_branch_code?: string | null;
+  pos_terminal_id?: string | null;
   created_at: string;
 }
 
@@ -89,6 +96,9 @@ interface BarbershopLocation {
   is_active: boolean;
   capacity_chairs: number;
   operating_hours_display: string;
+  google_maps_url?: string | null;
+  google_maps_embed_url?: string | null;
+  pos_terminal_id?: string | null;
 }
 
 export default function AdminBarbershopPage() {
@@ -111,6 +121,13 @@ export default function AdminBarbershopPage() {
   const [staffBio, setStaffBio] = useState('');
   const [staffPhone, setStaffPhone] = useState('');
   const [staffLocationId, setStaffLocationId] = useState('loc-cpt-flagship');
+  const [staffCommissionSplit, setStaffCommissionSplit] = useState('15');
+  const [staffPayfastId, setStaffPayfastId] = useState('');
+  const [staffPosTerminalId, setStaffPosTerminalId] = useState('');
+  const [staffBankName, setStaffBankName] = useState('');
+  const [staffBankAccountNum, setStaffBankAccountNum] = useState('');
+  const [staffBankAccountType, setStaffBankAccountType] = useState('cheque');
+  const [staffBankBranchCode, setStaffBankBranchCode] = useState('');
   const [staffSubmitting, setStaffSubmitting] = useState(false);
 
   // --- TAB 3: SERVICES STATE ---
@@ -134,6 +151,8 @@ export default function AdminBarbershopPage() {
   const [newLocCity, setNewLocCity] = useState('');
   const [newLocPhone, setNewLocPhone] = useState('');
   const [newLocChairs, setNewLocChairs] = useState('2');
+  const [newLocGoogleMapsUrl, setNewLocGoogleMapsUrl] = useState('');
+  const [newLocPosTerminalId, setNewLocPosTerminalId] = useState('');
 
   // --- EDIT MODAL STATES ---
   // 1. Staff Edit State
@@ -143,6 +162,13 @@ export default function AdminBarbershopPage() {
   const [editStaffPhone, setEditStaffPhone] = useState('');
   const [editStaffLocationId, setEditStaffLocationId] = useState('loc-cpt-flagship');
   const [editStaffActive, setEditStaffActive] = useState(true);
+  const [editStaffCommissionSplit, setEditStaffCommissionSplit] = useState('15');
+  const [editStaffPayfastId, setEditStaffPayfastId] = useState('');
+  const [editStaffPosTerminalId, setEditStaffPosTerminalId] = useState('');
+  const [editStaffBankName, setEditStaffBankName] = useState('');
+  const [editStaffBankAccountNum, setEditStaffBankAccountNum] = useState('');
+  const [editStaffBankAccountType, setEditStaffBankAccountType] = useState('cheque');
+  const [editStaffBankBranchCode, setEditStaffBankBranchCode] = useState('');
   const [editStaffSubmitting, setEditStaffSubmitting] = useState(false);
 
   // 2. Service Edit State
@@ -167,6 +193,8 @@ export default function AdminBarbershopPage() {
   const [editLocHours, setEditLocHours] = useState('');
   const [editLocFlagship, setEditLocFlagship] = useState(false);
   const [editLocActive, setEditLocActive] = useState(true);
+  const [editLocGoogleMapsUrl, setEditLocGoogleMapsUrl] = useState('');
+  const [editLocPosTerminalId, setEditLocPosTerminalId] = useState('');
   const [editLocSubmitting, setEditLocSubmitting] = useState(false);
 
   // --- LOAD DATA ---
@@ -180,17 +208,9 @@ export default function AdminBarbershopPage() {
       if (filterLocationId !== 'all') params.set('locationId', filterLocationId);
 
       const res = await adminFetch(`/api/bookings?${params.toString()}`);
-      if (res.ok) {
-        setBookings(await res.json());
-      } else if (res.status === 401) {
-        setStatusMsg('Administrative session expired or unauthorized. Please re-authenticate.');
-      } else {
-        const err = await res.json().catch(() => ({}));
-        setStatusMsg(err.error || 'Failed to load appointments from server.');
-      }
+      if (res.ok) setBookings(await res.json());
     } catch (e) {
-      console.error('Network error loading bookings:', e);
-      setStatusMsg('Network connection error loading appointments.');
+      console.error(e);
     } finally {
       setLoadingBookings(false);
     }
@@ -200,14 +220,9 @@ export default function AdminBarbershopPage() {
     setLoadingStaff(true);
     try {
       const res = await adminFetch('/api/staff');
-      if (res.ok) {
-        setStaffList(await res.json());
-      } else {
-        const err = await res.json().catch(() => ({}));
-        console.warn('Could not load staff list:', err.error);
-      }
+      if (res.ok) setStaffList(await res.json());
     } catch (e) {
-      console.error('Network error loading staff:', e);
+      console.error(e);
     } finally {
       setLoadingStaff(false);
     }
@@ -217,14 +232,9 @@ export default function AdminBarbershopPage() {
     setLoadingServices(true);
     try {
       const res = await adminFetch('/api/services');
-      if (res.ok) {
-        setServices(await res.json());
-      } else {
-        const err = await res.json().catch(() => ({}));
-        console.warn('Could not load services list:', err.error);
-      }
+      if (res.ok) setServices(await res.json());
     } catch (e) {
-      console.error('Network error loading services:', e);
+      console.error(e);
     } finally {
       setLoadingServices(false);
     }
@@ -234,14 +244,9 @@ export default function AdminBarbershopPage() {
     setLoadingLocations(true);
     try {
       const res = await adminFetch('/api/locations');
-      if (res.ok) {
-        setLocations(await res.json());
-      } else {
-        const err = await res.json().catch(() => ({}));
-        console.warn('Could not load locations list:', err.error);
-      }
+      if (res.ok) setLocations(await res.json());
     } catch (e) {
-      console.error('Network error loading locations:', e);
+      console.error(e);
     } finally {
       setLoadingLocations(false);
     }
@@ -267,6 +272,8 @@ export default function AdminBarbershopPage() {
           is_active: true,
           capacity_chairs: parseInt(newLocChairs || '2', 10),
           operating_hours_display: 'Mon-Fri: 09:00 - 18:00 | Sat: 09:00 - 17:00 | Sun: Closed',
+          google_maps_url: newLocGoogleMapsUrl.trim() || undefined,
+          pos_terminal_id: newLocPosTerminalId.trim() || undefined,
         }),
       });
 
@@ -276,6 +283,8 @@ export default function AdminBarbershopPage() {
         setNewLocAddress('');
         setNewLocCity('');
         setNewLocPhone('');
+        setNewLocGoogleMapsUrl('');
+        setNewLocPosTerminalId('');
         setStatusMsg(`Branch location "${newLocName}" registered and logged to audit trail.`);
         loadLocations();
       } else {
@@ -346,6 +355,13 @@ export default function AdminBarbershopPage() {
     setEditStaffPhone(staff.phone || '');
     setEditStaffLocationId(staff.location_id || 'loc-cpt-flagship');
     setEditStaffActive(staff.is_active);
+    setEditStaffCommissionSplit(String(staff.commission_split_pct ?? 15));
+    setEditStaffPayfastId(staff.payfast_merchant_id || '');
+    setEditStaffPosTerminalId(staff.pos_terminal_id || '');
+    setEditStaffBankName(staff.bank_name || '');
+    setEditStaffBankAccountNum(staff.bank_account_number || '');
+    setEditStaffBankAccountType(staff.bank_account_type || 'cheque');
+    setEditStaffBankBranchCode(staff.bank_branch_code || '');
   }
 
   async function handleSaveEditedStaff(e: React.FormEvent) {
@@ -363,6 +379,13 @@ export default function AdminBarbershopPage() {
           phone: editStaffPhone,
           location_id: editStaffLocationId,
           is_active: editStaffActive,
+          commission_split_pct: parseFloat(editStaffCommissionSplit) || 15,
+          payfast_merchant_id: editStaffPayfastId.trim() || null,
+          pos_terminal_id: editStaffPosTerminalId.trim() || null,
+          bank_name: editStaffBankName.trim() || null,
+          bank_account_number: editStaffBankAccountNum.trim() || null,
+          bank_account_type: editStaffBankAccountType,
+          bank_branch_code: editStaffBankBranchCode.trim() || null,
         }),
       });
       if (res.ok) {
@@ -395,6 +418,13 @@ export default function AdminBarbershopPage() {
           phone: staffPhone,
           location_id: staffLocationId,
           is_active: true,
+          commission_split_pct: parseFloat(staffCommissionSplit) || 15,
+          payfast_merchant_id: staffPayfastId.trim() || null,
+          pos_terminal_id: staffPosTerminalId.trim() || null,
+          bank_name: staffBankName.trim() || null,
+          bank_account_number: staffBankAccountNum.trim() || null,
+          bank_account_type: staffBankAccountType,
+          bank_branch_code: staffBankBranchCode.trim() || null,
         }),
       });
 
@@ -404,6 +434,13 @@ export default function AdminBarbershopPage() {
         setStaffBio('');
         setStaffPhone('');
         setStaffLocationId('loc-cpt-flagship');
+        setStaffCommissionSplit('15');
+        setStaffPayfastId('');
+        setStaffPosTerminalId('');
+        setStaffBankName('');
+        setStaffBankAccountNum('');
+        setStaffBankAccountType('cheque');
+        setStaffBankBranchCode('');
         setShowAddStaffModal(false);
         loadStaff();
       } else {
@@ -573,6 +610,8 @@ export default function AdminBarbershopPage() {
     setEditLocHours(loc.operating_hours_display);
     setEditLocFlagship(loc.is_flagship);
     setEditLocActive(loc.is_active);
+    setEditLocGoogleMapsUrl(loc.google_maps_url || '');
+    setEditLocPosTerminalId(loc.pos_terminal_id || '');
   }
 
   async function handleSaveEditedLocation(e: React.FormEvent) {
@@ -594,6 +633,8 @@ export default function AdminBarbershopPage() {
           operating_hours_display: editLocHours,
           is_flagship: editLocFlagship,
           is_active: editLocActive,
+          google_maps_url: editLocGoogleMapsUrl.trim() || undefined,
+          pos_terminal_id: editLocPosTerminalId.trim() || undefined,
         }),
       });
       if (res.ok) {
@@ -672,7 +713,7 @@ export default function AdminBarbershopPage() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 sm:gap-3">
+        <div className="flex items-center space-x-3">
           <Button
             variant="outline"
             size="sm"
@@ -864,7 +905,7 @@ export default function AdminBarbershopPage() {
                 </div>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center space-x-2">
                 <Button
                   size="sm"
                   variant={filterDate === 'upcoming' ? 'default' : 'outline'}
@@ -872,22 +913,27 @@ export default function AdminBarbershopPage() {
                   className={`text-xs ${
                     filterDate === 'upcoming'
                       ? 'bg-amber-500 text-black font-semibold hover:bg-amber-400'
-                      : 'border-stone-800 text-stone-300 hover:text-white'
+                      : 'border-stone-800 text-stone-300'
                   }`}
                 >
                   Upcoming
                 </Button>
                 <Button
                   size="sm"
-                  variant={filterDate === 'today' ? 'default' : 'outline'}
-                  onClick={() => setFilterDate('today')}
+                  variant="outline"
+                  onClick={() => {
+                    const today = new Date();
+                    setFilterDate(
+                      `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`
+                    );
+                  }}
                   className={`text-xs ${
-                    filterDate === 'today' || (filterDate.includes('-') && !filterDate.includes('upcoming'))
-                      ? 'bg-amber-500 text-black font-semibold hover:bg-amber-400'
-                      : 'border-stone-800 text-stone-300 hover:text-white'
+                    filterDate.includes('-') && !filterDate.includes('upcoming')
+                      ? 'border-amber-500/50 text-amber-300'
+                      : 'border-stone-800 text-stone-300'
                   }`}
                 >
-                  Today&apos;s Schedule
+                  Today
                 </Button>
                 <Button
                   size="sm"
@@ -896,7 +942,7 @@ export default function AdminBarbershopPage() {
                   className={`text-xs ${
                     filterDate === 'all'
                       ? 'bg-amber-500 text-black font-semibold hover:bg-amber-400'
-                      : 'border-stone-800 text-stone-300 hover:text-white'
+                      : 'border-stone-800 text-stone-300'
                   }`}
                 >
                   All Bookings
@@ -1175,6 +1221,83 @@ export default function AdminBarbershopPage() {
                   </select>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-stone-800">
+                  <div className="space-y-1">
+                    <Label className="text-amber-400">Platform Split %</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={staffCommissionSplit}
+                      onChange={(e) => setStaffCommissionSplit(e.target.value)}
+                      placeholder="15"
+                    />
+                    <span className="text-[10px] text-stone-500">
+                      Platform fee % ({100 - (Number(staffCommissionSplit) || 15)}% barber payout)
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>PayFast Merchant ID</Label>
+                    <Input
+                      value={staffPayfastId}
+                      onChange={(e) => setStaffPayfastId(e.target.value)}
+                      placeholder="e.g. 10024921"
+                    />
+                    <span className="text-[10px] text-stone-500">For PayFast-to-PayFast split</span>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Station POS Terminal ID</Label>
+                    <Input
+                      value={staffPosTerminalId}
+                      onChange={(e) => setStaffPosTerminalId(e.target.value)}
+                      placeholder="e.g. Yoco-Station-1"
+                    />
+                    <span className="text-[10px] text-stone-500">Assigned chair card machine</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-stone-800">
+                  <Label className="text-stone-300 font-semibold text-xs">Direct EFT Banking Details (Payouts)</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-stone-400">Bank Name</Label>
+                      <Input
+                        value={staffBankName}
+                        onChange={(e) => setStaffBankName(e.target.value)}
+                        placeholder="e.g. FNB"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-stone-400">Account Number</Label>
+                      <Input
+                        value={staffBankAccountNum}
+                        onChange={(e) => setStaffBankAccountNum(e.target.value)}
+                        placeholder="e.g. 62800000000"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-stone-400">Account Type</Label>
+                      <select
+                        value={staffBankAccountType}
+                        onChange={(e) => setStaffBankAccountType(e.target.value)}
+                        className="w-full h-10 rounded-md border border-stone-800 bg-stone-950 px-3 text-xs text-white focus:border-amber-500 focus:outline-none"
+                      >
+                        <option value="cheque">Cheque / Current</option>
+                        <option value="savings">Savings</option>
+                        <option value="transmission">Transmission</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-stone-400">Branch Code</Label>
+                      <Input
+                        value={staffBankBranchCode}
+                        onChange={(e) => setStaffBankBranchCode(e.target.value)}
+                        placeholder="e.g. 250655"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex justify-end space-x-3 pt-3">
                   <Button
                     type="button"
@@ -1277,6 +1400,83 @@ export default function AdminBarbershopPage() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-2 border-t border-stone-800">
+                  <div className="space-y-1">
+                    <Label className="text-amber-400">Platform Split %</Label>
+                    <Input
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={editStaffCommissionSplit}
+                      onChange={(e) => setEditStaffCommissionSplit(e.target.value)}
+                      placeholder="15"
+                    />
+                    <span className="text-[10px] text-stone-500">
+                      Platform fee % ({100 - (Number(editStaffCommissionSplit) || 15)}% barber payout)
+                    </span>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>PayFast Merchant ID</Label>
+                    <Input
+                      value={editStaffPayfastId}
+                      onChange={(e) => setEditStaffPayfastId(e.target.value)}
+                      placeholder="e.g. 10024921"
+                    />
+                    <span className="text-[10px] text-stone-500">For PayFast-to-PayFast split</span>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Station POS Terminal ID</Label>
+                    <Input
+                      value={editStaffPosTerminalId}
+                      onChange={(e) => setEditStaffPosTerminalId(e.target.value)}
+                      placeholder="e.g. Yoco-Station-1"
+                    />
+                    <span className="text-[10px] text-stone-500">Assigned chair card machine</span>
+                  </div>
+                </div>
+
+                <div className="space-y-2 pt-2 border-t border-stone-800">
+                  <Label className="text-stone-300 font-semibold text-xs">Direct EFT Banking Details (Payouts)</Label>
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-3">
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-stone-400">Bank Name</Label>
+                      <Input
+                        value={editStaffBankName}
+                        onChange={(e) => setEditStaffBankName(e.target.value)}
+                        placeholder="e.g. FNB"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-stone-400">Account Number</Label>
+                      <Input
+                        value={editStaffBankAccountNum}
+                        onChange={(e) => setEditStaffBankAccountNum(e.target.value)}
+                        placeholder="e.g. 62800000000"
+                      />
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-stone-400">Account Type</Label>
+                      <select
+                        value={editStaffBankAccountType}
+                        onChange={(e) => setEditStaffBankAccountType(e.target.value)}
+                        className="w-full h-10 rounded-md border border-stone-800 bg-stone-950 px-3 text-xs text-white focus:border-amber-500 focus:outline-none"
+                      >
+                        <option value="cheque">Cheque / Current</option>
+                        <option value="savings">Savings</option>
+                        <option value="transmission">Transmission</option>
+                      </select>
+                    </div>
+                    <div className="space-y-1">
+                      <Label className="text-[11px] text-stone-400">Branch Code</Label>
+                      <Input
+                        value={editStaffBankBranchCode}
+                        onChange={(e) => setEditStaffBankBranchCode(e.target.value)}
+                        placeholder="e.g. 250655"
+                      />
+                    </div>
+                  </div>
+                </div>
+
                 <div className="flex justify-end space-x-3 pt-3 border-t border-stone-800">
                   <Button
                     type="button"
@@ -1347,6 +1547,27 @@ export default function AdminBarbershopPage() {
                       </span>
                     </div>
                     <div>Standard Hours: Mon-Fri 09:00 - 18:00, Sat 09:00 - 17:00</div>
+                  </div>
+
+                  <div className="flex flex-wrap gap-1.5 pt-2 border-t border-stone-800/80">
+                    <span className="rounded bg-amber-500/10 px-2 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/20">
+                      {100 - (staff.commission_split_pct ?? 15)}% Barber Payout ({staff.commission_split_pct ?? 15}% Platform)
+                    </span>
+                    {staff.payfast_merchant_id && (
+                      <span className="rounded bg-stone-800 px-2 py-0.5 text-[10px] font-mono text-stone-300 border border-stone-700">
+                        PayFast: {staff.payfast_merchant_id}
+                      </span>
+                    )}
+                    {staff.pos_terminal_id && (
+                      <span className="rounded bg-stone-800 px-2 py-0.5 text-[10px] font-mono text-amber-300 border border-amber-500/30">
+                        POS: {staff.pos_terminal_id}
+                      </span>
+                    )}
+                    {staff.bank_name && (
+                      <span className="rounded bg-stone-800 px-2 py-0.5 text-[10px] text-stone-400 border border-stone-700">
+                        EFT: {staff.bank_name} ••••{staff.bank_account_number?.slice(-4) || '****'}
+                      </span>
+                    )}
                   </div>
                 </div>
 
@@ -1818,6 +2039,27 @@ export default function AdminBarbershopPage() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Google Maps Search / Directions URL</Label>
+                    <Input
+                      value={newLocGoogleMapsUrl}
+                      onChange={(e) => setNewLocGoogleMapsUrl(e.target.value)}
+                      placeholder="https://www.google.com/maps/search/?api=1&query=..."
+                    />
+                    <span className="text-[10px] text-stone-500">Optional. Leave blank to auto-generate from address.</span>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Branch POS Terminal ID</Label>
+                    <Input
+                      value={newLocPosTerminalId}
+                      onChange={(e) => setNewLocPosTerminalId(e.target.value)}
+                      placeholder="e.g. Yoco-Branch-Terminal-01"
+                    />
+                    <span className="text-[10px] text-stone-500">Physical card machine for walk-in desk.</span>
+                  </div>
+                </div>
+
                 <div className="flex justify-end space-x-3 pt-3">
                   <Button
                     type="button"
@@ -1929,6 +2171,27 @@ export default function AdminBarbershopPage() {
                   />
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>Google Maps Search / Directions URL</Label>
+                    <Input
+                      value={editLocGoogleMapsUrl}
+                      onChange={(e) => setEditLocGoogleMapsUrl(e.target.value)}
+                      placeholder="https://www.google.com/maps/search/?api=1&query=..."
+                    />
+                    <span className="text-[10px] text-stone-500">Optional. Leave blank to auto-generate from address.</span>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>Branch POS Terminal ID</Label>
+                    <Input
+                      value={editLocPosTerminalId}
+                      onChange={(e) => setEditLocPosTerminalId(e.target.value)}
+                      placeholder="e.g. Yoco-Branch-Terminal-01"
+                    />
+                    <span className="text-[10px] text-stone-500">Physical card machine for walk-in desk.</span>
+                  </div>
+                </div>
+
                 <div className="flex items-center space-x-6 pt-2">
                   <label className="flex items-center space-x-2 text-sm text-stone-200 cursor-pointer">
                     <input
@@ -1999,7 +2262,7 @@ export default function AdminBarbershopPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 gap-3 pt-2 text-xs border-t border-stone-800/80">
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 text-xs border-t border-stone-800/80">
                     <div>
                       <span className="text-stone-500 block">Operating Hours:</span>
                       <span className="text-stone-300 font-medium">{loc.operating_hours_display}</span>
@@ -2007,6 +2270,10 @@ export default function AdminBarbershopPage() {
                     <div>
                       <span className="text-stone-500 block">Chair Capacity:</span>
                       <span className="text-stone-300 font-medium">{loc.capacity_chairs} Barber Chairs</span>
+                    </div>
+                    <div>
+                      <span className="text-stone-500 block">POS Terminal:</span>
+                      <span className="text-amber-400 font-mono font-medium">{loc.pos_terminal_id || 'Not Assigned'}</span>
                     </div>
                   </div>
 
@@ -2033,6 +2300,17 @@ export default function AdminBarbershopPage() {
                   </div>
 
                   <div className="flex items-center space-x-2">
+                    <a
+                      href={
+                        loc.google_maps_url ||
+                        `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(loc.address + ', ' + loc.city + ', South Africa')}`
+                      }
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center text-xs text-amber-400 hover:text-amber-300 border border-amber-500/30 px-2.5 py-1 rounded-md hover:bg-amber-500/10 font-medium"
+                    >
+                      🗺️ Map
+                    </a>
                     <Button
                       variant="outline"
                       size="sm"

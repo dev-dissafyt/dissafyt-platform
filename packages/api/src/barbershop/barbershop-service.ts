@@ -77,6 +77,8 @@ export const DEFAULT_LOCATIONS: BarbershopLocation[] = [
     is_active: true,
     capacity_chairs: 4,
     operating_hours_display: 'Tue-Sat: 09:00 - 19:00 | Sun: 10:00 - 16:00 | Mon: By Appointment',
+    google_maps_url: 'https://www.google.com/maps/search/?api=1&query=1+Norwalk+Way+Bernadino+Heights+Kraaifontein+7570',
+    google_maps_embed_url: 'https://maps.google.com/maps?q=1%20Norwalk%20Way%20Bernadino%20Heights%20Kraaifontein%207570&t=&z=15&ie=UTF8&iwloc=&output=embed',
   },
 ];
 
@@ -155,7 +157,7 @@ export class BarbershopService {
   }
 
   /**
-   * Registers a new studio location with invisible audit logging.
+   * Registers a new studio location with invisible audit logging and maps generation.
    */
   static async createLocation(
     input: Omit<BarbershopLocation, 'id'>,
@@ -163,15 +165,38 @@ export class BarbershopService {
   ): Promise<{ success: boolean; location?: BarbershopLocation; error?: string }> {
     const admin = getSupabaseAdminClient();
     const id = `loc-${input.slug || Date.now()}`;
+
+    // Auto-generate Google Maps URL and embed URL if omitted
+    const queryAddress = `${input.address}, ${input.city || 'Cape Town'}, ${input.province || 'Western Cape'}, South Africa`;
+    const google_maps_url = input.google_maps_url?.trim() || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(queryAddress)}`;
+    const google_maps_embed_url = input.google_maps_embed_url?.trim() || `https://maps.google.com/maps?q=${encodeURIComponent(queryAddress)}&t=&z=15&ie=UTF8&iwloc=&output=embed`;
+
     const newLoc: BarbershopLocation = {
       ...input,
       id,
+      google_maps_url,
+      google_maps_embed_url,
     };
 
     try {
-      await admin.from('locations').insert(newLoc);
-    } catch {
-      // Fallback
+      const { data, error } = await admin
+        .from('locations')
+        .insert(newLoc)
+        .select('*')
+        .single();
+
+      if (error) {
+        console.error('[BarbershopService.createLocation] DB insert error:', error);
+        return { success: false, error: error.message };
+      }
+
+      if (data) {
+        newLoc.created_at = data.created_at;
+        newLoc.updated_at = data.updated_at;
+      }
+    } catch (err: any) {
+      console.error('[BarbershopService.createLocation] Exception during insert:', err);
+      return { success: false, error: err?.message || 'Failed to create location' };
     }
 
     // Update in-memory runtime store
@@ -990,6 +1015,22 @@ export class BarbershopService {
         }
       }
 
+      let locName = 'Dissafyt Studio - Bernie';
+      let locAddress = '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570';
+      let locMapsUrl = 'https://www.google.com/maps/search/?api=1&query=1+Norwalk+Way+Bernadino+Heights+Kraaifontein+7570';
+
+      try {
+        const locations = await BarbershopService.listLocations();
+        const matchedLoc = locations.find((l) => l.id === resolvedLocationId) || locations[0];
+        if (matchedLoc) {
+          locName = matchedLoc.name;
+          locAddress = `${matchedLoc.address}, ${matchedLoc.city || ''}`;
+          locMapsUrl = matchedLoc.google_maps_url || `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(locAddress)}`;
+        }
+      } catch {
+        // Fallback to default studio address
+      }
+
       if (customerProfile?.email) {
         await EmailService.sendBookingConfirmation({
           bookingId: bookingResult.id,
@@ -998,8 +1039,10 @@ export class BarbershopService {
           serviceName: serviceItem?.name || 'Studio Haircut',
           staffName,
           startTime: bookingResult.start_time,
-          locationName: 'Dissafyt Studio - Bernie',
-          locationAddress: '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570',
+          locationName: locName,
+          locationAddress: locAddress,
+          googleMapsUrl: locMapsUrl,
+          directionsUrl: locMapsUrl,
           totalAmount: Number(bookingResult.total_amount || 0),
           paymentStatus: bookingResult.payment_status || 'pending',
           bookingUrl: `https://dissafyt.com/account/bookings?id=${bookingResult.id}`,

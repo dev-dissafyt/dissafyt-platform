@@ -32,7 +32,21 @@ export async function POST(request: NextRequest) {
 
   try {
     const body = await request.json();
-    const { display_name, bio, phone, is_active, user_id, location_id } = body;
+    const {
+      display_name,
+      bio,
+      phone,
+      is_active,
+      user_id,
+      location_id,
+      commission_split_pct,
+      payfast_merchant_id,
+      bank_name,
+      bank_account_number,
+      bank_account_type,
+      bank_branch_code,
+      pos_terminal_id,
+    } = body;
 
     if (!display_name) {
       return NextResponse.json({ error: 'Display name is required' }, { status: 400 });
@@ -46,6 +60,13 @@ export async function POST(request: NextRequest) {
         is_active: is_active !== undefined ? is_active : true,
         user_id: user_id || null,
         location_id: location_id || undefined,
+        commission_split_pct: commission_split_pct !== undefined ? Number(commission_split_pct) : undefined,
+        payfast_merchant_id: payfast_merchant_id || undefined,
+        bank_name: bank_name || undefined,
+        bank_account_number: bank_account_number || undefined,
+        bank_account_type: bank_account_type || undefined,
+        bank_branch_code: bank_branch_code || undefined,
+        pos_terminal_id: pos_terminal_id || undefined,
       },
       { email: auth.email, role: auth.role }
     );

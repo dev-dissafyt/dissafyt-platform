@@ -342,10 +342,10 @@ export default function AdminCommercePage() {
     setSelectedColorways(nextColorways);
 
     // Rebuild matrix
-    const prefix = (name || 'DROP').substring(0, 4).toUpperCase();
+    const prefix = (name || 'DROP').substring(0, 4).toUpperCase().replace(/[^A-Z0-9]/g, '') || 'DROP';
     const newMatrix: Variant[] = [];
     nextColorways.forEach((cw) => {
-      const colorShort = cw.name.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, '');
+      const colorClean = cw.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() || 'COL';
       DEFAULT_STREETWEAR_SIZES.forEach((sz) => {
         const existing = colorMatrix.find(
           (m) =>
@@ -357,7 +357,7 @@ export default function AdminCommercePage() {
           color: cw.name,
           color_hex: cw.hex,
           size: sz,
-          sku: `${prefix}-${colorShort}-${sz}`,
+          sku: existing?.sku || `${prefix}-${colorClean}-${sz}-${Math.floor(100 + Math.random() * 900)}`,
           stock_quantity: existing ? existing.stock_quantity : (sizeStocks[sz] ?? 10),
           image_url: existing?.image_url || null,
         });
@@ -411,19 +411,40 @@ export default function AdminCommercePage() {
       nextColorways = editSelectedColorways.filter(
         (c) => c.name.toLowerCase() !== colorway.name.toLowerCase()
       );
+      // Remove variants belonging to this unselected color
+      setEditVariants((prev) =>
+        prev.filter((v) => (v.color || '').toLowerCase() !== colorway.name.toLowerCase())
+      );
     } else {
       nextColorways = [...editSelectedColorways, colorway];
+      // Automatically generate streetwear size variants for this newly added/selected color
+      const prefix = (editSlug || editName || 'DROP').substring(0, 4).toUpperCase().replace(/[^A-Z0-9]/g, '') || 'DROP';
+      const colorClean = colorway.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() || 'COL';
+      const newVariantsForColor: Variant[] = DEFAULT_STREETWEAR_SIZES.map((sz) => ({
+        name: `${colorway.name} / ${sz}`,
+        color: colorway.name,
+        color_hex: colorway.hex,
+        size: sz,
+        sku: `${prefix}-${colorClean}-${sz}-${Math.floor(100 + Math.random() * 900)}`,
+        stock_quantity: 15,
+        image_url: null,
+      }));
+      setEditVariants((prev) => {
+        // Strip out single generic 'Standard' placeholder if present
+        const filtered = prev.filter((v) => v.name !== 'Standard' || v.color);
+        return [...filtered, ...newVariantsForColor];
+      });
     }
     setEditSelectedColorways(nextColorways);
   }
 
   function applyColorwaysMatrixToEdit() {
     if (editSelectedColorways.length === 0) return;
-    const prefix = (editSlug || editName || 'DROP').substring(0, 4).toUpperCase();
+    const prefix = (editSlug || editName || 'DROP').substring(0, 4).toUpperCase().replace(/[^A-Z0-9]/g, '') || 'DROP';
     const updatedVariants: Variant[] = [];
 
     editSelectedColorways.forEach((cw) => {
-      const colorShort = cw.name.substring(0, 3).toUpperCase().replace(/[^A-Z]/g, '');
+      const colorClean = cw.name.replace(/[^a-zA-Z0-9]/g, '').slice(0, 4).toUpperCase() || 'COL';
       DEFAULT_STREETWEAR_SIZES.forEach((sz) => {
         const existing = editVariants.find(
           (v) =>
@@ -436,7 +457,7 @@ export default function AdminCommercePage() {
           color: cw.name,
           color_hex: cw.hex,
           size: sz,
-          sku: existing?.sku || `${prefix}-${colorShort}-${sz}`,
+          sku: existing?.sku || `${prefix}-${colorClean}-${sz}-${Math.floor(100 + Math.random() * 900)}`,
           stock_quantity: existing ? existing.stock_quantity : 15,
           image_url: existing?.image_url || null,
         });

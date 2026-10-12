@@ -541,6 +541,10 @@ export class WhatsAppService {
       dateTimeFormatted: string;
       amount: number;
       isSubscriptionCovered?: boolean;
+      locationName?: string;
+      locationAddress?: string;
+      directionsUrl?: string;
+      googleMapsUrl?: string;
     }
   ): Promise<WhatsAppSendResult> {
     const payMeLink = this.generatePayMeLink({
@@ -555,6 +559,13 @@ export class WhatsAppService {
       ? `💎 *Payment:* Included in VIP Membership (R 0.00)`
       : `💵 *Payment Due:* R ${booking.amount.toFixed(2)}`;
 
+    const locationName = booking.locationName || 'Dissafyt Studio - Bernie';
+    const destinationAddress = booking.locationAddress || '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570';
+    const directionsUrl =
+      booking.directionsUrl ||
+      booking.googleMapsUrl ||
+      `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destinationAddress + ', South Africa')}`;
+
     const body = [
       `✂️ *ACE OF FYT // BOOKING CONFIRMED*`,
       ``,
@@ -563,7 +574,10 @@ export class WhatsAppService {
       `💈 *Service:* ${booking.serviceName}`,
       `👤 *Barber:* ${booking.barberName}`,
       `📅 *Date & Time:* ${booking.dateTimeFormatted}`,
-      `📍 *Location:* Dissafyt Studio, Cape Town`,
+      `📍 *Studio:* ${locationName}`,
+      `🏢 *Address:* ${destinationAddress}`,
+      `🗺️ *Turn-by-Turn Directions:*`,
+      `${directionsUrl}`,
       paymentLine,
       ``,
       booking.amount > 0 && !booking.isSubscriptionCovered
@@ -595,8 +609,19 @@ export class WhatsAppService {
       timeFormatted: string;
       amount: number;
       isSubscriptionCovered?: boolean;
+      locationName?: string;
+      locationAddress?: string;
+      directionsUrl?: string;
+      googleMapsUrl?: string;
     }
   ): Promise<WhatsAppSendResult> {
+    const locationName = booking.locationName || 'Dissafyt Studio - Bernie';
+    const destinationAddress = booking.locationAddress || '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570';
+    const directionsUrl =
+      booking.directionsUrl ||
+      booking.googleMapsUrl ||
+      `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destinationAddress + ', South Africa')}`;
+
     const body = [
       `⏳ *ACE OF FYT APPOINTMENT REMINDER*`,
       ``,
@@ -605,7 +630,9 @@ export class WhatsAppService {
       `💈 *Service:* ${booking.serviceName}`,
       `👤 *Barber:* ${booking.barberName}`,
       `⏰ *Time:* ${booking.timeFormatted} (SAST)`,
-      `📍 *Studio:* Dissafyt Studio, Cape Town`,
+      `📍 *Studio:* ${locationName}`,
+      `🏢 *Address:* ${destinationAddress}`,
+      `🗺️ *Directions:* ${directionsUrl}`,
       ``,
       `Please arrive 5 minutes early. If you need to reschedule or talk to Curtis, tap below.`,
     ].join('\n');

@@ -49,6 +49,8 @@ export interface BookingConfirmationPayload {
   startTime: string | Date;
   locationName?: string;
   locationAddress?: string;
+  googleMapsUrl?: string;
+  directionsUrl?: string;
   totalAmount: number;
   paymentStatus: string;
   bookingUrl?: string;
@@ -394,6 +396,12 @@ export class EmailService {
       minute: '2-digit',
     });
 
+    const destinationAddress = payload.locationAddress || '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570';
+    const directionsUrl =
+      payload.directionsUrl ||
+      payload.googleMapsUrl ||
+      `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destinationAddress)}`;
+
     const content = `
       <div style="margin-bottom:24px;">
         <span style="background-color:rgba(255,85,0,0.15);color:#ff5500;border:1px solid rgba(255,85,0,0.4);border-radius:4px;padding:4px 8px;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;">
@@ -421,7 +429,12 @@ export class EmailService {
             <td style="padding-bottom:12px;color:#a1a1aa;font-size:13px;">Studio Location:</td>
             <td style="padding-bottom:12px;color:#f4f4f5;font-size:13px;line-height:1.4;">
               <strong>${payload.locationName || 'Dissafyt Studio - Bernie'}</strong><br/>
-              ${payload.locationAddress || '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570'}
+              ${destinationAddress}
+              <div style="margin-top:8px;">
+                <a href="${directionsUrl}" target="_blank" rel="noopener noreferrer" style="display:inline-block;background-color:#27272a;color:#ff5500;border:1px solid rgba(255,85,0,0.3);border-radius:4px;padding:5px 10px;font-size:11px;font-weight:700;text-decoration:none;letter-spacing:0.5px;">
+                  📍 Open Turn-by-Turn Directions in Google Maps &rarr;
+                </a>
+              </div>
             </td>
           </tr>
           <tr>
@@ -439,8 +452,11 @@ export class EmailService {
         </div>
       </div>
 
-      <div style="text-align:center;">
-        <a href="${payload.bookingUrl || 'https://dissafyt.com/account/bookings'}" style="background-color:#ff5500;color:#09090b;text-decoration:none;padding:14px 28px;border-radius:6px;font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase;display:inline-block;box-shadow:0 4px 14px rgba(255,85,0,0.35);">
+      <div style="text-align:center;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+        <a href="${directionsUrl}" target="_blank" rel="noopener noreferrer" style="background-color:#ff5500;color:#09090b;text-decoration:none;padding:14px 24px;border-radius:6px;font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase;display:inline-block;box-shadow:0 4px 14px rgba(255,85,0,0.35);margin:4px;">
+          🗺️ Get Directions in Google Maps
+        </a>
+        <a href="${payload.bookingUrl || 'https://dissafyt.com/account/bookings'}" style="background-color:#27272a;color:#f4f4f5;border:1px solid #3f3f46;text-decoration:none;padding:14px 24px;border-radius:6px;font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase;display:inline-block;margin:4px;">
           Manage Appointment
         </a>
       </div>
@@ -449,8 +465,75 @@ export class EmailService {
     return this.send({
       to: payload.customerEmail,
       subject: `Appointment Confirmed: ${payload.serviceName} &bull; Dissafyt Studio`,
-      html: this.renderShell(content, `Appointment booked for ${formattedDate} at Dissafyt Studio.`),
+      html: this.renderShell(content, `Appointment booked for ${formattedDate} at Dissafyt Studio. Directions included.`),
       tags: [{ name: 'category', value: 'booking_confirmation' }],
+    });
+  }
+
+  /**
+   * 2b. Appointment Reminder (with Turn-by-Turn Directions)
+   */
+  static async sendBookingReminder(payload: BookingConfirmationPayload) {
+    const formattedDate = new Date(payload.startTime).toLocaleString('en-ZA', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+
+    const destinationAddress = payload.locationAddress || '1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570';
+    const directionsUrl =
+      payload.directionsUrl ||
+      payload.googleMapsUrl ||
+      `https://www.google.com/maps/dir/?api=1&destination=${encodeURIComponent(destinationAddress)}`;
+
+    const content = `
+      <div style="margin-bottom:24px;">
+        <span style="background-color:rgba(255,85,0,0.15);color:#ff5500;border:1px solid rgba(255,85,0,0.4);border-radius:4px;padding:4px 8px;font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;">
+          Upcoming Appointment Reminder
+        </span>
+        <h2 style="color:#ffffff;font-size:22px;font-weight:800;margin:12px 0 6px;">
+          ${payload.serviceName} &bull; ${payload.staffName || 'Master Barber'}
+        </h2>
+        <p style="color:#a1a1aa;font-size:14px;margin:0;line-height:1.5;">
+          Hi ${payload.customerName}, this is a reminder for your chair session today at <strong>${formattedDate}</strong>.
+        </p>
+      </div>
+
+      <div style="background-color:#18181b;border:1px solid #27272a;border-radius:8px;padding:20px;margin-bottom:24px;">
+        <table role="presentation" width="100%" border="0" cellspacing="0" cellpadding="0">
+          <tr>
+            <td style="padding-bottom:12px;color:#a1a1aa;font-size:13px;width:110px;">Time:</td>
+            <td style="padding-bottom:12px;color:#ff5500;font-weight:700;font-size:14px;">${formattedDate}</td>
+          </tr>
+          <tr>
+            <td style="padding-bottom:12px;color:#a1a1aa;font-size:13px;">Barber:</td>
+            <td style="padding-bottom:12px;color:#f4f4f5;font-weight:600;font-size:14px;">${payload.staffName || 'Bernie'}</td>
+          </tr>
+          <tr>
+            <td style="padding-bottom:12px;color:#a1a1aa;font-size:13px;">Location:</td>
+            <td style="padding-bottom:12px;color:#f4f4f5;font-size:13px;line-height:1.4;">
+              <strong>${payload.locationName || 'Dissafyt Studio - Bernie'}</strong><br/>
+              ${destinationAddress}
+            </td>
+          </tr>
+        </table>
+      </div>
+
+      <div style="text-align:center;display:flex;gap:12px;justify-content:center;flex-wrap:wrap;">
+        <a href="${directionsUrl}" target="_blank" rel="noopener noreferrer" style="background-color:#ff5500;color:#09090b;text-decoration:none;padding:14px 24px;border-radius:6px;font-weight:800;font-size:13px;letter-spacing:1px;text-transform:uppercase;display:inline-block;box-shadow:0 4px 14px rgba(255,85,0,0.35);margin:4px;">
+          🗺️ Open Directions in Google Maps
+        </a>
+      </div>
+    `;
+
+    return this.send({
+      to: payload.customerEmail,
+      subject: `Reminder: Appointment Today at ${formattedDate} &bull; Dissafyt Studio`,
+      html: this.renderShell(content, `Appointment reminder for ${formattedDate} with turn-by-turn Google Maps directions.`),
+      tags: [{ name: 'category', value: 'booking_reminder' }],
     });
   }
 
