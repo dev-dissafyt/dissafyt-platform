@@ -161,7 +161,15 @@ export class OrderService {
         balance_amount: number;
       }[] = [];
 
+      if (!input.items || !Array.isArray(input.items) || input.items.length === 0) {
+        return { success: false, error: 'Cart must contain at least one item.' };
+      }
+
       for (const item of input.items) {
+        if (!Number.isInteger(item.quantity) || item.quantity <= 0 || item.quantity > 50) {
+          return { success: false, error: 'Invalid item quantity. Must be a positive whole number.' };
+        }
+
         const product = products.find((p) => p.id === item.product_id);
         if (!product) {
           return { success: false, error: `Product not found: ${item.product_id}` };

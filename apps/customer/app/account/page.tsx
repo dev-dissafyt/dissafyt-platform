@@ -910,8 +910,8 @@ export default function AccountPage() {
           }`}
         >
           <Scissors className="h-3.5 w-3.5 sm:h-4 sm:w-4 flex-shrink-0" />
-          <span className="sm:hidden">Haircuts</span>
-          <span className="hidden sm:inline truncate">Barbershop &amp; VIP Pass</span>
+          <span className="sm:hidden">Bookings</span>
+          <span className="hidden sm:inline truncate">Bookings &amp; VIP Pass</span>
           <span
             className={`hidden sm:inline-flex items-center justify-center rounded-full px-2 py-0.5 text-[10px] font-mono ${
               activeTab === 'barbershop'
@@ -1248,7 +1248,7 @@ export default function AccountPage() {
               <div>
                 <CardTitle className="text-lg sm:text-xl text-white flex items-center">
                   <Scissors className="mr-2 h-5 w-5 text-amber-500" />
-                  Barbershop Appointments ({bookings.length})
+                  Scheduled Bookings ({bookings.length})
                 </CardTitle>
                 <CardDescription className="text-xs">
                   Hover or tap any highlighted date to inspect or manage your session

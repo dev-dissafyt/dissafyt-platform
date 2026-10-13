@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdminClient } from '@dissafyt/database';
-import { AuditService, GUEST_USER_ID } from '@dissafyt/api';
+import { AuditService, AuthService, GUEST_USER_ID } from '@dissafyt/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -27,10 +27,49 @@ export interface PosCheckoutRequest {
 
 export async function POST(request: NextRequest) {
   try {
-    const operatorEmail =
-      request.cookies.get('dissafyt_pos_operator')?.value ||
-      request.cookies.get('dissafyt_admin_email')?.value ||
-      'pos-operator@dissafyt.com';
+    const authHeader = request.headers.get('Authorization');
+    const token =
+      (authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null) ||
+      request.cookies.get('dissafyt_pos_token')?.value ||
+      request.cookies.get('dissafyt_admin_token')?.value ||
+      null;
+
+    if (!token) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: POS operator credentials required.' },
+        { status: 401 }
+      );
+    }
+
+    const authCtx = await AuthService.verifyToken(token);
+    if (!authCtx || !authCtx.userId) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized: Invalid or expired POS session.' },
+        { status: 401 }
+      );
+    }
+
+    const admin = getSupabaseAdminClient();
+    const userEmail = (authCtx.email || '').toLowerCase();
+    const { data: dbRoles } = await admin
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', authCtx.userId);
+    const roles = (dbRoles || []).map((r: any) => r.role);
+    const isAuthorized =
+      roles.includes('admin') ||
+      roles.includes('staff') ||
+      userEmail === 'curtislee@dissafyt.com' ||
+      userEmail === 'dissafyt@gmail.com';
+
+    if (!isAuthorized) {
+      return NextResponse.json(
+        { success: false, error: 'Forbidden: POS checkout is restricted to authorized studio staff.' },
+        { status: 403 }
+      );
+    }
+
+    const operatorEmail = userEmail || 'pos-operator@dissafyt.com';
 
     const body: PosCheckoutRequest = await request.json();
     const {
@@ -45,14 +84,22 @@ export async function POST(request: NextRequest) {
       notes,
     } = body;
 
-    if (!items || items.length === 0) {
+    if (!items || !Array.isArray(items) || items.length === 0) {
       return NextResponse.json({ success: false, error: 'Cart is empty.' }, { status: 400 });
     }
 
-    const admin = getSupabaseAdminClient();
+    for (const item of items) {
+      if (!Number.isInteger(item.quantity) || item.quantity <= 0 || item.quantity > 100) {
+        return NextResponse.json(
+          { success: false, error: `Invalid quantity for "${item.name}". Must be a positive whole number.` },
+          { status: 400 }
+        );
+      }
+    }
+
     const userId = customer_id || GUEST_USER_ID;
 
-    // 1. Inventory Validation & Stock Decrement for Products
+    // 1. Inventory Validation, Authoritative Pricing & Stock Decrement for Products
     const productItems = items.filter((i) => i.type === 'product');
     const serviceItems = items.filter((i) => i.type === 'service');
 
@@ -66,7 +113,7 @@ export async function POST(request: NextRequest) {
 
       const { data: variant, error: vErr } = await admin
         .from('product_variants')
-        .select('id, name, stock_quantity')
+        .select('id, name, stock_quantity, price_override, product:products(id, name, base_price, is_preorder, is_active)')
         .eq('id', pItem.variant_id)
         .single();
 
@@ -76,6 +123,13 @@ export async function POST(request: NextRequest) {
           { status: 404 }
         );
       }
+
+      const parentProduct = (variant as any).product;
+      const authoritativePrice =
+        variant.price_override !== null && variant.price_override !== undefined && Number(variant.price_override) > 0
+          ? Number(variant.price_override)
+          : Number(parentProduct?.base_price ?? pItem.price);
+      pItem.price = authoritativePrice;
 
       if (variant.stock_quantity < pItem.quantity) {
         return NextResponse.json(
@@ -96,6 +150,17 @@ export async function POST(request: NextRequest) {
 
       if (updErr) {
         console.error('Failed to decrement stock for variant:', pItem.variant_id, updErr);
+      }
+    }
+
+    for (const sItem of serviceItems) {
+      const { data: dbSvc } = await admin
+        .from('services')
+        .select('id, name, price')
+        .eq('id', sItem.id)
+        .maybeSingle();
+      if (dbSvc) {
+        sItem.price = Number(dbSvc.price);
       }
     }
 

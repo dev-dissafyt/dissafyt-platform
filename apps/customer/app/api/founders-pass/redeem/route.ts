@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { FounderPassService } from '@dissafyt/api';
+import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -7,13 +8,17 @@ export const revalidate = 0;
 /**
  * POST /api/founders-pass/redeem
  * Redeems 1 haircut from an active Founder Pass (counter register or staff action).
+ * Restricted to authenticated POS / studio staff and administrators.
  */
 export async function POST(request: NextRequest) {
+  const auth = await requireAdminAuth(request, 'booking:edit');
+  if (isAuthFailure(auth)) return auth;
+
   try {
     const body = await request.json().catch(() => ({}));
     const passId = body.passId;
-    const barberName = body.barberName || 'Ace Barber';
-    const notes = body.notes || 'In-Studio Walk-in Haircut';
+    const barberName = body.barberName || auth.email || 'Ace Barber';
+    const notes = body.notes || `In-Studio Walk-in Haircut (Operator: ${auth.email})`;
 
     if (!passId) {
       return NextResponse.json(

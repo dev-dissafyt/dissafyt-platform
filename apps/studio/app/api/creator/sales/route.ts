@@ -1,18 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { BrandService } from '@dissafyt/api';
+import { requireStudioAuth, isAuthFailure } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  const auth = await requireStudioAuth(request, ['admin', 'creator']);
+  if (isAuthFailure(auth)) return auth;
+
   const { searchParams } = new URL(request.url);
-  const callerBrandId = request.headers.get('x-dissafyt-brand-id') || 
-                        request.cookies.get('dissafyt_studio_brand_id')?.value;
-  const brandId = searchParams.get('brandId') || callerBrandId || 'b0000000-0000-0000-0000-000000000001';
+  const requestedBrandId = searchParams.get('brandId');
+
+  let effectiveBrandId = requestedBrandId || auth.brandId || 'b0000000-0000-0000-0000-000000000001';
+  if (auth.role === 'creator') {
+    const creatorOwnBrandId = auth.brandId || 'b0000000-0000-0000-0000-000000000001';
+    if (requestedBrandId && requestedBrandId !== creatorOwnBrandId) {
+      return NextResponse.json({ error: 'Forbidden: Access to other brand analytics is prohibited.' }, { status: 403 });
+    }
+    effectiveBrandId = creatorOwnBrandId;
+  }
 
   try {
     const [salesSummary, stackedMetrics] = await Promise.all([
-      BrandService.getCreatorSalesSummary(brandId),
-      BrandService.getStackedReturnsMetrics(brandId),
+      BrandService.getCreatorSalesSummary(effectiveBrandId),
+      BrandService.getStackedReturnsMetrics(effectiveBrandId),
     ]);
 
     return NextResponse.json({

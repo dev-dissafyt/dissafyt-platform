@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { PayfastService, getCanonicalSiteUrl } from '@dissafyt/api';
 import { getSupabaseAdminClient } from '@dissafyt/database';
+import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,15 +17,15 @@ export async function POST(request: NextRequest) {
     const siteUrl = getCanonicalSiteUrl();
     const merchantId = process.env.PAYFAST_MERCHANT_ID || process.env.NEXT_PUBLIC_PAYFAST_MERCHANT_ID || '17675995';
 
-    let resolvedAmount = Number(amount || 0);
+    let resolvedAmount = 0;
     let resolvedItemName = item_name || 'Dissafyt Studio Payment';
     let relatedId = booking_id || order_id || `pm-${Date.now()}`;
-    let relatedType = booking_id ? 'booking' : 'order';
+    let relatedType = booking_id ? 'booking' : order_id ? 'order' : 'custom';
     let resolvedCustomerName = customer_name;
     let resolvedCustomerEmail = customer_email;
     let resolvedCustomerPhone = customer_phone;
 
-    // If booking_id provided, fetch exact details from database
+    // If booking_id provided, fetch exact details authoritatively from database
     if (booking_id) {
       const admin = getSupabaseAdminClient();
       const { data: booking } = await admin
@@ -36,10 +37,12 @@ export async function POST(request: NextRequest) {
         .eq('id', booking_id)
         .maybeSingle();
 
-      if (booking) {
-        resolvedAmount = Number(booking.total_amount || booking.service?.price || resolvedAmount);
-        resolvedItemName = `Ace of Fyt: ${booking.service?.name || 'Haircut'}`;
+      if (!booking) {
+        return NextResponse.json({ error: 'Booking not found' }, { status: 404 });
       }
+      resolvedAmount = Number(booking.total_amount || booking.service?.price || 0);
+      resolvedItemName = `Ace of Fyt: ${booking.service?.name || 'Haircut'}`;
+      relatedId = booking.id;
     } else if (order_id) {
       const admin = getSupabaseAdminClient();
       const { data: order } = await admin
@@ -48,19 +51,27 @@ export async function POST(request: NextRequest) {
         .eq('id', order_id)
         .maybeSingle();
 
-      if (order) {
-        const balanceDue = Number(order.balance_due || 0);
-        if (order.deposit_status === 'deposit_paid' && balanceDue > 0) {
-          resolvedAmount = balanceDue;
-          resolvedItemName = `Dissafyt Pre-Order Balance #${order.order_number}`;
-        } else {
-          resolvedAmount = Number(order.total || resolvedAmount);
-          resolvedItemName = `Dissafyt Order #${order.order_number}`;
-        }
-        if (order.customer_name) resolvedCustomerName = order.customer_name;
-        if (order.customer_email) resolvedCustomerEmail = order.customer_email;
-        if (order.customer_phone) resolvedCustomerPhone = order.customer_phone;
+      if (!order) {
+        return NextResponse.json({ error: 'Order not found' }, { status: 404 });
       }
+      const balanceDue = Number(order.balance_due || 0);
+      if (order.deposit_status === 'deposit_paid' && balanceDue > 0) {
+        resolvedAmount = balanceDue;
+        resolvedItemName = `Dissafyt Pre-Order Balance #${order.order_number}`;
+      } else {
+        resolvedAmount = Number(order.total || 0);
+        resolvedItemName = `Dissafyt Order #${order.order_number}`;
+      }
+      if (order.customer_name) resolvedCustomerName = order.customer_name;
+      if (order.customer_email) resolvedCustomerEmail = order.customer_email;
+      if (order.customer_phone) resolvedCustomerPhone = order.customer_phone;
+      relatedId = order.id;
+    } else {
+      // Ad-hoc custom Pay-Me amount requires staff/admin authorization
+      const auth = await requireAdminAuth(request, 'order:edit');
+      if (isAuthFailure(auth)) return auth;
+      resolvedAmount = Number(amount || 0);
+      relatedId = `pm-${Date.now()}`;
     }
 
     if (resolvedAmount <= 0) {

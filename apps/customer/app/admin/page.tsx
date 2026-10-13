@@ -17,6 +17,9 @@ import {
   CheckCircle2,
   ArrowRight,
   Sparkles,
+  Crown,
+  Flame,
+  Phone,
 } from 'lucide-react';
 import Link from 'next/link';
 import { adminFetch } from '@/lib/operator';
@@ -30,12 +33,37 @@ interface OperationalMetrics {
     barbershopRevenue: number;
     subscriptionRevenue?: number;
     walkInRevenue?: number;
+    founderPassRevenue?: number;
     serviceValueDelivered?: number;
     totalCustomers: number;
     totalOrders: number;
     totalBookings: number;
     preorderOrdersCount?: number;
     preorderUnitsCount?: number;
+  };
+  founderPass?: {
+    totalTarget: number;
+    totalCapitalTarget: number;
+    totalPasses: number;
+    activePaidPasses: number;
+    pendingPledges: number;
+    currentCapitalRaised: number;
+    pctFunded: number;
+    spotsRemaining: number;
+    totalCutsRedeemed: number;
+    recentPatrons: {
+      id: string;
+      passNumber: string;
+      customerName: string;
+      customerEmail: string;
+      customerPhone: string;
+      status: string;
+      cutsUsed: number;
+      totalCuts: number;
+      amountPaid: number;
+      paymentMethod?: string;
+      createdAt: string;
+    }[];
   };
   orders: {
     total: number;
@@ -64,7 +92,7 @@ interface OperationalMetrics {
   }[];
   recentActivity: {
     id: string;
-    type: 'order' | 'booking';
+    type: 'order' | 'booking' | 'founder_pass';
     title: string;
     subtitle: string;
     amount: number;
@@ -143,6 +171,12 @@ export default function AdminDashboardPage() {
               <span className="text-amber-400">Pre-orders: R {(metrics?.overview.preorderRevenue || 0).toFixed(0)}</span>
               <span>&bull;</span>
               <span>Barber: R {(metrics?.overview.barbershopRevenue || 0).toFixed(0)}</span>
+              {(metrics?.overview.founderPassRevenue || 0) > 0 && (
+                <>
+                  <span>&bull;</span>
+                  <span className="text-amber-500 font-bold">Founder: R {(metrics?.overview.founderPassRevenue || 0).toFixed(0)}</span>
+                </>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -199,6 +233,196 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ============================================================== */}
+      {/* FOUNDER'S PASS & PHYSICAL BUILDOUT CAPITAL POOL               */}
+      {/* ============================================================== */}
+      <Card className="border-[#ff5500]/40 bg-gradient-to-br from-stone-900/90 via-stone-950 to-stone-900/90 relative overflow-hidden shadow-xl shadow-[#ff5500]/5">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#ff5500] via-amber-500 to-[#ff7700]" />
+        
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-800/80">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#ff5500]/20 border border-[#ff5500]/40 text-[#ff5500] font-mono text-[10px] font-black uppercase tracking-wider">
+                <Flame className="w-3 h-3 fill-[#ff5500] animate-pulse" />
+                Physical Buildout Capital
+              </span>
+              <span className="text-xs font-mono text-stone-400">
+                1 Norwalk Way, Bernadino Heights Studio
+              </span>
+            </div>
+            <CardTitle className="text-xl text-white flex items-center">
+              <Crown className="mr-2 h-5 w-5 text-amber-400" />
+              Founder Pass &amp; Capital Telemetry
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Live tracking of 50 prepaid patron passes (R1,200 for 12 cuts) funding Belmont chairs, custom mirrors, and studio stations
+            </CardDescription>
+          </div>
+
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-lg">
+              TARGET: R 60,000.00
+            </span>
+          </div>
+        </CardHeader>
+
+        <CardContent className="pt-6 space-y-6">
+          {/* 4 Stat Pills */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {/* 1. Capital Collected */}
+            <div className="p-4 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
+              <div className="text-[11px] font-mono uppercase text-stone-400">Capital Collected</div>
+              <div className="text-2xl font-black font-mono text-emerald-400">
+                R {(metrics?.founderPass?.currentCapitalRaised || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[10px] font-mono text-stone-500">
+                {metrics?.founderPass?.pctFunded || 0}% of R 60,000 goal
+              </div>
+            </div>
+
+            {/* 2. Active Passes */}
+            <div className="p-4 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
+              <div className="text-[11px] font-mono uppercase text-stone-400">Passes Claimed</div>
+              <div className="text-2xl font-black font-mono text-white flex items-baseline gap-1.5">
+                <span>{metrics?.founderPass?.activePaidPasses || 0}</span>
+                <span className="text-xs font-normal text-stone-500">/ 50 Max</span>
+              </div>
+              <div className="text-[10px] font-mono text-[#ff5500] font-bold">
+                {metrics?.founderPass?.spotsRemaining ?? 50} Passes Remaining
+              </div>
+            </div>
+
+            {/* 3. Pledged Waitlist */}
+            <div className="p-4 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
+              <div className="text-[11px] font-mono uppercase text-stone-400">Waitlist Pledges</div>
+              <div className="text-2xl font-black font-mono text-amber-300">
+                {metrics?.founderPass?.pendingPledges || 0}
+              </div>
+              <div className="text-[10px] font-mono text-stone-500">
+                Awaiting payment completion
+              </div>
+            </div>
+
+            {/* 4. Haircut Redemptions */}
+            <div className="p-4 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
+              <div className="text-[11px] font-mono uppercase text-stone-400">Cuts Delivered</div>
+              <div className="text-2xl font-black font-mono text-blue-400 flex items-baseline gap-1.5">
+                <span>{metrics?.founderPass?.totalCutsRedeemed || 0}</span>
+                <span className="text-xs font-normal text-stone-500">
+                  / {((metrics?.founderPass?.activePaidPasses || 0) * 12)} Entitled
+                </span>
+              </div>
+              <div className="text-[10px] font-mono text-stone-500">
+                12 cuts/year prepaid entitlement
+              </div>
+            </div>
+          </div>
+
+          {/* Progress Bar towards R60k buildout */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center text-xs font-mono">
+              <span className="text-stone-300 uppercase font-semibold">
+                Studio Buildout Funding Progress: <strong className="text-amber-400">{metrics?.founderPass?.pctFunded || 0}%</strong>
+              </span>
+              <span className="text-stone-400">
+                R {(metrics?.founderPass?.currentCapitalRaised || 0).toLocaleString()} / R 60,000 Target
+              </span>
+            </div>
+            <div className="h-3 w-full bg-stone-950 rounded-full overflow-hidden border border-stone-800 p-0.5">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-[#ff5500] via-amber-500 to-emerald-500 transition-all duration-700 shadow-md shadow-[#ff5500]/40"
+                style={{ width: `${Math.max(2, Math.min(100, metrics?.founderPass?.pctFunded || 0))}%` }}
+              />
+            </div>
+          </div>
+
+          {/* Recent Patrons Roster */}
+          <div className="space-y-3 pt-2 border-t border-stone-800/80">
+            <div className="flex items-center justify-between text-xs font-medium">
+              <span className="text-stone-300 font-bold uppercase tracking-wider font-mono flex items-center gap-1.5">
+                <Users className="w-3.5 h-3.5 text-amber-500" />
+                <span>Founding Patron Roster ({metrics?.founderPass?.totalPasses || 0} Total Backers)</span>
+              </span>
+              <span className="text-[11px] font-mono text-stone-500">
+                Direct WhatsApp updates for studio milestones
+              </span>
+            </div>
+
+            {loading ? (
+              <div className="py-6 text-center text-stone-500 text-xs font-mono">Loading founder patrons...</div>
+            ) : !metrics?.founderPass?.recentPatrons || metrics.founderPass.recentPatrons.length === 0 ? (
+              <div className="py-6 text-center text-stone-500 text-xs font-mono rounded-lg bg-stone-950/40 border border-stone-800/60">
+                No founder passes registered yet. Online purchases and counter pledges will appear here live.
+              </div>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-xs font-mono">
+                  <thead>
+                    <tr className="border-b border-stone-800 text-stone-400 text-[11px]">
+                      <th className="pb-2 font-medium">Pass #</th>
+                      <th className="pb-2 font-medium">Patron Name</th>
+                      <th className="pb-2 font-medium">Contact</th>
+                      <th className="pb-2 font-medium">Status</th>
+                      <th className="pb-2 font-medium">Cuts Used</th>
+                      <th className="pb-2 font-medium text-right">Action</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-stone-800/60">
+                    {metrics.founderPass.recentPatrons.map((patron) => {
+                      const cleanPhone = (patron.customerPhone || '').replace(/[^0-9]/g, '');
+                      const waText = encodeURIComponent(
+                        `Hi ${patron.customerName}, this is Dissafyt Admin regarding your Founder Pass #${patron.passNumber} at 1 Norwalk Way studio.`
+                      );
+                      const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}?text=${waText}` : null;
+
+                      return (
+                        <tr key={patron.id} className="hover:bg-stone-950/60 transition-colors">
+                          <td className="py-2.5 font-bold text-amber-400">{patron.passNumber}</td>
+                          <td className="py-2.5 font-medium text-white">{patron.customerName}</td>
+                          <td className="py-2.5 text-stone-400">
+                            <div>{patron.customerPhone || '—'}</div>
+                            <div className="text-[10px] text-stone-500">{patron.customerEmail}</div>
+                          </td>
+                          <td className="py-2.5">
+                            <span
+                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                patron.status === 'active'
+                                  ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/40'
+                                  : patron.status === 'exhausted'
+                                  ? 'bg-blue-950/60 text-blue-400 border border-blue-800/40'
+                                  : 'bg-amber-950/60 text-amber-400 border border-amber-800/40'
+                              }`}
+                            >
+                              {patron.status}
+                            </span>
+                          </td>
+                          <td className="py-2.5 text-stone-300">
+                            {patron.cutsUsed} / {patron.totalCuts} cuts
+                          </td>
+                          <td className="py-2.5 text-right">
+                            {waUrl && (
+                              <a
+                                href={waUrl}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700/50 text-emerald-300 text-[10px] font-bold transition-all"
+                              >
+                                <Phone className="w-3 h-3" />
+                                <span>WhatsApp</span>
+                              </a>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Operational Breakdown Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -341,11 +565,15 @@ export default function AdminDashboardPage() {
                             ? act.isPreorder
                               ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
                               : 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                            : act.type === 'founder_pass'
+                            ? 'bg-amber-500/20 text-amber-400 border border-amber-500/40'
                             : 'bg-blue-500/10 text-blue-400 border border-blue-500/20'
                         }`}
                       >
                         {act.type === 'order' ? (
                           <ShoppingBag className="h-4 w-4" />
+                        ) : act.type === 'founder_pass' ? (
+                          <Crown className="h-4 w-4" />
                         ) : (
                           <Scissors className="h-4 w-4" />
                         )}

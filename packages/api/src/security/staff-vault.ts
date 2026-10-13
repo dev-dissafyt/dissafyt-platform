@@ -148,6 +148,34 @@ export class StaffVaultService {
   }
 
   /**
+   * Masks customer contact information in a booking record for specialist station views
+   * to enforce POPIA compliance and prevent client list poaching.
+   */
+  static maskCustomerContactForSpecialist<T extends Record<string, any>>(booking: T): T {
+    const clone: any = { ...booking };
+    if (clone.customer_phone) {
+      clone.customer_phone = this.maskClientPhone(clone.customer_phone);
+    }
+    if (clone.client_phone) {
+      clone.client_phone = this.maskClientPhone(clone.client_phone);
+    }
+    if (clone.customer_email) {
+      clone.customer_email = this.maskClientEmail(clone.customer_email);
+    }
+    if (clone.client_email) {
+      clone.client_email = this.maskClientEmail(clone.client_email);
+    }
+    if (clone.customer && typeof clone.customer === 'object') {
+      clone.customer = {
+        ...clone.customer,
+        phone_number: this.maskClientPhone(clone.customer.phone_number),
+        email: this.maskClientEmail(clone.customer.email),
+      };
+    }
+    return clone;
+  }
+
+  /**
    * Checks whether a user-submitted value is a masked placeholder (e.g., ••••1234)
    * so we don't overwrite the encrypted value in the database with bullets.
    */

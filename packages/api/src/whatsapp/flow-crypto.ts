@@ -127,12 +127,16 @@ export class FlowCrypto {
     appSecret?: string
   ): boolean {
     const secret = appSecret || process.env.META_APP_SECRET || process.env.APP_SECRET;
-    if (!signatureHeader || !secret) return true; // bypass if secret not configured
+    if (!secret) return true; // bypass only if secret is not configured in environment
+    if (!signatureHeader) return false; // reject missing signature header when secret is configured
 
     const cleanSig = signatureHeader.replace(/^sha256=/, '');
     const computed = crypto.createHmac('sha256', secret).update(rawBody, 'utf8').digest('hex');
     try {
-      return crypto.timingSafeEqual(Buffer.from(cleanSig, 'hex'), Buffer.from(computed, 'hex'));
+      const sigBuf = Buffer.from(cleanSig, 'hex');
+      const compBuf = Buffer.from(computed, 'hex');
+      if (sigBuf.length !== compBuf.length) return false;
+      return crypto.timingSafeEqual(sigBuf, compBuf);
     } catch {
       return false;
     }

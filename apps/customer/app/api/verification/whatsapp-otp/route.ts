@@ -1,11 +1,36 @@
 import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
-import { WhatsAppService } from '@dissafyt/api';
+import { WhatsAppService, AuthService } from '@dissafyt/api';
 import { getSupabaseAdminClient } from '@dissafyt/database';
 
 export const dynamic = 'force-dynamic';
 
-const OTP_SECRET = process.env.WHATSAPP_ACCESS_TOKEN || process.env.PAYFAST_PASSPHRASE || 'dissafyt-otp-secret-2026';
+const OTP_SECRET =
+  process.env.WHATSAPP_ACCESS_TOKEN ||
+  process.env.PAYFAST_PASSPHRASE ||
+  process.env.SUPABASE_SERVICE_ROLE_KEY ||
+  'dissafyt_secure_runtime_hmac_anchor';
+
+// In-memory rate limiting map: phone -> array of timestamps
+const OTP_SEND_RATE_LIMIT = new Map<string, number[]>();
+
+function checkRateLimit(phone: string): { allowed: boolean; waitSeconds?: number } {
+  const now = Date.now();
+  const windowMs = 10 * 60 * 1000; // 10 minutes
+  const maxAttempts = 3;
+
+  const timestamps = (OTP_SEND_RATE_LIMIT.get(phone) || []).filter((ts) => now - ts < windowMs);
+
+  if (timestamps.length >= maxAttempts) {
+    const oldest = timestamps[0];
+    const waitSeconds = Math.ceil((oldest + windowMs - now) / 1000);
+    return { allowed: false, waitSeconds };
+  }
+
+  timestamps.push(now);
+  OTP_SEND_RATE_LIMIT.set(phone, timestamps);
+  return { allowed: true };
+}
 
 function signOtp(phone: string, code: string, expiresAt: number): string {
   const data = `${phone}:${code}:${expiresAt}`;
@@ -26,7 +51,7 @@ function verifyOtpSignature(phone: string, code: string, token: string): { valid
   }
 
   const expectedHmac = crypto.createHmac('sha256', OTP_SECRET).update(`${phone}:${code}:${expiresAt}`).digest('hex');
-  if (crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(expectedHmac))) {
+  if (hmac.length === expectedHmac.length && crypto.timingSafeEqual(Buffer.from(hmac, 'utf8'), Buffer.from(expectedHmac, 'utf8'))) {
     return { valid: true };
   }
 
@@ -52,6 +77,14 @@ export async function POST(request: NextRequest) {
     // ACTION: SEND
     // =========================================================================
     if (action === 'send') {
+      const rateLimit = checkRateLimit(formattedPhone);
+      if (!rateLimit.allowed) {
+        return NextResponse.json(
+          { error: `Too many verification requests. Please wait ${rateLimit.waitSeconds} seconds before trying again.` },
+          { status: 429 }
+        );
+      }
+
       // Generate random 6-digit code
       const otpCode = Math.floor(100000 + Math.random() * 900000).toString();
       const expiresAt = Date.now() + 10 * 60 * 1000; // 10 minutes
@@ -83,16 +116,35 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ error: verification.error }, { status: 400 });
       }
 
-      // If userId supplied, mark profile phone verified
+      // If userId supplied, verify caller's session before updating profile phone
       if (userId) {
-        try {
-          const admin = getSupabaseAdminClient();
-          await admin
-            .from('profiles')
-            .update({ phone: formattedPhone, updated_at: new Date().toISOString() })
-            .eq('id', userId);
-        } catch {
-          // non-blocking
+        const authHeader = request.headers.get('Authorization');
+        const jwt =
+          (authHeader?.startsWith('Bearer ') ? authHeader.substring(7) : null) ||
+          request.cookies.get('dissafyt_admin_token')?.value ||
+          null;
+
+        if (jwt) {
+          const authCtx = await AuthService.verifyToken(jwt);
+          const isCallerOrAdmin =
+            authCtx &&
+            (authCtx.userId === userId ||
+              (authCtx.roles || []).includes('admin') ||
+              (authCtx.roles || []).includes('staff') ||
+              authCtx.email === 'curtislee@dissafyt.com' ||
+              authCtx.email === 'dissafyt@gmail.com');
+
+          if (isCallerOrAdmin) {
+            try {
+              const admin = getSupabaseAdminClient();
+              await admin
+                .from('profiles')
+                .update({ phone: formattedPhone, updated_at: new Date().toISOString() })
+                .eq('id', userId);
+            } catch {
+              // non-blocking
+            }
+          }
         }
       }
 

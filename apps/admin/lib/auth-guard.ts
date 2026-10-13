@@ -87,12 +87,8 @@ export async function requireAdminAuth(
     );
   }
 
-  const requestedEmail = request.headers.get('x-admin-email')?.toLowerCase().trim();
-  const effectiveEmail = (
-    requestedEmail === 'curtislee@dissafyt.com' || requestedEmail === 'dissafyt@gmail.com'
-      ? requestedEmail
-      : userEmail || 'curtislee@dissafyt.com'
-  );
+  // Always use the cryptographically verified JWT email for audit attribution (never trust x-admin-email header)
+  const effectiveEmail = userEmail || 'admin@dissafyt.com';
 
   return {
     authorized: true,

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AdminBarbershopService } from '@dissafyt/api';
+import { AdminBarbershopService, StaffVaultService } from '@dissafyt/api';
 import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
@@ -16,7 +16,13 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const locationId = searchParams.get('locationId') || undefined;
     const staff = await AdminBarbershopService.listStaff(locationId);
-    return NextResponse.json(staff);
+    if (auth.role === 'admin') {
+      return NextResponse.json(staff);
+    }
+    const scopedStaff = staff.map((s) =>
+      s.user_id && s.user_id === auth.userId ? s : StaffVaultService.sanitizePublicStaff(s)
+    );
+    return NextResponse.json(scopedStaff);
   } catch (error: any) {
     return NextResponse.json({ error: error.message || 'Failed to list staff' }, { status: 500 });
   }

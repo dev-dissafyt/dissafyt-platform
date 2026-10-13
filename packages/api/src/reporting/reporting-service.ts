@@ -1,5 +1,32 @@
 import { getSupabaseAdminClient, Payment } from '@dissafyt/database';
 
+export interface FounderPassPatronRecord {
+  id: string;
+  passNumber: string;
+  customerName: string;
+  customerEmail: string;
+  customerPhone: string;
+  status: string;
+  cutsUsed: number;
+  totalCuts: number;
+  amountPaid: number;
+  paymentMethod?: string;
+  createdAt: string;
+}
+
+export interface FounderPassMetrics {
+  totalTarget: number;
+  totalCapitalTarget: number;
+  totalPasses: number;
+  activePaidPasses: number;
+  pendingPledges: number;
+  currentCapitalRaised: number;
+  pctFunded: number;
+  spotsRemaining: number;
+  totalCutsRedeemed: number;
+  recentPatrons: FounderPassPatronRecord[];
+}
+
 export interface OperationalMetrics {
   overview: {
     totalRevenue: number;
@@ -9,6 +36,7 @@ export interface OperationalMetrics {
     barbershopRevenue: number;
     subscriptionRevenue: number;
     walkInRevenue: number;
+    founderPassRevenue?: number;
     serviceValueDelivered: number;
     totalCustomers: number;
     totalOrders: number;
@@ -16,6 +44,7 @@ export interface OperationalMetrics {
     preorderOrdersCount: number;
     preorderUnitsCount: number;
   };
+  founderPass: FounderPassMetrics;
   orders: {
     total: number;
     pending: number;
@@ -43,7 +72,7 @@ export interface OperationalMetrics {
   }[];
   recentActivity: {
     id: string;
-    type: 'order' | 'booking';
+    type: 'order' | 'booking' | 'founder_pass';
     title: string;
     subtitle: string;
     amount: number;
@@ -85,6 +114,7 @@ export class ReportingService {
     let subscriptionRevenue = 0;
     let commerceRevenue = 0;
     let walkInRevenue = 0;
+    let founderPassRevenueFromPayments = 0;
 
     for (const p of livePaid) {
       const amt = Number(p.amount) || 0;
@@ -94,11 +124,53 @@ export class ReportingService {
         commerceRevenue += amt;
       } else if (p.related_type === 'booking') {
         walkInRevenue += amt;
+      } else if (p.related_type === 'founder_pass' || (p.item_name && p.item_name.toLowerCase().includes('founder'))) {
+        founderPassRevenueFromPayments += amt;
       }
     }
 
-    const totalRevenue = subscriptionRevenue + commerceRevenue + walkInRevenue;
-    const barbershopRevenue = subscriptionRevenue + walkInRevenue;
+    // 2b. Fetch Founder Passes (Buildout Capital Single Source of Truth)
+    const { data: founderPasses } = await admin
+      .from('founder_passes')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    const fpList = founderPasses || [];
+    const activePaidPasses = fpList.filter((p) => p.status === 'active' || p.status === 'exhausted');
+    const pendingPledges = fpList.filter((p) => p.status === 'pending_payment');
+    const capitalFromPasses = activePaidPasses.reduce((acc, p) => acc + (Number(p.amount_paid) || 1200), 0);
+    const currentCapitalRaised = Math.max(capitalFromPasses, founderPassRevenueFromPayments);
+    const totalCutsRedeemed = fpList.reduce((acc, p) => acc + (Number(p.cuts_used) || 0), 0);
+    const pctFunded = Math.min(100, Math.round((currentCapitalRaised / 60000) * 100));
+    const spotsRemaining = Math.max(0, 50 - activePaidPasses.length);
+
+    const founderPass: FounderPassMetrics = {
+      totalTarget: 50,
+      totalCapitalTarget: 60000,
+      totalPasses: fpList.length,
+      activePaidPasses: activePaidPasses.length,
+      pendingPledges: pendingPledges.length,
+      currentCapitalRaised,
+      pctFunded,
+      spotsRemaining,
+      totalCutsRedeemed,
+      recentPatrons: fpList.slice(0, 10).map((p) => ({
+        id: p.id,
+        passNumber: p.pass_number,
+        customerName: p.customer_name,
+        customerEmail: p.customer_email,
+        customerPhone: p.customer_phone,
+        status: p.status,
+        cutsUsed: p.cuts_used || 0,
+        totalCuts: p.total_cuts || 12,
+        amountPaid: Number(p.amount_paid) || 0,
+        paymentMethod: p.payment_method || 'payfast',
+        createdAt: p.created_at,
+      })),
+    };
+
+    const totalRevenue = subscriptionRevenue + commerceRevenue + walkInRevenue + currentCapitalRaised;
+    const barbershopRevenue = subscriptionRevenue + walkInRevenue + currentCapitalRaised;
 
     // 3. Fetch all orders with items to inspect preorders
     const { data: orders } = await admin
@@ -256,6 +328,20 @@ export class ReportingService {
       });
     }
 
+    // Add recent founder passes to activity stream
+    for (const fp of fpList.slice(0, 10)) {
+      const isPaid = fp.status === 'active' || fp.status === 'exhausted';
+      activityFeed.push({
+        id: fp.id,
+        type: 'founder_pass',
+        title: `Founder Pass #${fp.pass_number} • ${fp.customer_name}`,
+        subtitle: isPaid ? '12 Cuts VIP Pass Active' : 'Pledge Reserved • Awaiting Payment',
+        amount: Number(fp.amount_paid) || (isPaid ? 1200 : 0),
+        status: fp.status,
+        timestamp: fp.created_at,
+      });
+    }
+
     // Sort combined feed by timestamp descending
     activityFeed.sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
 
@@ -268,6 +354,7 @@ export class ReportingService {
         barbershopRevenue,
         subscriptionRevenue,
         walkInRevenue,
+        founderPassRevenue: currentCapitalRaised,
         serviceValueDelivered,
         totalCustomers: customerCount || 0,
         totalOrders: orderList.length,
@@ -275,6 +362,7 @@ export class ReportingService {
         preorderOrdersCount,
         preorderUnitsCount,
       },
+      founderPass,
       orders: {
         total: orderList.length,
         ...orderStatusCounts,

@@ -107,6 +107,19 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Verify payment amount satisfies the requested plan tier price (prevents tier escalation)
+    const paidAmount = Number(verifiedPayment.amount || 0);
+    if (paidAmount < plan.price) {
+      return NextResponse.json(
+        {
+          success: false,
+          activated: false,
+          error: `Payment of R${paidAmount.toFixed(2)} does not cover "${plan.name}" (R${plan.price.toFixed(2)}).`,
+        },
+        { status: 400 }
+      );
+    }
+
     // 3. Reconcile active subscription only when backed by a verified PayFast payment
     const payDate = new Date(verifiedPayment.created_at);
     const endDate = new Date(payDate.getTime() + 30 * 24 * 60 * 60 * 1000);

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { AuthService, BarbershopService } from '@dissafyt/api';
+import { AuthService, BarbershopService, StaffVaultService } from '@dissafyt/api';
 
 export const dynamic = 'force-dynamic';
 
@@ -61,7 +61,7 @@ export async function PATCH(
 
 /**
  * GET /api/bookings/[id]
- * Retrieves a single appointment for the authenticated customer or platform admin.
+ * Retrieves a single appointment for the authenticated customer, assigned specialist, or platform admin.
  */
 export async function GET(
   request: NextRequest,
@@ -87,8 +87,8 @@ export async function GET(
     const isAdmin =
       userEmail === 'curtislee@dissafyt.com' ||
       userEmail === 'dissafyt@gmail.com' ||
-      (authCtx.roles || []).includes('admin') ||
-      (authCtx.roles || []).includes('staff');
+      (authCtx.roles || []).includes('admin');
+    const isStaff = (authCtx.roles || []).includes('staff');
 
     const adminClient = (await import('@dissafyt/database')).getSupabaseAdminClient();
     const { data: booking, error: bErr } = await adminClient
@@ -101,22 +101,25 @@ export async function GET(
       return NextResponse.json({ error: 'Appointment not found' }, { status: 404 });
     }
 
-    // Ensure regular customers can only view their own bookings
-    if (!isAdmin && booking.customer_id !== authCtx.userId) {
+    const isCustomerOwner = booking.customer_id === authCtx.userId;
+    const isAssignedSpecialist = Boolean(isStaff && booking.staff?.user_id === authCtx.userId);
+
+    // Ensure regular customers and non-admin staff can only view their own or assigned bookings
+    if (!isAdmin && !isCustomerOwner && !isAssignedSpecialist) {
       return NextResponse.json({ error: 'Unauthorized to view this appointment' }, { status: 403 });
     }
 
-    // If client returns from PayFast with ?paid=1 and booking is still pending, verify payment record before confirming
+    // If client returns from PayFast with ?paid=1 and booking is still pending, verify payment record & amount before confirming
     const { searchParams } = new URL(request.url);
     if (searchParams.get('paid') === '1' && booking.status === 'pending') {
       const { data: verifiedPayment } = await adminClient
         .from('payments')
-        .select('id, status, provider_reference')
+        .select('id, status, amount, provider_reference')
         .eq('related_id', booking.id)
         .eq('status', 'paid')
         .maybeSingle();
 
-      if (verifiedPayment) {
+      if (verifiedPayment && Number(verifiedPayment.amount || 0) >= Number(booking.total_amount || 0)) {
         await adminClient
           .from('bookings')
           .update({
@@ -133,7 +136,18 @@ export async function GET(
       }
     }
 
-    return NextResponse.json({ success: true, booking });
+    // Always sanitize staff financial vault fields before returning
+    if (booking.staff) {
+      booking.staff = StaffVaultService.sanitizePublicStaff(booking.staff);
+    }
+
+    // If viewed by a non-admin specialist (not the customer themselves), mask client contact details (Anti-Poaching)
+    const responseBooking =
+      !isAdmin && !isCustomerOwner && isAssignedSpecialist
+        ? StaffVaultService.maskCustomerContactForSpecialist(booking)
+        : booking;
+
+    return NextResponse.json({ success: true, booking: responseBooking });
   } catch (error: any) {
     console.error('Failed to get booking:', error);
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 });

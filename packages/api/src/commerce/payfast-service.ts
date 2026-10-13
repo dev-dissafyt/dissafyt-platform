@@ -403,40 +403,52 @@ export class PayfastService {
       if (isPaid) {
         if (orderId && !isSubscription) {
           if (isBooking) {
-            // Confirm the barbershop appointment
-            const { data: updatedBooking, error: bkErr } = await admin
+            // Verify booking amount authoritatively
+            const { data: existingBooking } = await admin
               .from('bookings')
-              .update({
-                status: 'confirmed',
-                payment_status: 'paid_online',
-                payment_id: paymentRecord?.id || null,
-                updated_at: new Date().toISOString(),
-              })
+              .select('id, total_amount, status')
               .eq('id', orderId)
-              .select('*, service:services(name), customer:profiles(email, full_name)')
-              .single();
+              .maybeSingle();
 
-            if (bkErr) {
-              console.error(`Booking payment confirmation failed for ${orderId}:`, bkErr);
+            const expectedBookingAmount = Number(existingBooking?.total_amount || 0);
+            if (expectedBookingAmount > 0 && amount < expectedBookingAmount) {
+              console.error(`[PayFast Webhook] Security Alert: Booking ${orderId} expected R${expectedBookingAmount} but received R${amount}. Payment not marked complete.`);
             } else {
-              console.log(`Booking ${orderId} successfully confirmed via PayFast payment.`);
-              try {
-                await AuditService.recordLog({
-                  actor_email: payload.email_address || updatedBooking?.customer?.email || 'payfast-webhook@dissafyt.com',
-                  actor_role: 'system',
-                  action: 'booking.payment_received',
-                  entity_type: 'booking',
-                  entity_id: orderId,
-                  entity_name: `Booking ${orderId} (${updatedBooking?.service?.name || 'Haircut'})`,
-                  changes: {
-                    status: 'confirmed',
-                    payment_status: 'paid_online',
-                    amount,
-                    pf_payment_id: payload.pf_payment_id,
-                  },
-                });
-              } catch (auditErr) {
-                console.warn('Booking payment audit log warning:', auditErr);
+              // Confirm the barbershop appointment
+              const { data: updatedBooking, error: bkErr } = await admin
+                .from('bookings')
+                .update({
+                  status: 'confirmed',
+                  payment_status: 'paid_online',
+                  payment_id: paymentRecord?.id || null,
+                  updated_at: new Date().toISOString(),
+                })
+                .eq('id', orderId)
+                .select('*, service:services(name), customer:profiles(email, full_name)')
+                .single();
+
+              if (bkErr) {
+                console.error(`Booking payment confirmation failed for ${orderId}:`, bkErr);
+              } else {
+                console.log(`Booking ${orderId} successfully confirmed via PayFast payment.`);
+                try {
+                  await AuditService.recordLog({
+                    actor_email: payload.email_address || updatedBooking?.customer?.email || 'payfast-webhook@dissafyt.com',
+                    actor_role: 'system',
+                    action: 'booking.payment_received',
+                    entity_type: 'booking',
+                    entity_id: orderId,
+                    entity_name: `Booking ${orderId} (${updatedBooking?.service?.name || 'Haircut'})`,
+                    changes: {
+                      status: 'confirmed',
+                      payment_status: 'paid_online',
+                      amount,
+                      pf_payment_id: payload.pf_payment_id,
+                    },
+                  });
+                } catch (auditErr) {
+                  console.warn('Booking payment audit log warning:', auditErr);
+                }
               }
             }
           } else {
@@ -456,58 +468,69 @@ export class PayfastService {
             executive: 'The Executive Membership',
             'father-son': 'The Executive Membership',
           };
+          const planMinPrices: Record<string, number> = {
+            solo: 100,
+            twice: 190,
+            executive: 350,
+            'father-son': 190,
+          };
           const planName = planNames[planCode] || payload.item_name || resolvedSub?.plan_name || 'Barbershop Membership';
+          const expectedMinPrice = planMinPrices[planCode] || 100;
 
-          const startDate = new Date();
-          const endDate = new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
+          if (amount < expectedMinPrice) {
+            console.error(`[PayFast Webhook] Security Alert: Subscription ${planCode} expected R${expectedMinPrice} but received R${amount}. Subscription not activated.`);
+          } else {
+            const startDate = new Date();
+            const endDate = new Date(startDate.getTime() + 30 * 24 * 60 * 60 * 1000);
 
-          try {
-            if (resolvedSub) {
-              await admin
-                .from('subscriptions')
-                .update({
+            try {
+              if (resolvedSub) {
+                await admin
+                  .from('subscriptions')
+                  .update({
+                    plan_code: planCode,
+                    plan_name: planName,
+                    price: amount || resolvedSub.price,
+                    status: 'active',
+                    current_period_start: startDate.toISOString(),
+                    current_period_end: endDate.toISOString(),
+                    payfast_token: payload.token || resolvedSub.payfast_token || payload.pf_payment_id || null,
+                    updated_at: new Date().toISOString(),
+                  })
+                  .eq('id', resolvedSub.id);
+
+                if (paymentRecord?.id) {
+                  await admin
+                    .from('payments')
+                    .update({ related_id: resolvedSub.id, user_id: resolvedSub.user_id })
+                    .eq('id', paymentRecord.id);
+                }
+
+                console.log(`Successfully renewed subscription ${resolvedSub.id} for user ${resolvedSub.user_id} through ${endDate.toISOString()}`);
+              } else if (userId && userId !== GUEST_USER_ID) {
+                const { data: createdSub } = await admin.from('subscriptions').insert({
+                  user_id: userId,
                   plan_code: planCode,
                   plan_name: planName,
-                  price: amount || resolvedSub.price,
+                  price: amount,
                   status: 'active',
                   current_period_start: startDate.toISOString(),
                   current_period_end: endDate.toISOString(),
-                  payfast_token: payload.token || resolvedSub.payfast_token || payload.pf_payment_id || null,
-                  updated_at: new Date().toISOString(),
-                })
-                .eq('id', resolvedSub.id);
+                  payfast_token: payload.token || payload.pf_payment_id || null,
+                }).select().single();
 
-              if (paymentRecord?.id) {
-                await admin
-                  .from('payments')
-                  .update({ related_id: resolvedSub.id, user_id: resolvedSub.user_id })
-                  .eq('id', paymentRecord.id);
+                if (paymentRecord?.id && createdSub?.id) {
+                  await admin
+                    .from('payments')
+                    .update({ related_id: createdSub.id })
+                    .eq('id', paymentRecord.id);
+                }
+
+                console.log(`Successfully created new subscription for user ${userId}`);
               }
-
-              console.log(`Successfully renewed subscription ${resolvedSub.id} for user ${resolvedSub.user_id} through ${endDate.toISOString()}`);
-            } else if (userId && userId !== GUEST_USER_ID) {
-              const { data: createdSub } = await admin.from('subscriptions').insert({
-                user_id: userId,
-                plan_code: planCode,
-                plan_name: planName,
-                price: amount,
-                status: 'active',
-                current_period_start: startDate.toISOString(),
-                current_period_end: endDate.toISOString(),
-                payfast_token: payload.token || payload.pf_payment_id || null,
-              }).select().single();
-
-              if (paymentRecord?.id && createdSub?.id) {
-                await admin
-                  .from('payments')
-                  .update({ related_id: createdSub.id })
-                  .eq('id', paymentRecord.id);
-              }
-
-              console.log(`Successfully created new subscription for user ${userId}`);
+            } catch (subErr) {
+              console.error('Failed to create/update subscription in table:', subErr);
             }
-          } catch (subErr) {
-            console.error('Failed to create/update subscription in table:', subErr);
           }
         }
 
@@ -516,11 +539,15 @@ export class PayfastService {
         if (isFounderPass) {
           const passId = payload.custom_str1 || payload.m_payment_id?.replace('founder-', '');
           if (passId) {
-            try {
-              const { FounderPassService } = await import('../barbershop/founder-pass-service');
-              await FounderPassService.activatePass(passId, payload.pf_payment_id || `PF_${Date.now()}`);
-            } catch (fpErr) {
-              console.error('Failed to activate founder pass from PayFast webhook:', fpErr);
+            if (amount < 1200.00) {
+              console.error(`[PayFast Webhook] Security Alert: Founder Pass expected R1200.00 but received R${amount}. Pass not activated.`);
+            } else {
+              try {
+                const { FounderPassService } = await import('../barbershop/founder-pass-service');
+                await FounderPassService.activatePass(passId, payload.pf_payment_id || `PF_${Date.now()}`);
+              } catch (fpErr) {
+                console.error('Failed to activate founder pass from PayFast webhook:', fpErr);
+              }
             }
           }
         }

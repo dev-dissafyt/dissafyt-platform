@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdminClient } from '@dissafyt/database';
+import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -7,23 +8,28 @@ export const revalidate = 0;
 /**
  * GET /api/founders-pass/lookup?query=...
  * Looks up Founder Passes by customer phone, email, name, or pass number.
+ * Restricted to authenticated POS / studio staff and administrators.
  */
 export async function GET(request: NextRequest) {
+  const auth = await requireAdminAuth(request, 'booking:view');
+  if (isAuthFailure(auth)) return auth;
+
   try {
     const { searchParams } = new URL(request.url);
-    const query = searchParams.get('query')?.trim() || '';
+    const rawQuery = searchParams.get('query')?.trim() || '';
+    const safeQuery = rawQuery.replace(/[,()%_*\\'"]/g, '').trim();
 
-    if (!query) {
+    if (!safeQuery) {
       return NextResponse.json({ success: true, passes: [] });
     }
 
     const admin = getSupabaseAdminClient();
 
-    let dbQuery = admin
+    const dbQuery = admin
       .from('founder_passes')
       .select('*')
       .or(
-        `pass_number.ilike.%${query}%,customer_name.ilike.%${query}%,customer_email.ilike.%${query}%,customer_phone.ilike.%${query}%`
+        `pass_number.ilike.%${safeQuery}%,customer_name.ilike.%${safeQuery}%,customer_email.ilike.%${safeQuery}%,customer_phone.ilike.%${safeQuery}%`
       )
       .order('created_at', { ascending: false })
       .limit(10);

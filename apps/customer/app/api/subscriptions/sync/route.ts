@@ -104,14 +104,17 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // 3. Fallback: Check payments table for recent confirmed payments
+    // 3. Fallback: Check payments table for recent confirmed subscription payments
     if (!synced) {
       const thirtyFiveDaysAgo = new Date(Date.now() - 35 * 86400000).toISOString();
+      const expectedMinPrice = Number(sub.price || 100);
       const { data: recentPayments } = await admin
         .from('payments')
         .select('*')
         .eq('user_id', authCtx.userId)
         .eq('status', 'paid')
+        .eq('related_type', 'subscription')
+        .gte('amount', expectedMinPrice)
         .gte('created_at', thirtyFiveDaysAgo)
         .order('created_at', { ascending: false })
         .limit(1);

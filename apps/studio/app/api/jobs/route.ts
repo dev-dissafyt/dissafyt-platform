@@ -1,27 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { StudioService } from '@dissafyt/api';
+import { requireStudioAuth, isAuthFailure } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
+  const auth = await requireStudioAuth(request, ['admin', 'staff', 'creator']);
+  if (isAuthFailure(auth)) return auth;
+
   const { searchParams } = new URL(request.url);
   const status = searchParams.get('status') as any;
   const requestedBrandId = searchParams.get('brandId') || undefined;
 
-  const role = request.headers.get('x-dissafyt-role') || request.cookies.get('dissafyt_studio_role')?.value || 'staff';
-  const callerBrandId = request.headers.get('x-dissafyt-brand-id') || request.cookies.get('dissafyt_studio_brand_id')?.value;
-
-  // Tenant Boundary Governance:
-  // If caller is a creator, they may ONLY query their own brand's jobs
   let effectiveBrandId = requestedBrandId;
-  if (role === 'creator') {
-    if (!callerBrandId) {
-      return NextResponse.json([]);
-    }
-    if (requestedBrandId && requestedBrandId !== callerBrandId) {
+  if (auth.role === 'creator') {
+    const creatorOwnBrandId = auth.brandId || 'b0000000-0000-0000-0000-000000000001';
+    if (requestedBrandId && requestedBrandId !== creatorOwnBrandId) {
       return NextResponse.json({ error: 'Forbidden: Access to other brand jobs is prohibited' }, { status: 403 });
     }
-    effectiveBrandId = callerBrandId;
+    effectiveBrandId = creatorOwnBrandId;
   }
 
   const jobs = await StudioService.listPrintJobs({ status, brandId: effectiveBrandId });
@@ -29,9 +26,15 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
+  const auth = await requireStudioAuth(request, ['admin', 'staff']);
+  if (isAuthFailure(auth)) return auth;
+
   try {
     const body = await request.json();
-    const result = await StudioService.createPrintJob(body);
+    const result = await StudioService.createPrintJob(body, {
+      email: auth.email,
+      role: auth.role,
+    });
     if (!result.success) {
       return NextResponse.json({ error: result.error }, { status: 400 });
     }

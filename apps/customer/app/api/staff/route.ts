@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { BarbershopService, AdminBarbershopService } from '@dissafyt/api';
+import { BarbershopService, AdminBarbershopService, StaffVaultService } from '@dissafyt/api';
 import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
@@ -20,7 +20,14 @@ export async function GET(request: NextRequest) {
       const auth = await requireAdminAuth(request);
       if (!isAuthFailure(auth)) {
         const staff = await AdminBarbershopService.listStaff();
-        return NextResponse.json(staff);
+        if (auth.role === 'admin') {
+          return NextResponse.json(staff);
+        }
+        // Non-admin staff may only view decrypted banking details for their own staff record
+        const scopedStaff = staff.map((s) =>
+          s.user_id && s.user_id === auth.userId ? s : StaffVaultService.sanitizePublicStaff(s)
+        );
+        return NextResponse.json(scopedStaff);
       }
     }
 

@@ -10,17 +10,30 @@ export const revalidate = 0;
  * Secure endpoint to promote an initial administrator.
  * Requires either an active authenticated administrator session OR a valid server bootstrap secret.
  */
-export async function POST(request: NextRequest) {
-  const secretHeader = request.headers.get('x-bootstrap-secret');
-  const configuredSecret = process.env.ADMIN_BOOTSTRAP_SECRET || 'Dissafyt_Bootstrap_Secure_2026';
+import crypto from 'crypto';
 
-  const isSecretValid = Boolean(secretHeader && secretHeader === configuredSecret);
+export async function POST(request: NextRequest) {
+  const secretHeader = request.headers.get('x-bootstrap-secret')?.trim() || '';
+  const configuredSecret = (process.env.ADMIN_BOOTSTRAP_SECRET || '').trim();
+
+  let isSecretValid = false;
+  if (
+    configuredSecret &&
+    configuredSecret.length >= 16 &&
+    configuredSecret !== 'Dissafyt_Bootstrap_Secure_2026' &&
+    secretHeader.length === configuredSecret.length
+  ) {
+    isSecretValid = crypto.timingSafeEqual(
+      Buffer.from(secretHeader, 'utf8'),
+      Buffer.from(configuredSecret, 'utf8')
+    );
+  }
 
   if (!isSecretValid) {
     const auth = await requireAdminAuth(request, 'user:manage_roles');
     if (isAuthFailure(auth)) {
       return NextResponse.json(
-        { error: 'Unauthorized: Bootstrapping requires administrative authentication or server secret.' },
+        { error: 'Unauthorized: Bootstrapping requires administrative authentication or a valid server secret.' },
         { status: 401 }
       );
     }

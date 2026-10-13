@@ -31,7 +31,7 @@ export interface RedeemCutInput {
 
 export class FounderPassService {
   // Baseline initial founder commitments prior to online launch
-  private static readonly BASE_PLEDGED_BACKERS = 28;
+  private static readonly BASE_PLEDGED_BACKERS = 0;
   private static readonly TOTAL_SPOTS = 50;
   private static readonly PRICE_PER_PASS = 1200;
   private static readonly TOTAL_CAPITAL_TARGET = 60000;

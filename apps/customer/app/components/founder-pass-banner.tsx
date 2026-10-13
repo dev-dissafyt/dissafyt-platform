@@ -34,14 +34,11 @@ export function FounderPassBanner() {
   // Live stats from database
   const [stats, setStats] = useState({
     totalSpots: 50,
-    claimedSpots: 29,
-    totalCapitalTarget: 60000,
-    currentCapital: 34800,
-    pctFunded: 58,
-    remainingSpots: 21,
+    claimedSpots: 0,
+    remainingSpots: 50,
   });
 
-  const { totalSpots, claimedSpots, totalCapitalTarget, currentCapital, pctFunded, remainingSpots } = stats;
+  const { totalSpots, claimedSpots, remainingSpots } = stats;
 
   useEffect(() => {
     if (cardRef.current) {
@@ -217,7 +214,7 @@ export function FounderPassBanner() {
             <div className="flex flex-wrap items-center gap-2">
               <span className="inline-flex items-center space-x-1.5 rounded-full bg-[#ff5500]/20 border border-[#ff5500]/50 px-3 py-1 text-[11px] font-mono font-black text-[#ff5500] uppercase tracking-wider shadow-sm shadow-[#ff5500]/20">
                 <Flame className="w-3.5 h-3.5 text-[#ff5500] fill-[#ff5500] animate-pulse" />
-                <span>Physical Barbershop Buildout // Invested Capital</span>
+                <span>Physical Barbershop Buildout // Flagship Studio</span>
               </span>
               <span className="text-[10px] font-mono text-zinc-400 bg-zinc-900/80 px-2.5 py-1 rounded-full border border-zinc-800">
                 1 Norwalk Way, Bernadino Heights, Cape Town
@@ -226,7 +223,7 @@ export function FounderPassBanner() {
 
             <div className="flex items-center space-x-2">
               <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded-full">
-                {claimedSpots} OF 50 PASSES CLAIMED &bull; {pctFunded}% FUNDED
+                EXCLUSIVE ALLOCATION &bull; 50 FOUNDER PASSES ONLY
               </span>
             </div>
           </div>
@@ -246,7 +243,7 @@ export function FounderPassBanner() {
               </div>
 
               <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed max-w-xl">
-                We are raising invested capital to physically build out our flagship barbershop and garment printing lab in Bernadino Heights. We are releasing <strong>only 50 Founder Passes</strong>: pay R1,200 upfront to directly fund our Belmont chairs, custom mirrors, and barber stations — in exchange, you lock in 1 master haircut every month for a full year with VIP priority.
+                To fund the physical buildout of our flagship barbershop and garment printing lab in Bernadino Heights, we are releasing <strong>only 50 Founder Passes</strong>: pay R1,200 upfront to directly back our Belmont chairs, custom mirrors, and barber stations — in exchange, you lock in 1 master haircut every month for a full year with VIP priority.
               </p>
 
               {/* 3 Pillar Perks */}
@@ -280,18 +277,13 @@ export function FounderPassBanner() {
                 </div>
               </div>
 
-              {/* Buildout Capital Progress Bar */}
-              <div className="space-y-1.5 pt-2">
-                <div className="flex justify-between items-baseline text-xs font-mono">
-                  <span className="text-zinc-400 uppercase">Capital Raised: <strong className="text-white font-bold">R {currentCapital.toLocaleString()}</strong> / R {totalCapitalTarget.toLocaleString()}</span>
-                  <span className="text-[#ff5500] font-bold">{totalSpots - claimedSpots} Passes Remaining</span>
-                </div>
-                <div className="h-3 w-full bg-zinc-950 rounded-full overflow-hidden border border-zinc-800 p-0.5">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-[#ff5500] via-amber-500 to-[#ff7700] transition-all duration-700 shadow-lg shadow-[#ff5500]/50"
-                    style={{ width: `${pctFunded}%` }}
-                  />
-                </div>
+              {/* Pass Allocation Info Strip */}
+              <div className="flex items-center justify-between text-xs font-mono py-2.5 px-4 rounded-xl bg-zinc-950/80 border border-zinc-800/80">
+                <span className="text-zinc-400 uppercase flex items-center gap-2">
+                  <Flame className="w-3.5 h-3.5 text-[#ff5500]" />
+                  <span>Founding Allocation: <strong className="text-white font-bold">50 Patrons Only</strong></span>
+                </span>
+                <span className="text-[#ff5500] font-bold">Strictly Limited &bull; Claim Your Chair</span>
               </div>
 
               {/* Actions & Exploration Jump */}
@@ -435,7 +427,7 @@ export function FounderPassBanner() {
                 </div>
                 <div className="space-y-1">
                   <span className="text-[10px] font-mono text-[#ff5500] uppercase tracking-widest font-bold">
-                    FOUNDER PATRON #{claimedSpots + 1} CONFIRMED
+                    FOUNDER PATRON PLEDGE CONFIRMED
                   </span>
                   <h3 className="font-display text-2xl font-black uppercase text-white">
                     Welcome to the Founder Circle!
@@ -566,7 +558,7 @@ export function FounderPassBanner() {
                         }`}
                       >
                         <div className="font-bold text-xs text-[#ff5500]">Ready to Pay R1,200 Now</div>
-                        <div className="text-[10px] text-zinc-400 mt-0.5">Immediate capital commitment via PayFast</div>
+                        <div className="text-[10px] text-zinc-400 mt-0.5">Instant pass activation via PayFast</div>
                       </button>
                     </div>
                   </div>
