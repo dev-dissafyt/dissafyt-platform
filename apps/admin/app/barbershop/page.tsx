@@ -33,6 +33,7 @@ import {
   Building2,
   Pencil,
   ShieldCheck,
+  Crown,
 } from 'lucide-react';
 import { adminFetch } from '../../lib/operator';
 
@@ -52,6 +53,8 @@ interface Service {
   is_active: boolean;
   is_subscription?: boolean;
   plan_code?: string | null;
+  extra_son_price?: number | null;
+  max_sons?: number | null;
 }
 
 interface StaffMember {
@@ -154,6 +157,8 @@ export default function AdminBarbershopPage() {
   const [servicePrice, setServicePrice] = useState('');
   const [isSubscription, setIsSubscription] = useState(false);
   const [planCode, setPlanCode] = useState('solo');
+  const [serviceExtraSonPrice, setServiceExtraSonPrice] = useState('60');
+  const [serviceMaxSons, setServiceMaxSons] = useState('3');
   const [serviceSubmitting, setServiceSubmitting] = useState(false);
 
   // --- TAB 4: LOCATIONS STATE ---
@@ -196,6 +201,8 @@ export default function AdminBarbershopPage() {
   const [editServicePrice, setEditServicePrice] = useState('');
   const [editServiceIsSubscription, setEditServiceIsSubscription] = useState(false);
   const [editServicePlanCode, setEditServicePlanCode] = useState('solo');
+  const [editServiceExtraSonPrice, setEditServiceExtraSonPrice] = useState('60');
+  const [editServiceMaxSons, setEditServiceMaxSons] = useState('3');
   const [editServiceActive, setEditServiceActive] = useState(true);
   const [editServiceSubmitting, setEditServiceSubmitting] = useState(false);
 
@@ -522,6 +529,8 @@ export default function AdminBarbershopPage() {
     setEditServicePrice(String(service.price));
     setEditServiceIsSubscription(Boolean(service.is_subscription));
     setEditServicePlanCode(service.plan_code || 'solo');
+    setEditServiceExtraSonPrice(String(service.extra_son_price ?? 60));
+    setEditServiceMaxSons(String(service.max_sons ?? 3));
     setEditServiceActive(service.is_active);
   }
 
@@ -531,6 +540,7 @@ export default function AdminBarbershopPage() {
     setEditServiceSubmitting(true);
     setStatusMsg(null);
     try {
+      const isFatherSon = editServiceIsSubscription && editServicePlanCode === 'father-son';
       const res = await adminFetch(`/api/services/${editingService.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -542,6 +552,8 @@ export default function AdminBarbershopPage() {
           price: parseFloat(editServicePrice) || 0,
           is_subscription: editServiceIsSubscription,
           plan_code: editServiceIsSubscription ? editServicePlanCode : null,
+          extra_son_price: isFatherSon ? parseFloat(editServiceExtraSonPrice) || 60 : null,
+          max_sons: isFatherSon ? parseInt(editServiceMaxSons, 10) || 3 : null,
           is_active: editServiceActive,
         }),
       });
@@ -566,6 +578,7 @@ export default function AdminBarbershopPage() {
     setStatusMsg(null);
 
     try {
+      const isFatherSon = isSubscription && planCode === 'father-son';
       const res = await adminFetch('/api/services', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -577,6 +590,8 @@ export default function AdminBarbershopPage() {
           price: parseFloat(servicePrice),
           is_subscription: isSubscription,
           plan_code: isSubscription ? planCode : null,
+          extra_son_price: isFatherSon ? parseFloat(serviceExtraSonPrice) || 60 : null,
+          max_sons: isFatherSon ? parseInt(serviceMaxSons, 10) || 3 : null,
           billing_frequency: 3,
           billing_cycles: 12,
           is_active: true,
@@ -1819,10 +1834,10 @@ export default function AdminBarbershopPage() {
                 </div>
 
                 {isSubscription && (
-                  <div className="space-y-1 md:col-span-2 bg-stone-800/40 p-3 rounded-lg border border-stone-800">
+                  <div className="space-y-3 md:col-span-2 bg-stone-800/40 p-3 rounded-lg border border-stone-800">
                     <Label className="text-amber-400">PayFast Plan Identifier</Label>
-                    <div className="flex gap-4 pt-1">
-                      {['solo', 'twice', 'executive'].map((code) => (
+                    <div className="flex flex-wrap gap-4 pt-1">
+                      {['solo', 'twice', 'executive', 'father-son'].map((code) => (
                         <label key={code} className="flex items-center space-x-1.5 text-xs text-stone-300">
                           <input
                             type="radio"
@@ -1832,10 +1847,46 @@ export default function AdminBarbershopPage() {
                             onChange={(e) => setPlanCode(e.target.value)}
                             className="accent-amber-500"
                           />
-                          <span>{code}</span>
+                          <span className="capitalize">{code.replace('-', ' & ')}</span>
                         </label>
                       ))}
                     </div>
+
+                    {planCode === 'father-son' && (
+                      <div className="pt-3 border-t border-stone-800 space-y-3">
+                        <div className="flex items-center space-x-2 text-xs font-mono text-amber-400 font-bold uppercase">
+                          <Crown className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Father &amp; Son Multi-Son Dynamic Pricing</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-stone-300">Extra Price Per Additional Son (ZAR)</Label>
+                            <Input
+                              type="number"
+                              step="5"
+                              value={serviceExtraSonPrice}
+                              onChange={(e) => setServiceExtraSonPrice(e.target.value)}
+                              placeholder="60.00"
+                              className="bg-stone-950 border-stone-800 text-white font-mono"
+                            />
+                            <p className="text-[10px] text-stone-400">Added to monthly fee for Son 2, Son 3, etc.</p>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-stone-300">Maximum Sons Allowed</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              max="5"
+                              value={serviceMaxSons}
+                              onChange={(e) => setServiceMaxSons(e.target.value)}
+                              placeholder="3"
+                              className="bg-stone-950 border-stone-800 text-white font-mono"
+                            />
+                            <p className="text-[10px] text-stone-400">Upper limit for customer selection.</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -1954,10 +2005,10 @@ export default function AdminBarbershopPage() {
                 </div>
 
                 {editServiceIsSubscription && (
-                  <div className="space-y-1 md:col-span-2 bg-stone-800/40 p-3 rounded-lg border border-stone-800">
+                  <div className="space-y-3 md:col-span-2 bg-stone-800/40 p-3 rounded-lg border border-stone-800">
                     <Label className="text-amber-400">PayFast Plan Identifier</Label>
-                    <div className="flex gap-4 pt-1">
-                      {['solo', 'twice', 'executive'].map((code) => (
+                    <div className="flex flex-wrap gap-4 pt-1">
+                      {['solo', 'twice', 'executive', 'father-son'].map((code) => (
                         <label key={code} className="flex items-center space-x-1.5 text-xs text-stone-300">
                           <input
                             type="radio"
@@ -1967,10 +2018,46 @@ export default function AdminBarbershopPage() {
                             onChange={(e) => setEditServicePlanCode(e.target.value)}
                             className="accent-amber-500"
                           />
-                          <span>{code}</span>
+                          <span className="capitalize">{code.replace('-', ' & ')}</span>
                         </label>
                       ))}
                     </div>
+
+                    {editServicePlanCode === 'father-son' && (
+                      <div className="pt-3 border-t border-stone-800 space-y-3">
+                        <div className="flex items-center space-x-2 text-xs font-mono text-amber-400 font-bold uppercase">
+                          <Crown className="w-3.5 h-3.5 text-amber-500" />
+                          <span>Father &amp; Son Multi-Son Dynamic Pricing</span>
+                        </div>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                          <div className="space-y-1">
+                            <Label className="text-xs text-stone-300">Extra Price Per Additional Son (ZAR)</Label>
+                            <Input
+                              type="number"
+                              step="5"
+                              value={editServiceExtraSonPrice}
+                              onChange={(e) => setEditServiceExtraSonPrice(e.target.value)}
+                              placeholder="60.00"
+                              className="bg-stone-950 border-stone-800 text-white font-mono"
+                            />
+                            <p className="text-[10px] text-stone-400">Added to monthly fee for Son 2, Son 3, etc.</p>
+                          </div>
+                          <div className="space-y-1">
+                            <Label className="text-xs text-stone-300">Maximum Sons Allowed</Label>
+                            <Input
+                              type="number"
+                              min="1"
+                              max="5"
+                              value={editServiceMaxSons}
+                              onChange={(e) => setEditServiceMaxSons(e.target.value)}
+                              placeholder="3"
+                              className="bg-stone-950 border-stone-800 text-white font-mono"
+                            />
+                            <p className="text-[10px] text-stone-400">Upper limit for customer selection.</p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
 
@@ -2075,6 +2162,11 @@ export default function AdminBarbershopPage() {
                     {service.plan_code && (
                       <span className="flex items-center text-amber-500/80">
                         <CreditCard className="mr-1 h-3.5 w-3.5" /> Plan: {service.plan_code}
+                      </span>
+                    )}
+                    {service.plan_code === 'father-son' && (
+                      <span className="flex items-center text-xs text-amber-400 font-medium">
+                        +R{Number(service.extra_son_price ?? 60).toFixed(0)}/extra son (max {service.max_sons ?? 3} sons)
                       </span>
                     )}
                   </div>

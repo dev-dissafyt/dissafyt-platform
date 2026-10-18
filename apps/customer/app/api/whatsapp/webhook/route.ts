@@ -6,6 +6,7 @@ import {
   BarbershopService,
   AuditService,
   GUEST_USER_ID,
+  FlowCrypto,
 } from '@dissafyt/api';
 import { getSupabaseAdminClient } from '@dissafyt/database';
 
@@ -43,7 +44,21 @@ export async function GET(request: NextRequest) {
  */
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
+    const rawBodyText = await request.text();
+
+    // 1. Validate X-Hub-Signature-256 if Meta App Secret is configured
+    const hubSignature = request.headers.get('x-hub-signature-256');
+    if (!FlowCrypto.validateSignature(rawBodyText, hubSignature)) {
+      console.warn('[WhatsApp Webhook] Signature verification failed on X-Hub-Signature-256');
+      return new Response('Unauthorized: Signature mismatch', { status: 401 });
+    }
+
+    let body: any;
+    try {
+      body = JSON.parse(rawBodyText);
+    } catch {
+      return NextResponse.json({ error: 'Invalid JSON payload' }, { status: 400 });
+    }
 
     // Check if this is a WhatsApp status update or message event
     const entry = body.entry?.[0];

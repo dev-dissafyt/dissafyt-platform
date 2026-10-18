@@ -1,6 +1,16 @@
-import { getSupabaseAdminClient, FounderPass, FounderPassRedemption } from '@dissafyt/database';
+import { getSupabaseAdminClient, FounderPass, FounderPassRedemption, FounderPassCampaignSettings } from '@dissafyt/database';
 import { EmailService } from '../notifications/email-service';
 import { AuditService } from '../audit/audit-service';
+
+export const DEFAULT_CAMPAIGN_SETTINGS: FounderPassCampaignSettings = {
+  id: 'default',
+  price_per_pass: 1200,
+  total_cuts: 12,
+  total_spots: 50,
+  capital_target: 60000,
+  is_active: true,
+  updated_at: new Date().toISOString(),
+};
 
 export interface BuildoutStats {
   totalSpots: number;
@@ -9,6 +19,8 @@ export interface BuildoutStats {
   currentCapital: number;
   pctFunded: number;
   remainingSpots: number;
+  pricePerPass?: number;
+  totalCuts?: number;
 }
 
 export interface CreatePassInput {
@@ -32,16 +44,132 @@ export interface RedeemCutInput {
 export class FounderPassService {
   // Baseline initial founder commitments prior to online launch
   private static readonly BASE_PLEDGED_BACKERS = 0;
-  private static readonly TOTAL_SPOTS = 50;
-  private static readonly PRICE_PER_PASS = 1200;
-  private static readonly TOTAL_CAPITAL_TARGET = 60000;
+
+  /**
+   * Retrieves active campaign parameters for Founder's Pass.
+   * Dynamically loads from DB founder_pass_campaign_settings with fallback to defaults.
+   */
+  static async getCampaignSettings(): Promise<FounderPassCampaignSettings> {
+    const admin = getSupabaseAdminClient();
+    try {
+      const { data, error } = await admin
+        .from('founder_pass_campaign_settings')
+        .select('*')
+        .eq('id', 'default')
+        .maybeSingle();
+
+      if (error || !data) {
+        return DEFAULT_CAMPAIGN_SETTINGS;
+      }
+
+      return {
+        id: data.id,
+        price_per_pass: Number(data.price_per_pass) || 1200,
+        total_cuts: Number(data.total_cuts) || 12,
+        total_spots: Number(data.total_spots) || 50,
+        capital_target: Number(data.capital_target) || 60000,
+        is_active: Boolean(data.is_active),
+        updated_at: data.updated_at || new Date().toISOString(),
+      };
+    } catch (err) {
+      console.warn('Error reading campaign settings, using defaults:', err);
+      return DEFAULT_CAMPAIGN_SETTINGS;
+    }
+  }
+
+  /**
+   * Updates Founder's Pass campaign parameters (admin only).
+   */
+  static async updateCampaignSettings(
+    changes: Partial<{
+      price_per_pass: number;
+      total_cuts: number;
+      total_spots: number;
+      capital_target: number;
+      is_active: boolean;
+    }>,
+    actorEmail: string = 'admin@dissafyt.com'
+  ): Promise<FounderPassCampaignSettings> {
+    const admin = getSupabaseAdminClient();
+    const current = await this.getCampaignSettings();
+
+    const updated = {
+      id: 'default',
+      price_per_pass: changes.price_per_pass !== undefined ? Number(changes.price_per_pass) : current.price_per_pass,
+      total_cuts: changes.total_cuts !== undefined ? Number(changes.total_cuts) : current.total_cuts,
+      total_spots: changes.total_spots !== undefined ? Number(changes.total_spots) : current.total_spots,
+      capital_target: changes.capital_target !== undefined ? Number(changes.capital_target) : current.capital_target,
+      is_active: changes.is_active !== undefined ? Boolean(changes.is_active) : current.is_active,
+      updated_at: new Date().toISOString(),
+    };
+
+    const { data, error } = await admin
+      .from('founder_pass_campaign_settings')
+      .upsert(updated)
+      .select()
+      .single();
+
+    if (error || !data) {
+      throw new Error(error?.message || 'Failed to update founder pass campaign settings');
+    }
+
+    await AuditService.recordLog({
+      actor_email: actorEmail,
+      actor_role: 'admin',
+      action: 'founder_pass_campaign.updated',
+      entity_type: 'founder_pass_campaign',
+      entity_id: 'default',
+      entity_name: "Founder's Pass Campaign Parameters",
+      changes: {
+        before: current,
+        after: updated,
+      },
+    });
+
+    return {
+      id: data.id,
+      price_per_pass: Number(data.price_per_pass),
+      total_cuts: Number(data.total_cuts),
+      total_spots: Number(data.total_spots),
+      capital_target: Number(data.capital_target),
+      is_active: Boolean(data.is_active),
+      updated_at: data.updated_at,
+    };
+  }
+
+  /**
+   * Lists all issued Founder Passes for administrative ledger view.
+   */
+  static async listPasses(): Promise<FounderPass[]> {
+    const admin = getSupabaseAdminClient();
+    const { data, error } = await admin
+      .from('founder_passes')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('Error listing founder passes:', error);
+      return [];
+    }
+
+    return (data || []).map((p: any) => ({
+      ...p,
+      amount_paid: Number(p.amount_paid) || 0,
+      total_cuts: Number(p.total_cuts) || 12,
+      cuts_used: Number(p.cuts_used) || 0,
+    }));
+  }
 
   /**
    * Retrieves live buildout funding progress and backer counts.
-   * Dynamically aggregates active database passes + baseline pledges.
+   * Dynamically aggregates active database passes + baseline pledges against campaign parameters.
    */
   static async getBuildoutStats(): Promise<BuildoutStats> {
     const admin = getSupabaseAdminClient();
+    const settings = await this.getCampaignSettings();
+    const totalSpots = settings.total_spots;
+    const pricePerPass = settings.price_per_pass;
+    const totalCapitalTarget = settings.capital_target;
 
     try {
       const { data: passes, error } = await admin
@@ -54,28 +182,32 @@ export class FounderPassService {
       }
 
       const activeCount = passes ? passes.length : 0;
-      const claimedSpots = Math.min(this.TOTAL_SPOTS, this.BASE_PLEDGED_BACKERS + activeCount);
-      const currentCapital = claimedSpots * this.PRICE_PER_PASS;
-      const pctFunded = Math.min(100, Math.round((currentCapital / this.TOTAL_CAPITAL_TARGET) * 100));
-      const remainingSpots = Math.max(0, this.TOTAL_SPOTS - claimedSpots);
+      const claimedSpots = Math.min(totalSpots, this.BASE_PLEDGED_BACKERS + activeCount);
+      const currentCapital = claimedSpots * pricePerPass;
+      const pctFunded = totalCapitalTarget > 0 ? Math.min(100, Math.round((currentCapital / totalCapitalTarget) * 100)) : 0;
+      const remainingSpots = Math.max(0, totalSpots - claimedSpots);
 
       return {
-        totalSpots: this.TOTAL_SPOTS,
+        totalSpots,
         claimedSpots,
-        totalCapitalTarget: this.TOTAL_CAPITAL_TARGET,
+        totalCapitalTarget,
         currentCapital,
         pctFunded,
         remainingSpots,
+        pricePerPass,
+        totalCuts: settings.total_cuts,
       };
     } catch (err) {
       console.error('Failed to get buildout stats:', err);
       return {
-        totalSpots: this.TOTAL_SPOTS,
-        claimedSpots: 29,
-        totalCapitalTarget: this.TOTAL_CAPITAL_TARGET,
-        currentCapital: 34800,
-        pctFunded: 58,
-        remainingSpots: 21,
+        totalSpots,
+        claimedSpots: 0,
+        totalCapitalTarget,
+        currentCapital: 0,
+        pctFunded: 0,
+        remainingSpots: totalSpots,
+        pricePerPass,
+        totalCuts: settings.total_cuts,
       };
     }
   }
@@ -91,6 +223,10 @@ export class FounderPassService {
     const cleanName = input.name.trim();
 
     try {
+      const settings = await this.getCampaignSettings();
+      const totalCuts = settings.total_cuts;
+      const pricePerPass = settings.price_per_pass;
+
       // 1. Check for existing active profile
       const { data: profile } = await admin
         .from('profiles')
@@ -119,9 +255,9 @@ export class FounderPassService {
           customer_name: cleanName,
           customer_email: cleanEmail,
           customer_phone: cleanPhone,
-          total_cuts: 12,
+          total_cuts: totalCuts,
           cuts_used: 0,
-          amount_paid: input.isPaid ? this.PRICE_PER_PASS : 0.0,
+          amount_paid: input.isPaid ? pricePerPass : 0.0,
           status,
           payment_method: input.paymentMethod || 'payfast',
           payment_ref: input.paymentRef || null,
@@ -139,9 +275,9 @@ export class FounderPassService {
         await admin.from('subscriptions').upsert(
           {
             user_id: userId,
-            plan_code: 'founder_pass_12cuts',
-            plan_name: "Founder's Circle Pass (12 Master Cuts)",
-            price: this.PRICE_PER_PASS,
+            plan_code: `founder_pass_${totalCuts}cuts`,
+            plan_name: `Founder's Circle Pass (${totalCuts} Master Cuts)`,
+            price: pricePerPass,
             status: 'active',
             current_period_start: new Date().toISOString(),
             current_period_end: new Date(Date.now() + 365 * 86400000).toISOString(),
@@ -166,8 +302,8 @@ export class FounderPassService {
         entity_name: `Founder Pass ${passNumber}: ${cleanName}`,
         changes: {
           passNumber,
-          totalCuts: 12,
-          amount: this.PRICE_PER_PASS,
+          totalCuts,
+          amount: pricePerPass,
           isPaid: input.isPaid,
         },
       });
@@ -186,6 +322,10 @@ export class FounderPassService {
     const admin = getSupabaseAdminClient();
 
     try {
+      const settings = await this.getCampaignSettings();
+      const pricePerPass = settings.price_per_pass;
+      const totalCuts = settings.total_cuts;
+
       const { data: pass, error: fetchErr } = await admin
         .from('founder_passes')
         .select('*')
@@ -198,7 +338,7 @@ export class FounderPassService {
         .from('founder_passes')
         .update({
           status: 'active',
-          amount_paid: this.PRICE_PER_PASS,
+          amount_paid: pricePerPass,
           payment_ref: paymentRef,
           updated_at: new Date().toISOString(),
         })
@@ -213,9 +353,9 @@ export class FounderPassService {
         await admin.from('subscriptions').upsert(
           {
             user_id: updated.user_id,
-            plan_code: 'founder_pass_12cuts',
-            plan_name: "Founder's Circle Pass (12 Master Cuts)",
-            price: this.PRICE_PER_PASS,
+            plan_code: `founder_pass_${totalCuts}cuts`,
+            plan_name: `Founder's Circle Pass (${totalCuts} Master Cuts)`,
+            price: pricePerPass,
             status: 'active',
             current_period_start: new Date().toISOString(),
             current_period_end: new Date(Date.now() + 365 * 86400000).toISOString(),

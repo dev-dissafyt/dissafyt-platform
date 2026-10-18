@@ -14,6 +14,8 @@ export interface CreateServiceInput {
   plan_code?: string | null;
   billing_frequency?: number;
   billing_cycles?: number;
+  extra_son_price?: number | null;
+  max_sons?: number | null;
 }
 
 export interface UpdateServiceInput {
@@ -25,6 +27,8 @@ export interface UpdateServiceInput {
   is_active?: boolean;
   is_subscription?: boolean;
   plan_code?: string | null;
+  extra_son_price?: number | null;
+  max_sons?: number | null;
 }
 
 export class AdminBarbershopService {
@@ -77,6 +81,12 @@ export class AdminBarbershopService {
     }
     if (input.billing_cycles !== undefined) {
       payload.billing_cycles = input.billing_cycles;
+    }
+    if (input.extra_son_price !== undefined) {
+      payload.extra_son_price = input.extra_son_price;
+    }
+    if (input.max_sons !== undefined) {
+      payload.max_sons = input.max_sons;
     }
 
     try {

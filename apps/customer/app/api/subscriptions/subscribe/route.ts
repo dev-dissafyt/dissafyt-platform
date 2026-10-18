@@ -50,7 +50,8 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { planCode = 'twice', isSandboxDemo = false } = body;
+    const { planCode = 'twice', isSandboxDemo = false, sonsCount = 1 } = body;
+    const effectiveSons = Math.max(1, Math.min(5, Number(sonsCount) || 1));
 
     const admin = getSupabaseAdminClient();
 
@@ -63,7 +64,7 @@ export async function POST(request: NextRequest) {
       .eq('plan_code', planCode)
       .maybeSingle();
 
-    const plan = dbService
+    let plan = dbService
       ? {
           name: dbService.name,
           price: Number(dbService.price),
@@ -73,6 +74,16 @@ export async function POST(request: NextRequest) {
 
     if (!plan) {
       return NextResponse.json({ error: `Unknown plan code: ${planCode}` }, { status: 400 });
+    }
+
+    // Dynamic adjustment for Father & Son plan with 2 or more sons (+R60/son)
+    if (planCode === 'father-son' && effectiveSons > 1) {
+      const additionalSons = effectiveSons - 1;
+      plan = {
+        name: `Father & Son Membership (1 Father + ${effectiveSons} Sons)`,
+        price: plan.price + additionalSons * 60.0,
+        description: `1 Adult Cut + ${effectiveSons} Junior Cuts per month with side-by-side or back-to-back chairs.`,
+      };
     }
 
     // Fetch user's profile for autofilling first/last name and phone
@@ -156,7 +167,7 @@ export async function POST(request: NextRequest) {
     const payfastData: Record<string, string> = {
       merchant_id: merchantId,
       merchant_key: merchantKey,
-      return_url: `${siteUrl}/book?subscribed=true&plan=${planCode}`,
+      return_url: `${siteUrl}/book?subscribed=true&plan=${planCode}${planCode === 'father-son' ? `&sons=${effectiveSons}` : ''}`,
       cancel_url: `${siteUrl}/book?cancelled=true`,
       notify_url: `${siteUrl}/api/payments/payfast-notify`,
       name_first: firstName,
@@ -167,7 +178,7 @@ export async function POST(request: NextRequest) {
       amount: plan.price.toFixed(2),
       item_name: `Ace of Fyt - ${plan.name}`,
       item_description: plan.description,
-      custom_str1: planCode,
+      custom_str1: planCode === 'father-son' ? `father-son-${effectiveSons}` : planCode,
       custom_str2: authCtx.userId,
       subscription_type: '1',
       recurring_amount: plan.price.toFixed(2),

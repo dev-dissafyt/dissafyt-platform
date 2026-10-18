@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdminClient } from '@dissafyt/database';
 import { AuditService } from '@dissafyt/api';
+import { getClientIp, checkRateLimit } from '@/lib/rate-limiter';
 
 export const dynamic = 'force-dynamic';
 
@@ -12,6 +13,19 @@ export const dynamic = 'force-dynamic';
  */
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+    const rateCheck = checkRateLimit(ip, 'auth_register', {
+      windowMs: 15 * 60 * 1000, // 15 minutes
+      maxRequests: 5,           // max 5 registrations per 15 min per IP
+    });
+
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: `Too many registration attempts from this network. Please wait ${rateCheck.waitSeconds} seconds.` },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json();
     const { email, password, fullName, phone } = body;
 

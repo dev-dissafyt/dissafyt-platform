@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useRef, useEffect } from 'react';
+import Link from 'next/link';
 import {
   Sparkles,
   Scissors,
@@ -36,6 +37,8 @@ export function FounderPassBanner() {
     totalSpots: 50,
     claimedSpots: 0,
     remainingSpots: 50,
+    pricePerPass: 1200,
+    totalCuts: 12,
   });
 
   const { totalSpots, claimedSpots, remainingSpots } = stats;
@@ -223,8 +226,15 @@ export function FounderPassBanner() {
 
             <div className="flex items-center space-x-2">
               <span className="text-[10px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded-full">
-                EXCLUSIVE ALLOCATION &bull; 50 FOUNDER PASSES ONLY
+                EXCLUSIVE ALLOCATION &bull; {totalSpots} FOUNDER PASSES ONLY
               </span>
+              <Link
+                href="/founders-pass"
+                className="inline-flex items-center space-x-1 px-3 py-1 rounded-full bg-zinc-900/90 border border-zinc-700 hover:border-[#ff5500] text-zinc-200 hover:text-white text-[10px] font-mono transition-all group"
+              >
+                <span>Read More</span>
+                <ArrowRight className="w-3 h-3 text-[#ff5500] group-hover:translate-x-0.5 transition-transform" />
+              </Link>
             </div>
           </div>
 
@@ -234,16 +244,16 @@ export function FounderPassBanner() {
             <div className="lg:col-span-7 space-y-4">
               <div>
                 <h1 className="font-display text-3xl sm:text-5xl lg:text-6xl font-black uppercase text-white tracking-tight leading-[0.92]">
-                  FOUNDER PASS: <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff5500] via-amber-400 to-[#ff7700]">R1,200 FOR 12 CUTS</span> PER YEAR
+                  FOUNDER PASS: <span className="text-transparent bg-clip-text bg-gradient-to-r from-[#ff5500] via-amber-400 to-[#ff7700]">R{(stats.pricePerPass || 1200).toLocaleString('en-ZA')} FOR {stats.totalCuts || 12} CUTS</span> PER YEAR
                 </h1>
                 <p className="text-sm sm:text-base font-bold text-amber-300/90 mt-2 font-mono flex items-center gap-2">
                   <span className="h-1.5 w-1.5 rounded-full bg-[#ff5500] animate-ping" />
-                  <span>Only R100 Per Master Haircut &bull; Lifetime Price Lock &bull; Limited to 50 Patrons Only</span>
+                  <span>Only R{Math.round((stats.pricePerPass || 1200) / (stats.totalCuts || 12))} Per Master Haircut &bull; Lifetime Price Lock &bull; Limited to {totalSpots} Patrons Only</span>
                 </p>
               </div>
 
               <p className="text-xs sm:text-sm text-zinc-300 leading-relaxed max-w-xl">
-                To fund the physical buildout of our flagship barbershop and garment printing lab in Bernadino Heights, we are releasing <strong>only 50 Founder Passes</strong>: pay R1,200 upfront to directly back our Belmont chairs, custom mirrors, and barber stations — in exchange, you lock in 1 master haircut every month for a full year with VIP priority.
+                To fund the physical buildout of our flagship barbershop and garment printing lab in Bernadino Heights, we are releasing <strong>only {totalSpots} Founder Passes</strong>: pay R{stats.pricePerPass || 1200} upfront to directly back our Belmont chairs, custom mirrors, and barber stations — in exchange, you lock in 1 master haircut every month for a full year with VIP priority.
               </p>
 
               {/* 3 Pillar Perks */}
@@ -251,10 +261,10 @@ export function FounderPassBanner() {
                 <div className="rounded-xl border border-zinc-800 bg-black/60 p-3 space-y-1 hover:border-[#ff5500]/50 transition-colors">
                   <div className="text-xs font-bold text-white flex items-center gap-1.5">
                     <Scissors className="w-3.5 h-3.5 text-[#ff5500]" />
-                    <span>12 Fresh Cuts</span>
+                    <span>{stats.totalCuts || 12} Fresh Cuts</span>
                   </div>
                   <div className="text-[10px] text-zinc-400 font-mono">
-                    1 cut/month (R100/cut vs R220)
+                    1 cut/month (R{Math.round((stats.pricePerPass || 1200) / (stats.totalCuts || 12))}/cut)
                   </div>
                 </div>
                 <div className="rounded-xl border border-zinc-800 bg-black/60 p-3 space-y-1 hover:border-[#ff5500]/50 transition-colors">
@@ -281,7 +291,7 @@ export function FounderPassBanner() {
               <div className="flex items-center justify-between text-xs font-mono py-2.5 px-4 rounded-xl bg-zinc-950/80 border border-zinc-800/80">
                 <span className="text-zinc-400 uppercase flex items-center gap-2">
                   <Flame className="w-3.5 h-3.5 text-[#ff5500]" />
-                  <span>Founding Allocation: <strong className="text-white font-bold">50 Patrons Only</strong></span>
+                  <span>Founding Allocation: <strong className="text-white font-bold">{totalSpots} Patrons Only</strong></span>
                 </span>
                 <span className="text-[#ff5500] font-bold">Strictly Limited &bull; Claim Your Chair</span>
               </div>
@@ -294,15 +304,23 @@ export function FounderPassBanner() {
                   className="py-3.5 px-6 rounded-xl bg-gradient-to-r from-[#ff5500] via-amber-500 to-[#ff7700] hover:brightness-110 text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-xl shadow-[#ff5500]/25 hover:scale-[1.02] active:scale-95 cursor-pointer flex items-center justify-center space-x-2"
                 >
                   <Sparkles className="w-4 h-4 fill-black" />
-                  <span>Claim Your Founder Pass (R1,200)</span>
+                  <span>Claim Your Founder Pass (R{stats.pricePerPass || 1200})</span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
 
+                <Link
+                  href="/founders-pass"
+                  className="py-3.5 px-5 rounded-xl border border-zinc-700 hover:border-[#ff5500] bg-zinc-900 hover:bg-zinc-800 text-zinc-200 hover:text-white font-mono text-xs flex items-center justify-center gap-1.5 transition-all"
+                >
+                  <span>Read More</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-[#ff5500]" />
+                </Link>
+
                 <a
                   href="#barbershop-section"
-                  className="py-3.5 px-5 rounded-xl border border-zinc-800 hover:border-zinc-700 bg-zinc-950/70 hover:bg-zinc-900 text-zinc-300 hover:text-white font-mono text-xs flex items-center justify-center gap-1.5 transition-all"
+                  className="py-3.5 px-4 rounded-xl border border-zinc-800 hover:border-zinc-700 bg-zinc-950/70 hover:bg-zinc-900 text-zinc-400 hover:text-white font-mono text-xs flex items-center justify-center gap-1.5 transition-all"
                 >
-                  <span>Explore Grooming & Garments</span>
+                  <span>Grooming</span>
                   <ChevronDown className="w-3.5 h-3.5 text-[#ff5500]" />
                 </a>
               </div>

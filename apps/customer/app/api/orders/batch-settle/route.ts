@@ -76,31 +76,17 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Order not found or invalid settlement link token' }, { status: 404 });
   }
 
-  // Enforce token check if order has a payment_link_token
+  // Enforce authoritative authorization (cryptographic link token or authenticated owner/staff)
   const isAuthorized = await isCallerAuthorizedForOrder(request, order, token);
-  if (order.payment_link_token && !isAuthorized) {
+  if (!isAuthorized) {
     return NextResponse.json({ error: 'Order not found or invalid settlement link token' }, { status: 404 });
   }
 
   const total = Number(order.total);
   const depositAmount = Math.round(total * 0.5 * 100) / 100;
 
-  // Never leak payment_link_token or unmasked PII if not authorized
-  const { payment_link_token: _secretToken, ...restOrder } = order as any;
-  const safeOrder = isAuthorized
-    ? restOrder
-    : {
-        ...restOrder,
-        customer_name: order.customer_name ? String(order.customer_name).split(' ')[0] : 'Customer',
-        customer_email: maskEmail(order.customer_email),
-        customer_phone: maskPhone(order.customer_phone),
-        shipping_address: order.shipping_address
-          ? {
-              city: (order.shipping_address as any).city,
-              province: (order.shipping_address as any).province,
-            }
-          : null,
-      };
+  // Never leak payment_link_token to client response
+  const { payment_link_token: _secretToken, ...safeOrder } = order as any;
 
   return NextResponse.json({
     order: safeOrder,
@@ -136,7 +122,7 @@ export async function POST(request: NextRequest) {
     }
 
     const isAuthorized = await isCallerAuthorizedForOrder(request, order, token);
-    if (order.payment_link_token && !isAuthorized) {
+    if (!isAuthorized) {
       return NextResponse.json({ error: 'Order not found or invalid security token' }, { status: 404 });
     }
 

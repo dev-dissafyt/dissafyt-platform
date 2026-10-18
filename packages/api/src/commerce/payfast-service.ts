@@ -461,12 +461,14 @@ export class PayfastService {
 
         // 4. Activate or renew barbershop subscription if subscription payment
         if (isSubscription) {
-          const planCode = payload.custom_str1 || resolvedSub?.plan_code || 'twice';
+          const rawPlan = payload.custom_str1 || resolvedSub?.plan_code || 'twice';
+          const planCode = rawPlan;
+          const basePlanCode = rawPlan.startsWith('father-son') ? 'father-son' : rawPlan;
           const planNames: Record<string, string> = {
             solo: 'The Solo Membership',
             twice: 'The Regular Membership',
             executive: 'The Executive Membership',
-            'father-son': 'The Executive Membership',
+            'father-son': 'Father & Son Membership',
           };
           const planMinPrices: Record<string, number> = {
             solo: 100,
@@ -474,8 +476,8 @@ export class PayfastService {
             executive: 350,
             'father-son': 190,
           };
-          const planName = planNames[planCode] || payload.item_name || resolvedSub?.plan_name || 'Barbershop Membership';
-          const expectedMinPrice = planMinPrices[planCode] || 100;
+          const planName = payload.item_name || planNames[basePlanCode] || resolvedSub?.plan_name || 'Barbershop Membership';
+          const expectedMinPrice = planMinPrices[basePlanCode] || 100;
 
           if (amount < expectedMinPrice) {
             console.error(`[PayFast Webhook] Security Alert: Subscription ${planCode} expected R${expectedMinPrice} but received R${amount}. Subscription not activated.`);

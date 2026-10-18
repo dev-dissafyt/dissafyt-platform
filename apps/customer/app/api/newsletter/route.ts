@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getSupabaseAdminClient } from '@dissafyt/database';
 import { AuthService } from '@dissafyt/api';
 import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
+import { getClientIp, checkRateLimit } from '@/lib/rate-limiter';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -14,6 +15,18 @@ const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  */
 export async function POST(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+    const rateCheck = checkRateLimit(ip, 'newsletter_subscribe', {
+      windowMs: 15 * 60 * 1000,
+      maxRequests: 10,
+    });
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: `Too many subscription attempts. Please wait ${rateCheck.waitSeconds} seconds.` },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json().catch(() => ({}));
     const rawEmail = typeof body.email === 'string' ? body.email.trim() : '';
     const source = typeof body.source === 'string' ? body.source.trim() : 'website_footer';
@@ -103,6 +116,18 @@ export async function GET(request: NextRequest) {
  */
 export async function PATCH(request: NextRequest) {
   try {
+    const ip = getClientIp(request);
+    const rateCheck = checkRateLimit(ip, 'newsletter_unsubscribe', {
+      windowMs: 15 * 60 * 1000,
+      maxRequests: 5,
+    });
+    if (!rateCheck.allowed) {
+      return NextResponse.json(
+        { error: `Too many unsubscribe requests from this network. Please wait ${rateCheck.waitSeconds} seconds.` },
+        { status: 429 }
+      );
+    }
+
     const body = await request.json().catch(() => ({}));
     const rawEmail = typeof body.email === 'string' ? body.email.trim() : '';
 

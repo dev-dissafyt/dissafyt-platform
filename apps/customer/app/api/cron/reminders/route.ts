@@ -11,11 +11,11 @@ export const dynamic = 'force-dynamic';
  * Can be called by Vercel Cron or external scheduler every 15 minutes.
  */
 export async function GET(request: NextRequest) {
-  // Optional security token check for cron triggers
+  // Strict fail-closed security token check for cron triggers
   const authHeader = request.headers.get('authorization');
   const cronSecret = process.env.CRON_SECRET;
-  if (cronSecret && authHeader !== `Bearer ${cronSecret}`) {
-    return NextResponse.json({ error: 'Unauthorized cron trigger' }, { status: 401 });
+  if (!cronSecret || authHeader !== `Bearer ${cronSecret}`) {
+    return NextResponse.json({ error: 'Unauthorized: valid CRON_SECRET authorization required' }, { status: 401 });
   }
 
   try {

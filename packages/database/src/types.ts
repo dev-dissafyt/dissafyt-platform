@@ -217,6 +217,8 @@ export interface BarberService {
   plan_code?: string | null;
   billing_frequency?: number;
   billing_cycles?: number;
+  extra_son_price?: number | null;
+  max_sons?: number | null;
   created_at: string;
 }
 
@@ -431,6 +433,16 @@ export interface FounderPassRedemption {
   barber_name?: string | null;
   notes?: string | null;
   redeemed_at: string;
+}
+
+export interface FounderPassCampaignSettings {
+  id: string;
+  price_per_pass: number;
+  total_cuts: number;
+  total_spots: number;
+  capital_target: number;
+  is_active: boolean;
+  updated_at: string;
 }
 
 // Product Pricing Survey types

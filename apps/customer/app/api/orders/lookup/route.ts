@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AuthService, OrderService } from '@dissafyt/api';
+import { getClientIp, checkRateLimit } from '@/lib/rate-limiter';
 
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
@@ -25,6 +26,19 @@ function maskPhone(phone?: string | null): string | undefined {
  * Redacts full street address, phone, and email unless authenticated as the order owner or platform admin.
  */
 export async function GET(request: NextRequest) {
+  const ip = getClientIp(request);
+  const rateCheck = checkRateLimit(ip, 'order_lookup', {
+    windowMs: 5 * 60 * 1000, // 5 minutes
+    maxRequests: 25,         // max 25 lookups per 5 minutes per IP
+  });
+
+  if (!rateCheck.allowed) {
+    return NextResponse.json(
+      { error: `Too many lookup requests. Please wait ${rateCheck.waitSeconds} seconds.` },
+      { status: 429 }
+    );
+  }
+
   const { searchParams } = new URL(request.url);
   const orderNumber = searchParams.get('orderNumber');
 

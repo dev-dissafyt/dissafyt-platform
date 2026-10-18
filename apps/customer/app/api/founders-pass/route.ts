@@ -95,6 +95,7 @@ export async function POST(request: NextRequest) {
     // 3. Handle PayFast Live Payment payload if customer selected 'pay_now'
     if (pledgeType === 'pay_now') {
       const siteUrl = getCanonicalSiteUrl();
+      const campaign = await FounderPassService.getCampaignSettings();
 
       const merchantId = process.env.PAYFAST_MERCHANT_ID || '10000100';
       const merchantKey = process.env.PAYFAST_MERCHANT_KEY || '46f0cd694581a';
@@ -114,9 +115,9 @@ export async function POST(request: NextRequest) {
         email_address: email,
         cell_number: phone,
         m_payment_id: `founder-${pass.id}`,
-        amount: '1200.00',
-        item_name: `Dissafyt Founder Pass #${pass.pass_number} (12 Cuts / Year)`,
-        item_description: 'Prepaid 12 Master Cuts Entitlement to fund 1 Norwalk Way Barbershop Buildout',
+        amount: campaign.price_per_pass.toFixed(2),
+        item_name: `Dissafyt Founder Pass #${pass.pass_number} (${campaign.total_cuts} Cuts / Year)`,
+        item_description: `Prepaid ${campaign.total_cuts} Master Cuts Entitlement to fund 1 Norwalk Way Barbershop Buildout`,
         custom_str1: pass.id,
         custom_str2: pass.user_id || email,
         custom_str3: 'founder_pass',
