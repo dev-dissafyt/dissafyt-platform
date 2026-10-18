@@ -2,8 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input } from '@dissafyt/ui';
-import { Package, Truck, Clock, CheckCircle2, ArrowLeft, RefreshCw, Search, Phone, MapPin, ChevronRight, X } from 'lucide-react';
+import { Package, Truck, Clock, CheckCircle2, ArrowLeft, RefreshCw, Search, Phone, MapPin, ChevronRight, X, Layers } from 'lucide-react';
 import { adminFetch } from '@/lib/operator';
 
 interface OrderItem {
@@ -46,6 +47,8 @@ const STATUS_OPTIONS = [
 ];
 
 export default function AdminOrdersPage() {
+  const pathname = usePathname();
+  const basePrefix = pathname.startsWith('/admin') ? '/admin' : '';
   const [orders, setOrders] = useState<Order[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -121,7 +124,7 @@ export default function AdminOrdersPage() {
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <div className="flex items-center space-x-2 text-sm text-stone-400 mb-1">
-            <Link href="/admin/commerce" className="hover:text-white">Commerce</Link>
+            <Link href={`${basePrefix}/commerce`} className="hover:text-white">Commerce</Link>
             <span>/</span>
             <span className="text-amber-500 font-medium">Orders</span>
           </div>
@@ -134,14 +137,25 @@ export default function AdminOrdersPage() {
           </p>
         </div>
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={loadOrders}
-          className="border-stone-700 text-stone-300 hover:bg-stone-800"
-        >
-          <RefreshCw className="mr-2 h-4 w-4" /> Refresh Orders
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Link href={`${basePrefix}/commerce/batches`}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-amber-500/50 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 font-semibold"
+            >
+              <Layers className="mr-2 h-4 w-4 text-amber-400" /> Pre-order Batches (R10k Pool)
+            </Button>
+          </Link>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={loadOrders}
+            className="border-stone-700 text-stone-300 hover:bg-stone-800"
+          >
+            <RefreshCw className="mr-2 h-4 w-4" /> Refresh Orders
+          </Button>
+        </div>
       </div>
 
       {statusMsg && (

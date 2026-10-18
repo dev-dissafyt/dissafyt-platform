@@ -93,7 +93,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       icon: ShoppingBag,
       isActive:
         (pathname === '/admin/commerce' || pathname === '/commerce') &&
-        !pathname.includes('/orders'),
+        !pathname.includes('/orders') &&
+        !pathname.includes('/batches'),
     },
     {
       name: 'Customer Orders',
@@ -103,6 +104,16 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
       isActive:
         pathname.startsWith('/admin/commerce/orders') ||
         pathname.startsWith('/commerce/orders'),
+    },
+    {
+      name: 'Batches & Working Capital',
+      href: `${basePrefix}/commerce/batches`,
+      icon: null,
+      isSubItem: true,
+      badge: 'R10k Pool',
+      isActive:
+        pathname.startsWith('/admin/commerce/batches') ||
+        pathname.startsWith('/commerce/batches'),
     },
     {
       name: 'Bookings',
@@ -197,7 +208,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                   key={item.href}
                   href={item.href}
                   onClick={() => setMobileOpen(false)}
-                  className={`flex items-center space-x-3 rounded-md px-3 py-2.5 transition-colors ${
+                  className={`flex items-center justify-between rounded-md px-3 py-2.5 transition-colors ${
                     item.isSubItem ? 'pl-6 text-xs' : ''
                   } ${
                     item.isActive
@@ -205,12 +216,19 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
                       : 'text-stone-300 hover:bg-stone-800 hover:text-white'
                   }`}
                 >
-                  {Icon ? (
-                    <Icon className="h-4 w-4 text-amber-500 flex-shrink-0" />
-                  ) : item.isSubItem ? (
-                    <span className="text-amber-400">&bull;</span>
+                  <div className="flex items-center space-x-3 truncate">
+                    {Icon ? (
+                      <Icon className="h-4 w-4 text-amber-500 flex-shrink-0" />
+                    ) : item.isSubItem ? (
+                      <span className="text-amber-400">&bull;</span>
+                    ) : null}
+                    <span className="truncate">{item.name}</span>
+                  </div>
+                  {item.badge ? (
+                    <span className="text-[9px] font-mono font-bold bg-amber-500/20 text-amber-400 px-1.5 py-0.5 rounded border border-amber-500/30 flex-shrink-0">
+                      {item.badge}
+                    </span>
                   ) : null}
-                  <span className="truncate">{item.name}</span>
                 </Link>
               );
             })}

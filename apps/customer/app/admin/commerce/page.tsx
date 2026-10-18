@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input, Label } from '@dissafyt/ui';
 import { ShoppingBag, Plus, Trash2, CheckCircle, XCircle, Tag, Layers, RefreshCw, Package, Pencil, Copy, Check, ExternalLink, Share2, HelpCircle, Upload, Image as ImageIcon, Palette, Loader2, Sparkles, X, MessageSquare, TrendingUp, Percent, AlertCircle, Phone, Send, DollarSign, BarChart3, Vote } from 'lucide-react';
 
@@ -143,6 +144,8 @@ const PRESET_COLORWAYS: StreetwearColorway[] = [
 const DEFAULT_STREETWEAR_SIZES = ['S', 'M', 'L', 'XL', '2XL'];
 
 export default function AdminCommercePage() {
+  const pathname = usePathname();
+  const basePrefix = pathname.startsWith('/admin') ? '/admin' : '';
   const [products, setProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<Category[]>([]);
   const [loading, setLoading] = useState(true);
@@ -904,7 +907,17 @@ export default function AdminCommercePage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <Link href="/admin/commerce/orders">
+          <Link href={`${basePrefix}/commerce/batches`}>
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-amber-500/50 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 font-semibold shadow-sm"
+            >
+              <Layers className="h-4 w-4 mr-2 text-amber-400" />
+              Pre-order Batches (R10k Pool)
+            </Button>
+          </Link>
+          <Link href={`${basePrefix}/commerce/orders`}>
             <Button
               variant="outline"
               size="sm"
@@ -1356,6 +1369,16 @@ export default function AdminCommercePage() {
                       placeholder="e.g. 50"
                       className="bg-stone-950 border-stone-700 text-xs"
                     />
+                  </div>
+                  <div className="pt-2 border-t border-amber-500/20 flex items-center justify-between col-span-1 md:col-span-2">
+                    <span className="text-[10px] text-stone-400">Master Budget Pool:</span>
+                    <Link
+                      href={`${basePrefix}/commerce/batches?edit=true`}
+                      className="text-[11px] font-mono font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1"
+                    >
+                      <Layers className="w-3 h-3 text-amber-400" />
+                      Edit Working Capital Pool &rarr;
+                    </Link>
                   </div>
                 </div>
               )}
@@ -2038,6 +2061,16 @@ export default function AdminCommercePage() {
                       <option value="in_production">In Production / Sourcing</option>
                       <option value="completed">Completed / Dispatched</option>
                     </select>
+                  </div>
+                  <div className="pt-2 border-t border-amber-500/20 flex items-center justify-between col-span-1 md:col-span-3">
+                    <span className="text-[10px] text-stone-400">Master Budget Pool:</span>
+                    <Link
+                      href={`${basePrefix}/commerce/batches?edit=true`}
+                      className="text-[11px] font-mono font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1"
+                    >
+                      <Layers className="w-3 h-3 text-amber-400" />
+                      Edit Working Capital Pool &rarr;
+                    </Link>
                   </div>
                 </div>
               )}
