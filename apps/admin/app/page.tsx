@@ -245,325 +245,409 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* ============================================================== */}
-      {/* PRE-ORDER WORKING CAPITAL BATCH ENGINE (R10k POOL)            */}
+      {/* DUAL CAPITAL POOLS: PHYSICAL BUILDOUT VS WORKING CAPITAL       */}
       {/* ============================================================== */}
-      <Card className="border-amber-500/40 bg-gradient-to-br from-stone-900/90 via-stone-950 to-stone-900/90 relative overflow-hidden shadow-xl shadow-amber-500/5">
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-400" />
-        
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-800/80">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+        {/* ============================================================== */}
+        {/* LEFT: PHYSICAL BUILDOUT CAPITAL (Ace of Fyt Studio Buildout)   */}
+        {/* ============================================================== */}
+        <Card className="border-[#ff5500]/40 bg-gradient-to-br from-stone-900/90 via-stone-950 to-stone-900/90 relative overflow-hidden shadow-xl shadow-[#ff5500]/5 flex flex-col justify-between">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#ff5500] via-amber-500 to-[#ff7700]" />
+          
           <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 font-mono text-[10px] font-black uppercase tracking-wider">
-                <Layers className="w-3 h-3 text-amber-400 animate-pulse" />
-                Working Capital Pre-Order Pool
-              </span>
-              <span className="text-xs font-mono text-stone-400">
-                {batchData?.analytics?.batch?.batch_code || 'batch-01'} &bull; Status: {batchData?.analytics?.batch?.status || 'accumulating'}
-              </span>
-            </div>
-            <CardTitle className="text-xl text-white flex items-center">
-              <Layers className="mr-2 h-5 w-5 text-amber-400" />
-              {batchData?.analytics?.batch?.batch_name || 'Batch 01 — Cape Town Streetwear Drop'}
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Automated R10,000 manufacturing ceiling. Atomic row-level spot reservation protects against wholesale blank over-allocation with automated 48h settlement cascade.
-            </CardDescription>
-          </div>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-800/80">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#ff5500]/20 border border-[#ff5500]/40 text-[#ff5500] font-mono text-[10px] font-black uppercase tracking-wider">
+                    <Flame className="w-3 h-3 fill-[#ff5500] animate-pulse" />
+                    Physical Buildout Capital
+                  </span>
+                  <span className="text-xs font-mono text-stone-400">
+                    1 Norwalk Way, Bernadino Heights Studio
+                  </span>
+                </div>
+                <CardTitle className="text-xl text-white flex items-center">
+                  <Crown className="mr-2 h-5 w-5 text-amber-400" />
+                  Founder Pass &amp; Capital Telemetry
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  50 prepaid patron passes (R1,200 for 12 cuts) funding Belmont chairs, custom mirrors, and studio stations
+                </CardDescription>
+              </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <Link href="/commerce/batches?edit=true">
-              <Button
-                variant="outline"
-                size="sm"
-                className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10 text-xs font-mono font-bold"
-              >
-                <Sliders className="w-3.5 h-3.5 mr-1 text-amber-400" />
-                Edit Batch Parameters
-              </Button>
-            </Link>
-            <Link href="/commerce/batches">
-              <Button
-                size="sm"
-                className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs font-mono uppercase tracking-wider shadow-lg shadow-amber-500/10"
-              >
-                Open Batches Engine &rarr;
-              </Button>
-            </Link>
-          </div>
-        </CardHeader>
-
-        <CardContent className="pt-6 space-y-6">
-          {/* 4 Stat Pills */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {/* 1. Working Capital Cap */}
-            <div className="p-4 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
-              <div className="text-[11px] font-mono uppercase text-stone-400">Capital Budget Ceiling</div>
-              <div className="text-2xl font-black font-mono text-amber-400">
-                R {(batchData?.analytics?.budgetCap || 10000).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-              </div>
-              <div className="text-[10px] font-mono text-stone-500">
-                Fixed manufacturing allocation
-              </div>
-            </div>
-
-            {/* 2. Remaining Headroom */}
-            <div className="p-4 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
-              <div className="text-[11px] font-mono uppercase text-stone-400">Remaining Budget</div>
-              <div className="text-2xl font-black font-mono text-emerald-400">
-                R {(batchData?.analytics?.remainingBudget ?? 10000).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-              </div>
-              <div className="text-[10px] font-mono text-emerald-500 font-bold">
-                Available for R0 pre-orders
-              </div>
-            </div>
-
-            {/* 3. Wholesale COGS Allocated */}
-            <div className="p-4 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
-              <div className="text-[11px] font-mono uppercase text-stone-400">Wholesale COGS Claimed</div>
-              <div className="text-2xl font-black font-mono text-orange-400">
-                R {(batchData?.analytics?.allocatedCogs || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-              </div>
-              <div className="text-[10px] font-mono text-stone-500">
-                {batchData?.analytics?.totalUnits || 0} blank garments reserved
-              </div>
-            </div>
-
-            {/* 4. Projected Net Profit */}
-            <div className="p-4 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
-              <div className="text-[11px] font-mono uppercase text-stone-400">Projected Retail Net</div>
-              <div className="text-2xl font-black font-mono text-white">
-                R {(batchData?.analytics?.projectedNetProfit || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-              </div>
-              <div className="text-[10px] font-mono text-stone-400">
-                Retail: R {(batchData?.analytics?.projectedRetail || 0).toFixed(0)}
-              </div>
-            </div>
-          </div>
-
-          {/* Progress Bar */}
-          <div className="space-y-1.5">
-            <div className="flex justify-between items-center text-xs font-mono">
-              <span className="text-stone-300 uppercase font-semibold">
-                Working Capital Allocation:{' '}
-                <strong className="text-amber-400">
-                  {batchData?.analytics
-                    ? Math.round(((batchData.analytics.allocatedCogs || 0) / (batchData.analytics.budgetCap || 10000)) * 100)
-                    : 0}%
-                </strong>
-              </span>
-              <span className="text-stone-400">
-                R {(batchData?.analytics?.allocatedCogs || 0).toLocaleString()} / R {(batchData?.analytics?.budgetCap || 10000).toLocaleString()} Ceiling
-              </span>
-            </div>
-            <div className="h-3 w-full bg-stone-950 rounded-full overflow-hidden border border-stone-800 p-0.5">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-amber-500 to-orange-500 transition-all duration-700 shadow-md shadow-amber-500/40"
-                style={{
-                  width: `${Math.max(
-                    2,
-                    Math.min(
-                      100,
-                      batchData?.analytics
-                        ? Math.round(((batchData.analytics.allocatedCogs || 0) / (batchData.analytics.budgetCap || 10000)) * 100)
-                        : 0
-                    )
-                  )}%`,
-                }}
-              />
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* ============================================================== */}
-      {/* FOUNDER'S PASS & PHYSICAL BUILDOUT CAPITAL POOL               */}
-      {/* ============================================================== */}
-      <Card className="border-[#ff5500]/40 bg-gradient-to-br from-stone-900/90 via-stone-950 to-stone-900/90 relative overflow-hidden shadow-xl shadow-[#ff5500]/5">
-        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-[#ff5500] via-amber-500 to-[#ff7700]" />
-        
-        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-800/80">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-[#ff5500]/20 border border-[#ff5500]/40 text-[#ff5500] font-mono text-[10px] font-black uppercase tracking-wider">
-                <Flame className="w-3 h-3 fill-[#ff5500] animate-pulse" />
-                Physical Buildout Capital
-              </span>
-              <span className="text-xs font-mono text-stone-400">
-                1 Norwalk Way, Bernadino Heights Studio
-              </span>
-            </div>
-            <CardTitle className="text-xl text-white flex items-center">
-              <Crown className="mr-2 h-5 w-5 text-amber-400" />
-              Founder Pass &amp; Capital Telemetry
-            </CardTitle>
-            <CardDescription className="text-xs">
-              Live tracking of 50 prepaid patron passes (R1,200 for 12 cuts) funding Belmont chairs, custom mirrors, and studio stations
-            </CardDescription>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-lg">
-              TARGET: R 60,000.00
-            </span>
-          </div>
-        </CardHeader>
-
-        <CardContent className="pt-6 space-y-6">
-          {/* 4 Stat Pills */}
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {/* 1. Capital Collected */}
-            <div className="p-4 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
-              <div className="text-[11px] font-mono uppercase text-stone-400">Capital Collected</div>
-              <div className="text-2xl font-black font-mono text-emerald-400">
-                R {(metrics?.founderPass?.currentCapitalRaised || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-              </div>
-              <div className="text-[10px] font-mono text-stone-500">
-                {metrics?.founderPass?.pctFunded || 0}% of R 60,000 goal
-              </div>
-            </div>
-
-            {/* 2. Active Passes */}
-            <div className="p-4 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
-              <div className="text-[11px] font-mono uppercase text-stone-400">Passes Claimed</div>
-              <div className="text-2xl font-black font-mono text-white flex items-baseline gap-1.5">
-                <span>{metrics?.founderPass?.activePaidPasses || 0}</span>
-                <span className="text-xs font-normal text-stone-500">/ 50 Max</span>
-              </div>
-              <div className="text-[10px] font-mono text-[#ff5500] font-bold">
-                {metrics?.founderPass?.spotsRemaining ?? 50} Passes Remaining
-              </div>
-            </div>
-
-            {/* 3. Pledged Waitlist */}
-            <div className="p-4 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
-              <div className="text-[11px] font-mono uppercase text-stone-400">Waitlist Pledges</div>
-              <div className="text-2xl font-black font-mono text-amber-300">
-                {metrics?.founderPass?.pendingPledges || 0}
-              </div>
-              <div className="text-[10px] font-mono text-stone-500">
-                Awaiting payment completion
-              </div>
-            </div>
-
-            {/* 4. Haircut Redemptions */}
-            <div className="p-4 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
-              <div className="text-[11px] font-mono uppercase text-stone-400">Cuts Delivered</div>
-              <div className="text-2xl font-black font-mono text-blue-400 flex items-baseline gap-1.5">
-                <span>{metrics?.founderPass?.totalCutsRedeemed || 0}</span>
-                <span className="text-xs font-normal text-stone-500">
-                  / {((metrics?.founderPass?.activePaidPasses || 0) * 12)} Entitled
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1.5 rounded-lg whitespace-nowrap">
+                  TARGET: R 60,000.00
                 </span>
               </div>
-              <div className="text-[10px] font-mono text-stone-500">
-                12 cuts/year prepaid entitlement
+            </CardHeader>
+
+            <CardContent className="pt-6 space-y-6">
+              {/* 4 Stat Pills (2x2 Grid) */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* 1. Capital Collected */}
+                <div className="p-3.5 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
+                  <div className="text-[11px] font-mono uppercase text-stone-400">Capital Collected</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
+                    R {(metrics?.founderPass?.currentCapitalRaised || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[10px] font-mono text-stone-500">
+                    {metrics?.founderPass?.pctFunded || 0}% of R 60,000 goal
+                  </div>
+                </div>
+
+                {/* 2. Active Passes */}
+                <div className="p-3.5 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
+                  <div className="text-[11px] font-mono uppercase text-stone-400">Passes Claimed</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono text-white flex items-baseline gap-1.5">
+                    <span>{metrics?.founderPass?.activePaidPasses || 0}</span>
+                    <span className="text-xs font-normal text-stone-500">/ 50 Max</span>
+                  </div>
+                  <div className="text-[10px] font-mono text-[#ff5500] font-bold">
+                    {metrics?.founderPass?.spotsRemaining ?? 50} Passes Remaining
+                  </div>
+                </div>
+
+                {/* 3. Pledged Waitlist */}
+                <div className="p-3.5 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
+                  <div className="text-[11px] font-mono uppercase text-stone-400">Waitlist Pledges</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono text-amber-300">
+                    {metrics?.founderPass?.pendingPledges || 0}
+                  </div>
+                  <div className="text-[10px] font-mono text-stone-500">
+                    Awaiting payment completion
+                  </div>
+                </div>
+
+                {/* 4. Haircut Redemptions */}
+                <div className="p-3.5 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
+                  <div className="text-[11px] font-mono uppercase text-stone-400">Cuts Delivered</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono text-blue-400 flex items-baseline gap-1.5">
+                    <span>{metrics?.founderPass?.totalCutsRedeemed || 0}</span>
+                    <span className="text-xs font-normal text-stone-500">
+                      / {((metrics?.founderPass?.activePaidPasses || 0) * 12)} Entitled
+                    </span>
+                  </div>
+                  <div className="text-[10px] font-mono text-stone-500">
+                    12 cuts/year prepaid
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          {/* Progress Bar towards R60k buildout */}
-          <div className="space-y-1.5">
-            <div className="flex justify-between items-center text-xs font-mono">
-              <span className="text-stone-300 uppercase font-semibold">
-                Studio Buildout Funding Progress: <strong className="text-amber-400">{metrics?.founderPass?.pctFunded || 0}%</strong>
-              </span>
-              <span className="text-stone-400">
-                R {(metrics?.founderPass?.currentCapitalRaised || 0).toLocaleString()} / R 60,000 Target
-              </span>
-            </div>
-            <div className="h-3 w-full bg-stone-950 rounded-full overflow-hidden border border-stone-800 p-0.5">
-              <div
-                className="h-full rounded-full bg-gradient-to-r from-[#ff5500] via-amber-500 to-emerald-500 transition-all duration-700 shadow-md shadow-[#ff5500]/40"
-                style={{ width: `${Math.max(2, Math.min(100, metrics?.founderPass?.pctFunded || 0))}%` }}
-              />
-            </div>
-          </div>
-
-          {/* Recent Patrons Roster */}
-          <div className="space-y-3 pt-2 border-t border-stone-800/80">
-            <div className="flex items-center justify-between text-xs font-medium">
-              <span className="text-stone-300 font-bold uppercase tracking-wider font-mono flex items-center gap-1.5">
-                <Users className="w-3.5 h-3.5 text-amber-500" />
-                <span>Founding Patron Roster ({metrics?.founderPass?.totalPasses || 0} Total Backers)</span>
-              </span>
-              <span className="text-[11px] font-mono text-stone-500">
-                Direct WhatsApp updates for studio milestones
-              </span>
-            </div>
-
-            {loading ? (
-              <div className="py-6 text-center text-stone-500 text-xs font-mono">Loading founder patrons...</div>
-            ) : !metrics?.founderPass?.recentPatrons || metrics.founderPass.recentPatrons.length === 0 ? (
-              <div className="py-6 text-center text-stone-500 text-xs font-mono rounded-lg bg-stone-950/40 border border-stone-800/60">
-                No founder passes registered yet. Online purchases and counter pledges will appear here live.
+              {/* Progress Bar towards R60k buildout */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-xs font-mono">
+                  <span className="text-stone-300 uppercase font-semibold">
+                    Funding Progress: <strong className="text-amber-400">{metrics?.founderPass?.pctFunded || 0}%</strong>
+                  </span>
+                  <span className="text-stone-400">
+                    R {(metrics?.founderPass?.currentCapitalRaised || 0).toLocaleString()} / R 60,000
+                  </span>
+                </div>
+                <div className="h-3 w-full bg-stone-950 rounded-full overflow-hidden border border-stone-800 p-0.5">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-[#ff5500] via-amber-500 to-emerald-500 transition-all duration-700 shadow-md shadow-[#ff5500]/40"
+                    style={{ width: `${Math.max(2, Math.min(100, metrics?.founderPass?.pctFunded || 0))}%` }}
+                  />
+                </div>
               </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs font-mono">
-                  <thead>
-                    <tr className="border-b border-stone-800 text-stone-400 text-[11px]">
-                      <th className="pb-2 font-medium">Pass #</th>
-                      <th className="pb-2 font-medium">Patron Name</th>
-                      <th className="pb-2 font-medium">Contact</th>
-                      <th className="pb-2 font-medium">Status</th>
-                      <th className="pb-2 font-medium">Cuts Used</th>
-                      <th className="pb-2 font-medium text-right">Action</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-stone-800/60">
-                    {metrics.founderPass.recentPatrons.map((patron) => {
-                      const cleanPhone = (patron.customerPhone || '').replace(/[^0-9]/g, '');
-                      const waText = encodeURIComponent(
-                        `Hi ${patron.customerName}, this is Dissafyt Admin regarding your Founder Pass #${patron.passNumber} at 1 Norwalk Way studio.`
-                      );
-                      const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}?text=${waText}` : null;
 
-                      return (
-                        <tr key={patron.id} className="hover:bg-stone-950/60 transition-colors">
-                          <td className="py-2.5 font-bold text-amber-400">{patron.passNumber}</td>
-                          <td className="py-2.5 font-medium text-white">{patron.customerName}</td>
-                          <td className="py-2.5 text-stone-400">
-                            <div>{patron.customerPhone || '—'}</div>
-                            <div className="text-[10px] text-stone-500">{patron.customerEmail}</div>
-                          </td>
-                          <td className="py-2.5">
-                            <span
-                              className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${
-                                patron.status === 'active'
-                                  ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/40'
-                                  : patron.status === 'exhausted'
-                                  ? 'bg-blue-950/60 text-blue-400 border border-blue-800/40'
-                                  : 'bg-amber-950/60 text-amber-400 border border-amber-800/40'
-                              }`}
-                            >
-                              {patron.status}
-                            </span>
-                          </td>
-                          <td className="py-2.5 text-stone-300">
-                            {patron.cutsUsed} / {patron.totalCuts} cuts
-                          </td>
-                          <td className="py-2.5 text-right">
-                            {waUrl && (
-                              <a
-                                href={waUrl}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                className="inline-flex items-center gap-1 px-2.5 py-1 rounded bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700/50 text-emerald-300 text-[10px] font-bold transition-all"
-                              >
-                                <Phone className="w-3 h-3" />
-                                <span>WhatsApp</span>
-                              </a>
-                            )}
-                          </td>
+              {/* Founding Patron Roster */}
+              <div className="space-y-3 pt-2 border-t border-stone-800/80">
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <span className="text-stone-300 font-bold uppercase tracking-wider font-mono flex items-center gap-1.5">
+                    <Users className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Founding Patron Roster ({metrics?.founderPass?.totalPasses || 0})</span>
+                  </span>
+                  <span className="text-[11px] font-mono text-stone-500">
+                    WhatsApp concierge
+                  </span>
+                </div>
+
+                {loading ? (
+                  <div className="py-6 text-center text-stone-500 text-xs font-mono">Loading founder patrons...</div>
+                ) : !metrics?.founderPass?.recentPatrons || metrics.founderPass.recentPatrons.length === 0 ? (
+                  <div className="py-6 text-center text-stone-500 text-xs font-mono rounded-lg bg-stone-950/40 border border-stone-800/60">
+                    No founder passes registered yet. Online purchases and counter pledges will appear here live.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto max-h-[220px]">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead>
+                        <tr className="border-b border-stone-800 text-stone-400 text-[11px]">
+                          <th className="pb-2 font-medium">Pass #</th>
+                          <th className="pb-2 font-medium">Patron</th>
+                          <th className="pb-2 font-medium">Status</th>
+                          <th className="pb-2 font-medium text-right">Action</th>
                         </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
+                      </thead>
+                      <tbody className="divide-y divide-stone-800/60">
+                        {metrics.founderPass.recentPatrons.slice(0, 5).map((patron) => {
+                          const cleanPhone = (patron.customerPhone || '').replace(/[^0-9]/g, '');
+                          const waText = encodeURIComponent(
+                            `Hi ${patron.customerName}, this is Dissafyt Admin regarding your Founder Pass #${patron.passNumber} at 1 Norwalk Way studio.`
+                          );
+                          const waUrl = cleanPhone ? `https://wa.me/${cleanPhone}?text=${waText}` : null;
+
+                          return (
+                            <tr key={patron.id} className="hover:bg-stone-950/60 transition-colors">
+                              <td className="py-2.5 font-bold text-amber-400">{patron.passNumber}</td>
+                              <td className="py-2.5 font-medium text-white">
+                                <div className="truncate max-w-[120px]">{patron.customerName}</div>
+                                <div className="text-[10px] text-stone-500 truncate max-w-[120px]">{patron.customerPhone || patron.customerEmail}</div>
+                              </td>
+                              <td className="py-2.5">
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                    patron.status === 'active'
+                                      ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/40'
+                                      : patron.status === 'exhausted'
+                                      ? 'bg-blue-950/60 text-blue-400 border border-blue-800/40'
+                                      : 'bg-amber-950/60 text-amber-400 border border-amber-800/40'
+                                  }`}
+                                >
+                                  {patron.status}
+                                </span>
+                              </td>
+                              <td className="py-2.5 text-right">
+                                {waUrl && (
+                                  <a
+                                    href={waUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700/50 text-emerald-300 text-[10px] font-bold transition-all"
+                                  >
+                                    <Phone className="w-3 h-3" />
+                                    <span>Chat</span>
+                                  </a>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
-            )}
+            </CardContent>
           </div>
-        </CardContent>
-      </Card>
+        </Card>
+
+        {/* ============================================================== */}
+        {/* RIGHT: WORKING CAPITAL PRE-ORDER POOL (Streetwear Blanks Drop) */}
+        {/* ============================================================== */}
+        <Card className="border-amber-500/40 bg-gradient-to-br from-stone-900/90 via-stone-950 to-stone-900/90 relative overflow-hidden shadow-xl shadow-amber-500/5 flex flex-col justify-between">
+          <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-400" />
+          
+          <div>
+            <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-800/80">
+              <div>
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 font-mono text-[10px] font-black uppercase tracking-wider">
+                    <Layers className="w-3 h-3 text-amber-400 animate-pulse" />
+                    Working Capital Pre-Order Pool
+                  </span>
+                  <span className="text-xs font-mono text-stone-400">
+                    {batchData?.analytics?.batch?.batch_code || 'batch-01'} &bull; Status: {batchData?.analytics?.batch?.status || 'accumulating'}
+                  </span>
+                </div>
+                <CardTitle className="text-xl text-white flex items-center">
+                  <Layers className="mr-2 h-5 w-5 text-amber-400" />
+                  {batchData?.analytics?.batch?.batch_name || 'Batch 01 — Cape Town Streetwear Drop'}
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Automated R10,000 manufacturing ceiling. Atomic spot reservation protects against blank over-allocation with 48h settlement.
+                </CardDescription>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Link href="/commerce/batches?edit=true">
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10 text-xs font-mono font-bold"
+                  >
+                    <Sliders className="w-3.5 h-3.5 mr-1 text-amber-400" />
+                    Edit Parameters
+                  </Button>
+                </Link>
+                <Link href="/commerce/batches">
+                  <Button
+                    size="sm"
+                    className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs font-mono uppercase tracking-wider shadow-lg shadow-amber-500/10"
+                  >
+                    Open Batches &rarr;
+                  </Button>
+                </Link>
+              </div>
+            </CardHeader>
+
+            <CardContent className="pt-6 space-y-6">
+              {/* 4 Stat Pills (2x2 Grid) */}
+              <div className="grid grid-cols-2 gap-3">
+                {/* 1. Working Capital Cap */}
+                <div className="p-3.5 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
+                  <div className="text-[11px] font-mono uppercase text-stone-400">Budget Ceiling</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono text-amber-400">
+                    R {(batchData?.analytics?.budgetCap || 10000).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[10px] font-mono text-stone-500">
+                    Fixed manufacturing allocation
+                  </div>
+                </div>
+
+                {/* 2. Remaining Headroom */}
+                <div className="p-3.5 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
+                  <div className="text-[11px] font-mono uppercase text-stone-400">Remaining Budget</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono text-emerald-400">
+                    R {(batchData?.analytics?.remainingBudget ?? 10000).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[10px] font-mono text-emerald-500 font-bold">
+                    Available for R0 pre-orders
+                  </div>
+                </div>
+
+                {/* 3. Wholesale COGS Allocated */}
+                <div className="p-3.5 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
+                  <div className="text-[11px] font-mono uppercase text-stone-400">Wholesale COGS Claimed</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono text-orange-400">
+                    R {(batchData?.analytics?.allocatedCogs || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[10px] font-mono text-stone-500">
+                    {batchData?.analytics?.totalUnits || 0} blank garments reserved
+                  </div>
+                </div>
+
+                {/* 4. Projected Net Profit */}
+                <div className="p-3.5 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
+                  <div className="text-[11px] font-mono uppercase text-stone-400">Projected Retail Net</div>
+                  <div className="text-xl sm:text-2xl font-black font-mono text-white">
+                    R {(batchData?.analytics?.projectedNetProfit || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-[10px] font-mono text-stone-400">
+                    Retail: R {(batchData?.analytics?.projectedRetail || 0).toFixed(0)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Progress Bar towards R10k ceiling */}
+              <div className="space-y-1.5">
+                <div className="flex justify-between items-center text-xs font-mono">
+                  <span className="text-stone-300 uppercase font-semibold">
+                    Allocation:{' '}
+                    <strong className="text-amber-400">
+                      {batchData?.analytics
+                        ? Math.round(((batchData.analytics.allocatedCogs || 0) / (batchData.analytics.budgetCap || 10000)) * 100)
+                        : 0}%
+                    </strong>
+                  </span>
+                  <span className="text-stone-400">
+                    R {(batchData?.analytics?.allocatedCogs || 0).toLocaleString()} / R {(batchData?.analytics?.budgetCap || 10000).toLocaleString()}
+                  </span>
+                </div>
+                <div className="h-3 w-full bg-stone-950 rounded-full overflow-hidden border border-stone-800 p-0.5">
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-amber-500 to-orange-500 transition-all duration-700 shadow-md shadow-amber-500/40"
+                    style={{
+                      width: `${Math.max(
+                        2,
+                        Math.min(
+                          100,
+                          batchData?.analytics
+                            ? Math.round(((batchData.analytics.allocatedCogs || 0) / (batchData.analytics.budgetCap || 10000)) * 100)
+                            : 0
+                        )
+                      )}%`,
+                    }}
+                  />
+                </div>
+              </div>
+
+              {/* Pre-Order Backers Roster */}
+              <div className="space-y-3 pt-2 border-t border-stone-800/80">
+                <div className="flex items-center justify-between text-xs font-medium">
+                  <span className="text-stone-300 font-bold uppercase tracking-wider font-mono flex items-center gap-1.5">
+                    <Package className="w-3.5 h-3.5 text-amber-500" />
+                    <span>Pre-Order Backers Roster ({batchData?.analytics?.totalOrders || 0})</span>
+                  </span>
+                  <Link
+                    href="/commerce/batches"
+                    className="text-[11px] font-mono text-amber-400 hover:text-amber-300 flex items-center gap-1"
+                  >
+                    Manage All &rarr;
+                  </Link>
+                </div>
+
+                {loading ? (
+                  <div className="py-6 text-center text-stone-500 text-xs font-mono">Loading pre-order reservations...</div>
+                ) : !batchData?.analytics?.orders || batchData.analytics.orders.length === 0 ? (
+                  <div className="py-6 text-center text-stone-500 text-xs font-mono rounded-lg bg-stone-950/40 border border-stone-800/60">
+                    No batch pre-orders placed yet. Active garments reserving blank spots will appear here live.
+                  </div>
+                ) : (
+                  <div className="overflow-x-auto max-h-[220px]">
+                    <table className="w-full text-left text-xs font-mono">
+                      <thead>
+                        <tr className="border-b border-stone-800 text-stone-400 text-[11px]">
+                          <th className="pb-2 font-medium">Order #</th>
+                          <th className="pb-2 font-medium">Backer</th>
+                          <th className="pb-2 font-medium">Status</th>
+                          <th className="pb-2 font-medium text-right">Action</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-stone-800/60">
+                        {batchData.analytics.orders.slice(0, 5).map((order: any) => {
+                          const cleanPhone = (order.customer_phone || '').replace(/[^0-9]/g, '');
+                          const waUrl = order.whatsappLink || (cleanPhone ? `https://wa.me/${cleanPhone}` : null);
+
+                          return (
+                            <tr key={order.id} className="hover:bg-stone-950/60 transition-colors">
+                              <td className="py-2.5 font-bold text-amber-400">{order.order_number}</td>
+                              <td className="py-2.5 font-medium text-white">
+                                <div className="truncate max-w-[120px]">{order.customer_name || 'Anonymous Backer'}</div>
+                                <div className="text-[10px] text-stone-500 truncate max-w-[120px]">{order.customer_phone || order.customer_email || '—'}</div>
+                              </td>
+                              <td className="py-2.5">
+                                <span
+                                  className={`px-1.5 py-0.5 rounded text-[10px] font-bold uppercase ${
+                                    order.status === 'paid' || order.status === 'completed'
+                                      ? 'bg-emerald-950/60 text-emerald-400 border border-emerald-800/40'
+                                      : order.status === 'deposit_paid'
+                                      ? 'bg-blue-950/60 text-blue-400 border border-blue-800/40'
+                                      : order.status === 'batch_payment_requested'
+                                      ? 'bg-amber-950/60 text-amber-400 border border-amber-800/40'
+                                      : 'bg-stone-900 text-stone-400 border border-stone-800'
+                                  }`}
+                                >
+                                  {order.status}
+                                </span>
+                              </td>
+                              <td className="py-2.5 text-right">
+                                {waUrl && (
+                                  <a
+                                    href={waUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded bg-emerald-900/40 hover:bg-emerald-800/60 border border-emerald-700/50 text-emerald-300 text-[10px] font-bold transition-all"
+                                  >
+                                    <Phone className="w-3 h-3" />
+                                    <span>Chat</span>
+                                  </a>
+                                )}
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
+              </div>
+            </CardContent>
+          </div>
+        </Card>
+      </div>
 
       {/* Operational Breakdown Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
