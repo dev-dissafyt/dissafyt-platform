@@ -21,6 +21,7 @@ import {
   Flame,
   Phone,
   Layers,
+  Sliders,
 } from 'lucide-react';
 import Link from 'next/link';
 import { adminFetch } from '@/lib/operator';
@@ -270,12 +271,22 @@ export default function AdminDashboardPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <Link href="/commerce/batches?edit=true">
+              <Button
+                variant="outline"
+                size="sm"
+                className="border-amber-500/40 text-amber-300 hover:bg-amber-500/10 text-xs font-mono font-bold"
+              >
+                <Sliders className="w-3.5 h-3.5 mr-1 text-amber-400" />
+                Edit Batch Parameters
+              </Button>
+            </Link>
             <Link href="/commerce/batches">
               <Button
                 size="sm"
                 className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs font-mono uppercase tracking-wider shadow-lg shadow-amber-500/10"
               >
-                Open Batches &amp; Working Capital Engine &rarr;
+                Open Batches Engine &rarr;
               </Button>
             </Link>
           </div>

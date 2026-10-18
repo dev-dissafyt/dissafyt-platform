@@ -161,7 +161,23 @@ export default function AdminBatchesPage() {
   }
 
   useEffect(() => {
-    loadBatchData();
+    if (typeof window !== 'undefined') {
+      const params = new URLSearchParams(window.location.search);
+      const targetBatchId = params.get('batchId') || undefined;
+      loadBatchData(targetBatchId).then(() => {
+        if (params.get('edit') === 'true') {
+          setShowConfigModal(true);
+        }
+        if (params.get('create') === 'true') {
+          setShowCreateBatchModal(true);
+        }
+        if (params.get('directory') === 'true') {
+          setShowBatchDirectory(true);
+        }
+      });
+    } else {
+      loadBatchData();
+    }
   }, []);
 
   async function handleCreateBatch(e: React.FormEvent) {

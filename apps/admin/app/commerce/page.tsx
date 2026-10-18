@@ -2048,6 +2048,16 @@ export default function AdminCommercePage() {
                       <option value="completed">Completed / Dispatched</option>
                     </select>
                   </div>
+                  <div className="pt-2 border-t border-amber-500/20 flex items-center justify-between">
+                    <span className="text-[10px] text-stone-400">Master Budget Pool:</span>
+                    <Link
+                      href="/commerce/batches?edit=true"
+                      className="text-[11px] font-mono font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1"
+                    >
+                      <Layers className="w-3 h-3 text-amber-400" />
+                      Edit Working Capital Pool &rarr;
+                    </Link>
+                  </div>
                 </div>
               )}
             </div>
