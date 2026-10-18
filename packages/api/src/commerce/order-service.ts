@@ -4,6 +4,7 @@ import { BrandService } from '../studio/brand-service';
 import { AuditService } from '../audit/audit-service';
 import { EmailService } from '../notifications/email-service';
 import { getCanonicalSiteUrl } from '../config/domains.config';
+import { BatchBudgetService } from './batch-budget-service';
 
 export interface ShippingAddress {
   recipient_name: string;
@@ -165,6 +166,52 @@ export class OrderService {
         return { success: false, error: 'Cart must contain at least one item.' };
       }
 
+      // Pre-calculate pre-order COGS to check against active batch R10,000 working capital ceiling
+      let totalPreorderCogs = 0;
+      let totalPreorderUnits = 0;
+      let totalPreorderRetail = 0;
+
+      for (const item of input.items) {
+        const product = products.find((p) => p.id === item.product_id);
+        if (product && product.is_preorder) {
+          const itemCogs = Number(product.cost_price) || 180;
+          const qty = Number(item.quantity) || 1;
+          totalPreorderCogs += itemCogs * qty;
+          totalPreorderUnits += qty;
+          totalPreorderRetail += Number(product.base_price) * qty;
+        }
+      }
+
+      let activeBatch: any = null;
+      let qualifiesForSubsidizedR0 = false;
+      let reservationTier: 'subsidized_free' | 'deposit_paid' | 'waitlist' | 'standard' = 'standard';
+
+      if (hasPreorder) {
+        try {
+          activeBatch = await BatchBudgetService.getActiveBatch();
+          if (activeBatch && activeBatch.status === 'accumulating') {
+            const reserveRes = await BatchBudgetService.reserveSpot({
+              batchId: activeBatch.id,
+              cogsAmount: totalPreorderCogs,
+              retailAmount: totalPreorderRetail,
+              quantity: totalPreorderUnits,
+            });
+
+            if (reserveRes.success) {
+              qualifiesForSubsidizedR0 = true;
+              reservationTier = 'subsidized_free';
+            } else {
+              reservationTier = 'deposit_paid';
+            }
+          } else {
+            reservationTier = 'deposit_paid';
+          }
+        } catch (e) {
+          console.warn('[OrderService] BatchBudgetService reservation warning:', e);
+          reservationTier = 'deposit_paid';
+        }
+      }
+
       for (const item of input.items) {
         if (!Number.isInteger(item.quantity) || item.quantity <= 0 || item.quantity > 50) {
           return { success: false, error: 'Invalid item quantity. Must be a positive whole number.' };
@@ -203,9 +250,13 @@ export class OrderService {
         let balanceAmount = 0;
 
         if (isPreorder) {
-          // Zero upfront deposit for preorder accumulation
-          depositAmount = 0.00;
-          balanceAmount = totalPrice;
+          if (qualifiesForSubsidizedR0) {
+            depositAmount = 0.00;
+            balanceAmount = totalPrice;
+          } else {
+            depositAmount = totalPrice * 0.5;
+            balanceAmount = totalPrice * 0.5;
+          }
         }
 
         orderSubtotal += totalPrice;
@@ -268,6 +319,8 @@ export class OrderService {
             customer_phone: input.customer_phone || input.shipping_address?.recipient_phone || null,
             customer_name: input.customer_name || input.shipping_address?.recipient_name || null,
             shipping_address: enrichedShippingAddress,
+            batch_id: activeBatch?.id || null,
+            reservation_tier: reservationTier,
           })
           .select()
           .single();
@@ -276,9 +329,25 @@ export class OrderService {
           order = dbOrder;
         } else if (orderErr) {
           console.error('Failed to insert order into DB:', orderErr);
+          if (qualifiesForSubsidizedR0 && activeBatch) {
+            await BatchBudgetService.releaseSpot({
+              batchId: activeBatch.id,
+              cogsAmount: totalPreorderCogs,
+              retailAmount: totalPreorderRetail,
+              quantity: totalPreorderUnits,
+            });
+          }
         }
       } catch (insertErr) {
         console.error('Exception inserting order:', insertErr);
+        if (qualifiesForSubsidizedR0 && activeBatch) {
+          await BatchBudgetService.releaseSpot({
+            batchId: activeBatch.id,
+            cogsAmount: totalPreorderCogs,
+            retailAmount: totalPreorderRetail,
+            quantity: totalPreorderUnits,
+          });
+        }
       }
 
       if (!order) {

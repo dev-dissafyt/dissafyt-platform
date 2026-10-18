@@ -146,22 +146,30 @@ function SuccessContent() {
     );
   }
 
+  const isPreorder = searchParams.get('type') === 'preorder';
+
   return (
     <div className="container mx-auto max-w-4xl px-4 py-12 sm:py-20">
       {/* Hero Confirmation Banner */}
       <div className="text-center space-y-4 mb-12">
-        <div className="inline-flex h-20 w-20 items-center justify-center rounded-full bg-amber-500/10 border-2 border-amber-500/30 text-amber-400 mb-2">
-          <CheckCircle2 className="h-10 w-10 text-amber-500 stroke-[2.5]" />
+        <div className={`inline-flex h-20 w-20 items-center justify-center rounded-full border-2 mb-2 ${
+          isPreorder
+            ? 'bg-orange-500/10 border-orange-500/30 text-orange-400'
+            : 'bg-amber-500/10 border-amber-500/30 text-amber-400'
+        }`}>
+          <CheckCircle2 className={`h-10 w-10 stroke-[2.5] ${isPreorder ? 'text-orange-400' : 'text-amber-500'}`} />
         </div>
         <div className="space-y-1">
           <span className="text-xs font-mono tracking-widest text-amber-500 uppercase font-bold">
-            PAYMENT CONFIRMED // DISPATCH QUEUED
+            {isPreorder ? 'BATCH 01 SPOT SECURED // R0.00 DOWN' : 'PAYMENT CONFIRMED // DISPATCH QUEUED'}
           </span>
           <h1 className="font-display text-3xl sm:text-5xl font-black uppercase text-white tracking-tight">
-            Order Confirmed
+            {isPreorder ? 'Pre-Order Reserved' : 'Order Confirmed'}
           </h1>
           <p className="text-sm text-zinc-400 max-w-md mx-auto">
-            Your Cape Town streetwear order has been secured and logged into the fulfillment queue.
+            {isPreorder
+              ? 'Your spot in Batch 01 has been locked into the Cape Town Garment Lab queue. We will notify you via WhatsApp & email with your PayFast settlement link prior to print dispatch.'
+              : 'Your Cape Town streetwear order has been secured and logged into the fulfillment queue.'}
           </p>
         </div>
 

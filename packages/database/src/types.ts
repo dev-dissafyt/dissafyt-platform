@@ -159,6 +159,22 @@ export type OrderStatus =
 export type DepositStatus = 'none' | 'deposit_paid' | 'fully_settled' | 'refunded';
 export type FulfillmentChoice = 'courier' | 'studio_collection';
 
+export interface Batch {
+  id: string;
+  batch_name: string;
+  batch_code: string;
+  capital_budget: number;
+  remaining_budget: number;
+  current_cogs_allocated: number;
+  current_retail_value: number;
+  total_units_reserved: number;
+  status: 'accumulating' | 'batch_filled' | 'in_production' | 'dispatched' | 'completed' | 'cancelled';
+  contingency_buffer_pct?: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
 export interface Order {
   id: string;
   user_id?: string | null;
@@ -177,6 +193,11 @@ export interface Order {
   shipping_address?: Record<string, unknown> | null;
   payment_link_token?: string | null;
   batch_notified_at?: string | null;
+  batch_id?: string | null;
+  reservation_tier?: 'subsidized_free' | 'waitlist' | 'standard' | 'deposit_paid' | null;
+  reservation_expires_at?: string | null;
+  batch_settlement_requested_at?: string | null;
+  batch?: Batch;
   created_at: string;
   updated_at: string;
 }

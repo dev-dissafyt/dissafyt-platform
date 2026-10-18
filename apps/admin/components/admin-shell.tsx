@@ -82,6 +82,15 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
               <span>Customer Orders</span>
             </Link>
             <Link
+              href="/commerce/batches"
+              className={`flex items-center space-x-3 rounded-md px-3 py-2 transition-colors pl-6 text-xs ${
+                pathname.startsWith('/commerce/batches') ? 'bg-stone-800 text-white font-bold' : 'text-stone-300 hover:bg-stone-800 hover:text-white'
+              }`}
+            >
+              <span className="text-amber-400">&bull;</span>
+              <span>Batches &amp; Working Capital</span>
+            </Link>
+            <Link
               href="/barbershop"
               className={`flex items-center space-x-3 rounded-md px-3 py-2 transition-colors ${
                 pathname.startsWith('/barbershop') ? 'bg-stone-800 text-white font-bold' : 'text-stone-300 hover:bg-stone-800 hover:text-white'
