@@ -98,6 +98,106 @@ export class BatchBudgetService {
   }
 
   /**
+   * Lists all batches in descending order of creation.
+   */
+  static async listBatches(): Promise<Batch[]> {
+    const admin = getSupabaseAdminClient();
+    const { data, error } = await admin
+      .from('batches')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error('[BatchBudgetService] listBatches error:', error);
+      throw error;
+    }
+    return (data || []) as Batch[];
+  }
+
+  /**
+   * Creates a new pre-order batch.
+   */
+  static async createBatch(params: {
+    batch_name: string;
+    batch_code: string;
+    capital_budget?: number;
+    contingency_buffer_pct?: number;
+    is_active?: boolean;
+  }): Promise<Batch> {
+    const admin = getSupabaseAdminClient();
+    const budget = Number(params.capital_budget) || 10000;
+    const shouldActivate = params.is_active ?? false;
+
+    if (shouldActivate) {
+      await admin.from('batches').update({ is_active: false }).eq('is_active', true);
+    }
+
+    const cleanCode = params.batch_code.trim().toLowerCase().replace(/[^a-z0-9_-]/g, '-');
+
+    const { data, error } = await admin
+      .from('batches')
+      .insert({
+        batch_name: params.batch_name.trim(),
+        batch_code: cleanCode,
+        capital_budget: budget,
+        remaining_budget: budget,
+        current_cogs_allocated: 0,
+        current_retail_value: 0,
+        total_units_reserved: 0,
+        status: 'accumulating',
+        contingency_buffer_pct: Number(params.contingency_buffer_pct) || 5,
+        is_active: shouldActivate,
+      })
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return data as Batch;
+  }
+
+  /**
+   * Sets a specific batch as the primary active batch for incoming pre-orders.
+   */
+  static async setActiveBatch(batchId: string): Promise<Batch> {
+    const admin = getSupabaseAdminClient();
+    // 1. Deactivate all existing batches
+    await admin.from('batches').update({ is_active: false }).eq('is_active', true);
+    // 2. Activate target batch
+    const { data, error } = await admin
+      .from('batches')
+      .update({ is_active: true, updated_at: new Date().toISOString() })
+      .eq('id', batchId)
+      .select('*')
+      .single();
+
+    if (error) throw error;
+    return data as Batch;
+  }
+
+  /**
+   * Deletes an empty batch (only permitted if no customer orders are attached).
+   */
+  static async deleteBatch(batchId: string): Promise<{ success: boolean; error?: string }> {
+    const admin = getSupabaseAdminClient();
+    const { count, error: countErr } = await admin
+      .from('orders')
+      .select('id', { count: 'exact', head: true })
+      .eq('batch_id', batchId);
+
+    if (countErr) throw countErr;
+    if ((count || 0) > 0) {
+      return {
+        success: false,
+        error: `Cannot delete batch with ${count} linked order(s). Deactivate or mark status as cancelled instead.`,
+      };
+    }
+
+    const { error } = await admin.from('batches').delete().eq('id', batchId);
+    if (error) throw error;
+    return { success: true };
+  }
+
+  /**
    * Updates batch parameters (budget, status, name, etc.).
    */
   static async updateBatchSettings(
@@ -105,10 +205,20 @@ export class BatchBudgetService {
     updates: Partial<Batch>
   ): Promise<Batch> {
     const admin = getSupabaseAdminClient();
+
+    let payload = { ...updates };
+    if (updates.capital_budget !== undefined) {
+      const current = await this.getBatchById(batchId);
+      if (current) {
+        const cogsAllocated = Number(current.current_cogs_allocated) || 0;
+        payload.remaining_budget = Math.max(0, Number(updates.capital_budget) - cogsAllocated);
+      }
+    }
+
     const { data, error } = await admin
       .from('batches')
       .update({
-        ...updates,
+        ...payload,
         updated_at: new Date().toISOString(),
       })
       .eq('id', batchId)

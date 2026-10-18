@@ -904,11 +904,20 @@ export default function AdminCommercePage() {
         </div>
 
         <div className="flex flex-wrap items-center gap-2 sm:gap-3">
-          <Link href="/admin/commerce/orders">
+          <Link href="/commerce/batches">
             <Button
               variant="outline"
               size="sm"
-              className="border-amber-500/50 text-amber-400 hover:bg-amber-500/10 font-semibold"
+              className="border-amber-500/50 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 font-semibold shadow-sm"
+            >
+              <Layers className="mr-2 h-4 w-4 text-amber-400" /> Pre-order Batches (R10k Pool)
+            </Button>
+          </Link>
+          <Link href="/commerce/orders">
+            <Button
+              variant="outline"
+              size="sm"
+              className="border-stone-700 text-stone-300 hover:bg-stone-800 font-medium"
             >
               <Package className="mr-2 h-4 w-4" /> View Customer Orders
             </Button>

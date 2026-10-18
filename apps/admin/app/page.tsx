@@ -20,6 +20,7 @@ import {
   Crown,
   Flame,
   Phone,
+  Layers,
 } from 'lucide-react';
 import Link from 'next/link';
 import { adminFetch } from '@/lib/operator';
@@ -104,15 +105,23 @@ interface OperationalMetrics {
 
 export default function AdminDashboardPage() {
   const [metrics, setMetrics] = useState<OperationalMetrics | null>(null);
+  const [batchData, setBatchData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   async function fetchMetrics() {
     setLoading(true);
     try {
-      const res = await adminFetch('/api/reporting');
-      if (res.ok) {
-        const data = await res.json();
+      const [reportingRes, batchRes] = await Promise.all([
+        adminFetch('/api/reporting'),
+        adminFetch('/api/batches').catch(() => null),
+      ]);
+      if (reportingRes.ok) {
+        const data = await reportingRes.json();
         setMetrics(data);
+      }
+      if (batchRes && batchRes.ok) {
+        const bData = await batchRes.json();
+        setBatchData(bData);
       }
     } catch (e) {
       console.error('Failed to load operational metrics:', e);
@@ -233,6 +242,127 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* ============================================================== */}
+      {/* PRE-ORDER WORKING CAPITAL BATCH ENGINE (R10k POOL)            */}
+      {/* ============================================================== */}
+      <Card className="border-amber-500/40 bg-gradient-to-br from-stone-900/90 via-stone-950 to-stone-900/90 relative overflow-hidden shadow-xl shadow-amber-500/5">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-amber-400" />
+        
+        <CardHeader className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-4 border-b border-stone-800/80">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              <span className="flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-amber-500/20 border border-amber-500/40 text-amber-400 font-mono text-[10px] font-black uppercase tracking-wider">
+                <Layers className="w-3 h-3 text-amber-400 animate-pulse" />
+                Working Capital Pre-Order Pool
+              </span>
+              <span className="text-xs font-mono text-stone-400">
+                {batchData?.analytics?.batch?.batch_code || 'batch-01'} &bull; Status: {batchData?.analytics?.batch?.status || 'accumulating'}
+              </span>
+            </div>
+            <CardTitle className="text-xl text-white flex items-center">
+              <Layers className="mr-2 h-5 w-5 text-amber-400" />
+              {batchData?.analytics?.batch?.batch_name || 'Batch 01 — Cape Town Streetwear Drop'}
+            </CardTitle>
+            <CardDescription className="text-xs">
+              Automated R10,000 manufacturing ceiling. Atomic row-level spot reservation protects against wholesale blank over-allocation with automated 48h settlement cascade.
+            </CardDescription>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <Link href="/commerce/batches">
+              <Button
+                size="sm"
+                className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs font-mono uppercase tracking-wider shadow-lg shadow-amber-500/10"
+              >
+                Open Batches &amp; Working Capital Engine &rarr;
+              </Button>
+            </Link>
+          </div>
+        </CardHeader>
+
+        <CardContent className="pt-6 space-y-6">
+          {/* 4 Stat Pills */}
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+            {/* 1. Working Capital Cap */}
+            <div className="p-4 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
+              <div className="text-[11px] font-mono uppercase text-stone-400">Capital Budget Ceiling</div>
+              <div className="text-2xl font-black font-mono text-amber-400">
+                R {(batchData?.analytics?.budgetCap || 10000).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[10px] font-mono text-stone-500">
+                Fixed manufacturing allocation
+              </div>
+            </div>
+
+            {/* 2. Remaining Headroom */}
+            <div className="p-4 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
+              <div className="text-[11px] font-mono uppercase text-stone-400">Remaining Budget</div>
+              <div className="text-2xl font-black font-mono text-emerald-400">
+                R {(batchData?.analytics?.remainingBudget ?? 10000).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[10px] font-mono text-emerald-500 font-bold">
+                Available for R0 pre-orders
+              </div>
+            </div>
+
+            {/* 3. Wholesale COGS Allocated */}
+            <div className="p-4 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
+              <div className="text-[11px] font-mono uppercase text-stone-400">Wholesale COGS Claimed</div>
+              <div className="text-2xl font-black font-mono text-orange-400">
+                R {(batchData?.analytics?.allocatedCogs || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[10px] font-mono text-stone-500">
+                {batchData?.analytics?.totalUnits || 0} blank garments reserved
+              </div>
+            </div>
+
+            {/* 4. Projected Net Profit */}
+            <div className="p-4 rounded-xl bg-stone-950/70 border border-stone-800 space-y-1">
+              <div className="text-[11px] font-mono uppercase text-stone-400">Projected Retail Net</div>
+              <div className="text-2xl font-black font-mono text-white">
+                R {(batchData?.analytics?.projectedNetProfit || 0).toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+              </div>
+              <div className="text-[10px] font-mono text-stone-400">
+                Retail: R {(batchData?.analytics?.projectedRetail || 0).toFixed(0)}
+              </div>
+            </div>
+          </div>
+
+          {/* Progress Bar */}
+          <div className="space-y-1.5">
+            <div className="flex justify-between items-center text-xs font-mono">
+              <span className="text-stone-300 uppercase font-semibold">
+                Working Capital Allocation:{' '}
+                <strong className="text-amber-400">
+                  {batchData?.analytics
+                    ? Math.round(((batchData.analytics.allocatedCogs || 0) / (batchData.analytics.budgetCap || 10000)) * 100)
+                    : 0}%
+                </strong>
+              </span>
+              <span className="text-stone-400">
+                R {(batchData?.analytics?.allocatedCogs || 0).toLocaleString()} / R {(batchData?.analytics?.budgetCap || 10000).toLocaleString()} Ceiling
+              </span>
+            </div>
+            <div className="h-3 w-full bg-stone-950 rounded-full overflow-hidden border border-stone-800 p-0.5">
+              <div
+                className="h-full rounded-full bg-gradient-to-r from-emerald-500 via-amber-500 to-orange-500 transition-all duration-700 shadow-md shadow-amber-500/40"
+                style={{
+                  width: `${Math.max(
+                    2,
+                    Math.min(
+                      100,
+                      batchData?.analytics
+                        ? Math.round(((batchData.analytics.allocatedCogs || 0) / (batchData.analytics.budgetCap || 10000)) * 100)
+                        : 0
+                    )
+                  )}%`,
+                }}
+              />
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* ============================================================== */}
       {/* FOUNDER'S PASS & PHYSICAL BUILDOUT CAPITAL POOL               */}
@@ -437,7 +567,7 @@ export default function AdminDashboardPage() {
               <CardDescription>Order processing stages with Courier Guy delivery</CardDescription>
             </div>
             <Link
-              href="/admin/commerce/orders"
+              href="/commerce/orders"
               className="text-xs text-amber-500 hover:text-amber-400 flex items-center font-medium"
             >
               View Orders <ArrowRight className="ml-1 h-3 w-3" />
@@ -480,7 +610,7 @@ export default function AdminDashboardPage() {
               <CardDescription>Upcoming schedule and cut volume per barber</CardDescription>
             </div>
             <Link
-              href="/admin/barbershop"
+              href="/barbershop"
               className="text-xs text-amber-500 hover:text-amber-400 flex items-center font-medium"
             >
               Open Schedule <ArrowRight className="ml-1 h-3 w-3" />
@@ -538,7 +668,7 @@ export default function AdminDashboardPage() {
               </CardDescription>
             </div>
             <Link
-              href="/admin/finance"
+              href="/finance"
               className="text-xs text-amber-500 hover:text-amber-400 flex items-center font-medium"
             >
               Payment Audit <ArrowRight className="ml-1 h-3 w-3" />
