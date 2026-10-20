@@ -1,4 +1,4 @@
-import { getSupabaseAdminClient, BarberService, Booking, BookingWithDetails, Staff, BookingStatus, BarbershopLocation } from '@dissafyt/database';
+import { getSupabaseAdminClient, BarberService, Booking, BookingWithDetails, Staff, BookingStatus, BarbershopLocation, ServiceLocation } from '@dissafyt/database';
 import { AuditService } from '../audit/audit-service';
 import { EmailService } from '../notifications/email-service';
 import { StaffVaultService } from '../security/staff-vault';
@@ -141,20 +141,123 @@ export class BarbershopService {
   }
 
   /**
-   * Lists all barbershop services and subscription plans.
+   * Lists all barbershop services and subscription plans, optionally merged with location pricing.
    */
-  static async listServices(): Promise<BarberService[]> {
+  static async listServices(locationId?: string): Promise<BarberService[]> {
     const admin = getSupabaseAdminClient();
-    const { data, error } = await admin
+    const { data: services, error } = await admin
       .from('services')
       .select('*')
       .order('price', { ascending: true });
 
-    if (error || !data) {
+    if (error || !services) {
       console.error('Failed to list services:', error);
       return [];
     }
-    return data as BarberService[];
+
+    try {
+      // If a specific location is targeted
+      if (locationId && locationId !== 'all') {
+        const { data: locPrices } = await admin
+          .from('service_locations')
+          .select('*')
+          .eq('location_id', locationId);
+
+        const priceMap = new Map<string, ServiceLocation>();
+        (locPrices || []).forEach((lp: any) => {
+          priceMap.set(lp.service_id, lp);
+        });
+
+        return services.map((s: any) => {
+          const locOverride = priceMap.get(s.id);
+          const hasOverride = locOverride && locOverride.price !== null && locOverride.price !== undefined;
+          return {
+            ...s,
+            effective_price: hasOverride ? Number(locOverride.price) : Number(s.price),
+            location_price: hasOverride ? Number(locOverride.price) : null,
+            is_available_at_location: locOverride ? Boolean(locOverride.is_available) : true,
+            location_pricing: locOverride ? [locOverride] : [],
+          };
+        }) as BarberService[];
+      }
+
+      // If 'all' or no location specified, attach all location overrides for admin matrix
+      const { data: allLocPrices } = await admin
+        .from('service_locations')
+        .select('*');
+
+      const multiMap = new Map<string, ServiceLocation[]>();
+      (allLocPrices || []).forEach((lp: any) => {
+        const list = multiMap.get(lp.service_id) || [];
+        list.push(lp);
+        multiMap.set(lp.service_id, list);
+      });
+
+      return services.map((s: any) => ({
+        ...s,
+        effective_price: Number(s.price),
+        location_price: null,
+        is_available_at_location: true,
+        location_pricing: multiMap.get(s.id) || [],
+      })) as BarberService[];
+    } catch (err) {
+      console.warn('Failed to load service_locations pricing:', err);
+      return services as BarberService[];
+    }
+  }
+
+  /**
+   * Sets or updates studio-specific price overrides and availability for a service.
+   */
+  static async upsertLocationServicePricing(
+    serviceId: string,
+    locationId: string,
+    data: {
+      price?: number | null;
+      is_available?: boolean;
+      custom_duration_minutes?: number | null;
+    },
+    actor?: { email?: string; role?: string }
+  ): Promise<{ success: boolean; serviceLocation?: ServiceLocation; error?: string }> {
+    const admin = getSupabaseAdminClient();
+    try {
+      const payload: any = {
+        service_id: serviceId,
+        location_id: locationId,
+        updated_at: new Date().toISOString(),
+      };
+      if (data.price !== undefined) payload.price = data.price;
+      if (data.is_available !== undefined) payload.is_available = data.is_available;
+      if (data.custom_duration_minutes !== undefined) payload.custom_duration_minutes = data.custom_duration_minutes;
+
+      const { data: result, error } = await admin
+        .from('service_locations')
+        .upsert(payload, { onConflict: 'service_id,location_id' })
+        .select()
+        .single();
+
+      if (error) {
+        console.error('[upsertLocationServicePricing] error:', error);
+        return { success: false, error: error.message };
+      }
+
+      // Invisible Audit Trail
+      await AuditService.recordLog({
+        actor_email: actor?.email || 'admin@dissafyt.com',
+        actor_role: actor?.role || 'admin',
+        action: 'service.location_pricing_update',
+        entity_type: 'service',
+        entity_id: serviceId,
+        changes: {
+          location_id: locationId,
+          ...data,
+        },
+      });
+
+      return { success: true, serviceLocation: result as ServiceLocation };
+    } catch (err: any) {
+      return { success: false, error: err?.message || 'Failed to update location pricing' };
+    }
   }
 
   /**
@@ -1032,7 +1135,34 @@ export class BarbershopService {
       console.warn('Subscription quota verification fallback:', subErr?.message);
     }
 
-    const totalAmount = isCoveredBySubscription ? 0.00 : Number(service.price || 0);
+    const resolvedLocationId = input.location_id || 'loc-cpt-flagship';
+
+    // 2b. Location-specific pricing and availability check
+    let effectiveServicePrice = Number(service.price || 0);
+    try {
+      const { data: locPricing } = await admin
+        .from('service_locations')
+        .select('price, is_available')
+        .eq('service_id', input.service_id)
+        .eq('location_id', resolvedLocationId)
+        .maybeSingle();
+
+      if (locPricing) {
+        if (locPricing.is_available === false) {
+          return {
+            success: false,
+            error: 'This service is currently unavailable at the selected studio location.',
+          };
+        }
+        if (locPricing.price !== null && locPricing.price !== undefined) {
+          effectiveServicePrice = Number(locPricing.price);
+        }
+      }
+    } catch (locErr) {
+      console.warn('Location pricing lookup fallback:', locErr);
+    }
+
+    const totalAmount = isCoveredBySubscription ? 0.00 : effectiveServicePrice;
     const paymentStatus: 'membership_covered' | 'unpaid' = isCoveredBySubscription ? 'membership_covered' : 'unpaid';
 
     // 3b. Anti-Hoarding & No-Show Protection when customer selects "Pay in Chair"
@@ -1099,8 +1229,6 @@ export class BarbershopService {
     const bookingNote = input.notes
       ? (statusNote ? `${input.notes} (${statusNote})` : input.notes)
       : (statusNote || (isCoveredBySubscription ? 'Included in Member Subscription' : null));
-
-    const resolvedLocationId = input.location_id || 'loc-cpt-flagship';
 
     // 4. Create booking record with audit attributes and location
     let bookingResult: any = null;

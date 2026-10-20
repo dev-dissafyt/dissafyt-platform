@@ -33,21 +33,26 @@ export interface UpdateServiceInput {
 
 export class AdminBarbershopService {
   /**
-   * Lists all barbershop services and subscription plans.
+   * Lists all barbershop services and subscription plans, optionally scoped to a branch location.
    */
-  static async listServices(): Promise<BarberService[]> {
-    const admin = getSupabaseAdminClient();
-    const { data, error } = await admin
-      .from('services')
-      .select('*')
-      .order('price', { ascending: true });
+  static async listServices(locationId?: string): Promise<BarberService[]> {
+    return BarbershopService.listServices(locationId);
+  }
 
-    if (error || !data) {
-      console.error('Failed to list services:', error);
-      return [];
-    }
-
-    return data as BarberService[];
+  /**
+   * Updates or sets branch-specific price overrides and availability for a service.
+   */
+  static async updateServiceLocationPricing(
+    serviceId: string,
+    locationId: string,
+    data: {
+      price?: number | null;
+      is_available?: boolean;
+      custom_duration_minutes?: number | null;
+    },
+    actor?: { email?: string; role?: string }
+  ) {
+    return BarbershopService.upsertLocationServicePricing(serviceId, locationId, data, actor);
   }
 
   /**

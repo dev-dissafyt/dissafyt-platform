@@ -9,7 +9,9 @@ export async function GET(request: NextRequest) {
   const auth = await requireAdminAuth(request);
   if (isAuthFailure(auth)) return auth;
 
-  const services = await AdminBarbershopService.listServices();
+  const { searchParams } = new URL(request.url);
+  const locationId = searchParams.get('location_id') || searchParams.get('locationId') || undefined;
+  const services = await AdminBarbershopService.listServices(locationId);
   return NextResponse.json(services);
 }
 

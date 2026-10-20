@@ -36,6 +36,9 @@ interface Service {
   is_active: boolean;
   is_subscription?: boolean;
   plan_code?: string | null;
+  effective_price?: number;
+  location_price?: number | null;
+  is_available_at_location?: boolean;
 }
 
 interface StaffMember {
@@ -390,6 +393,40 @@ function BookContent() {
       clearTimeout(failsafeTimeout);
     };
   }, []);
+
+  // 1b. Reactive load of studio-scoped services & pricing when selectedLocation changes
+  useEffect(() => {
+    if (!selectedLocation?.id) return;
+    let active = true;
+
+    async function loadStudioServices() {
+      try {
+        const res = await fetch(`/api/services?location_id=${selectedLocation!.id}`);
+        if (res.ok) {
+          const data: Service[] = await res.json();
+          if (!active) return;
+          const availableServices = (data || []).filter(
+            (s: any) => s.is_active !== false && s.is_available_at_location !== false
+          );
+          setServices(availableServices);
+
+          // Update currently selected service with branch-specific price or fallback
+          setSelectedService((prev) => {
+            if (!prev) return availableServices.find((s) => !s.is_subscription) || null;
+            const updatedMatch = availableServices.find((s) => s.id === prev.id);
+            return updatedMatch || availableServices.find((s) => !s.is_subscription) || null;
+          });
+        }
+      } catch (err) {
+        console.warn('Failed to load studio services:', err);
+      }
+    }
+
+    loadStudioServices();
+    return () => {
+      active = false;
+    };
+  }, [selectedLocation?.id]);
 
   // 2. Fetch Availability whenever Service, Barber, or Date changes
   useEffect(() => {

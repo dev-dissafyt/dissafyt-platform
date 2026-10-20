@@ -7,12 +7,13 @@ export const revalidate = 0;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
+  const locationId = searchParams.get('location_id') || searchParams.get('locationId') || undefined;
   const isAdminRequest =
     searchParams.get('scope') === 'admin' ||
     request.headers.has('x-admin-role') ||
     request.cookies.has('dissafyt_admin_token');
 
-  const services = await AdminBarbershopService.listServices();
+  const services = await AdminBarbershopService.listServices(locationId);
 
   if (isAdminRequest) {
     const auth = await requireAdminAuth(request);
@@ -21,7 +22,17 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  const activeServices = services.filter((s) => s.is_active);
+  const activeServices = services
+    .filter((s) => {
+      if (!s.is_active) return false;
+      if (locationId && locationId !== 'all' && s.is_available_at_location === false) return false;
+      return true;
+    })
+    .map((s) => ({
+      ...s,
+      price: s.effective_price ?? s.price,
+    }));
+
   return NextResponse.json(activeServices);
 }
 

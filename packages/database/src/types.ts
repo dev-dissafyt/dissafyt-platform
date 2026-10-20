@@ -226,6 +226,33 @@ export type BookingStatus =
 
 export type StaffSpecialty = 'barber' | 'nail_tech' | 'beautician';
 
+export interface ServiceLocation {
+  id: string;
+  service_id: string;
+  location_id: string;
+  price?: number | null;
+  is_available: boolean;
+  custom_duration_minutes?: number | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DayOperatingHours {
+  open: string; // e.g. "09:00"
+  close: string; // e.g. "19:00"
+  is_closed: boolean;
+}
+
+export interface LocationOperatingHours {
+  monday: DayOperatingHours;
+  tuesday: DayOperatingHours;
+  wednesday: DayOperatingHours;
+  thursday: DayOperatingHours;
+  friday: DayOperatingHours;
+  saturday: DayOperatingHours;
+  sunday: DayOperatingHours;
+}
+
 export interface BarberService {
   id: string;
   name: string;
@@ -240,6 +267,10 @@ export interface BarberService {
   billing_cycles?: number;
   extra_son_price?: number | null;
   max_sons?: number | null;
+  effective_price?: number;
+  location_price?: number | null;
+  is_available_at_location?: boolean;
+  location_pricing?: ServiceLocation[];
   created_at: string;
 }
 
@@ -342,6 +373,7 @@ export interface BarbershopLocation {
   is_active: boolean;
   capacity_chairs: number;
   operating_hours_display: string;
+  operating_hours?: LocationOperatingHours | Record<string, DayOperatingHours> | null;
   google_maps_url?: string | null;
   google_maps_embed_url?: string | null;
   latitude?: number | null;

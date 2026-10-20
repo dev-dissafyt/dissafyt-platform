@@ -33,15 +33,28 @@ import {
   Building2,
   Pencil,
   ShieldCheck,
-  Crown,
+  DollarSign,
+  AlertCircle,
+  CheckCircle2,
+  Sliders,
+  Store,
 } from 'lucide-react';
-import { adminFetch } from '../../lib/operator';
+import { adminFetch } from '@/lib/operator';
 
 const SPECIALTY_LABELS: Record<string, string> = {
   barber: 'Barber',
   nail_tech: 'Nail Technician',
   beautician: 'Beautician',
 };
+
+interface ServiceLocation {
+  id?: string;
+  service_id: string;
+  location_id: string;
+  price?: number | null;
+  is_available: boolean;
+  custom_duration_minutes?: number | null;
+}
 
 interface Service {
   id: string;
@@ -55,6 +68,10 @@ interface Service {
   plan_code?: string | null;
   extra_son_price?: number | null;
   max_sons?: number | null;
+  effective_price?: number;
+  location_price?: number | null;
+  is_available_at_location?: boolean;
+  location_pricing?: ServiceLocation[];
 }
 
 interface StaffMember {
@@ -97,6 +114,22 @@ interface BookingRecord {
   customer?: { full_name?: string; email?: string; phone?: string } | null;
 }
 
+interface DayOperatingHours {
+  open: string;
+  close: string;
+  is_closed: boolean;
+}
+
+interface LocationOperatingHours {
+  monday: DayOperatingHours;
+  tuesday: DayOperatingHours;
+  wednesday: DayOperatingHours;
+  thursday: DayOperatingHours;
+  friday: DayOperatingHours;
+  saturday: DayOperatingHours;
+  sunday: DayOperatingHours;
+}
+
 interface BarbershopLocation {
   id: string;
   name: string;
@@ -110,6 +143,7 @@ interface BarbershopLocation {
   is_active: boolean;
   capacity_chairs: number;
   operating_hours_display: string;
+  operating_hours?: LocationOperatingHours | Record<string, DayOperatingHours> | null;
   google_maps_url?: string | null;
   google_maps_embed_url?: string | null;
   pos_terminal_id?: string | null;
@@ -118,6 +152,26 @@ interface BarbershopLocation {
 export default function AdminBarbershopPage() {
   const [activeTab, setActiveTab] = useState<'appointments' | 'staff' | 'services' | 'locations'>('appointments');
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+
+  // --- TOP BRANCH SWITCHER STATE ---
+  const [selectedBranchId, setSelectedBranchId] = useState<string>('all');
+  const [branchPriceInputs, setBranchPriceInputs] = useState<Record<string, string>>({});
+  const [branchAvailabilityInputs, setBranchAvailabilityInputs] = useState<Record<string, boolean>>({});
+  const [savingServiceId, setSavingServiceId] = useState<string | null>(null);
+
+  // --- OPERATING HOURS MODAL STATE ---
+  const [showHoursModal, setShowHoursModal] = useState(false);
+  const [hoursEditingLocationId, setHoursEditingLocationId] = useState<string>('loc-cpt-flagship');
+  const [operatingHoursState, setOperatingHoursState] = useState<LocationOperatingHours>({
+    monday: { open: '09:00', close: '18:00', is_closed: true },
+    tuesday: { open: '09:00', close: '19:00', is_closed: false },
+    wednesday: { open: '09:00', close: '19:00', is_closed: false },
+    thursday: { open: '09:00', close: '19:00', is_closed: false },
+    friday: { open: '09:00', close: '19:00', is_closed: false },
+    saturday: { open: '09:00', close: '17:00', is_closed: false },
+    sunday: { open: '10:00', close: '16:00', is_closed: true },
+  });
+  const [savingHours, setSavingHours] = useState(false);
 
   // --- TAB 1: APPOINTMENTS STATE ---
   const [bookings, setBookings] = useState<BookingRecord[]>([]);
@@ -157,8 +211,6 @@ export default function AdminBarbershopPage() {
   const [servicePrice, setServicePrice] = useState('');
   const [isSubscription, setIsSubscription] = useState(false);
   const [planCode, setPlanCode] = useState('solo');
-  const [serviceExtraSonPrice, setServiceExtraSonPrice] = useState('60');
-  const [serviceMaxSons, setServiceMaxSons] = useState('3');
   const [serviceSubmitting, setServiceSubmitting] = useState(false);
 
   // --- TAB 4: LOCATIONS STATE ---
@@ -201,8 +253,6 @@ export default function AdminBarbershopPage() {
   const [editServicePrice, setEditServicePrice] = useState('');
   const [editServiceIsSubscription, setEditServiceIsSubscription] = useState(false);
   const [editServicePlanCode, setEditServicePlanCode] = useState('solo');
-  const [editServiceExtraSonPrice, setEditServiceExtraSonPrice] = useState('60');
-  const [editServiceMaxSons, setEditServiceMaxSons] = useState('3');
   const [editServiceActive, setEditServiceActive] = useState(true);
   const [editServiceSubmitting, setEditServiceSubmitting] = useState(false);
 
@@ -252,11 +302,30 @@ export default function AdminBarbershopPage() {
     }
   }
 
-  async function loadServices() {
+  async function loadServices(branchId = selectedBranchId) {
     setLoadingServices(true);
     try {
-      const res = await adminFetch('/api/services');
-      if (res.ok) setServices(await res.json());
+      const url =
+        branchId && branchId !== 'all'
+          ? `/api/services?location_id=${branchId}`
+          : '/api/services';
+      const res = await adminFetch(url);
+      if (res.ok) {
+        const data: Service[] = await res.json();
+        setServices(data);
+        const initialPrices: Record<string, string> = {};
+        const initialAvail: Record<string, boolean> = {};
+        data.forEach((s) => {
+          if (s.location_price !== undefined && s.location_price !== null) {
+            initialPrices[s.id] = String(s.location_price);
+          } else {
+            initialPrices[s.id] = '';
+          }
+          initialAvail[s.id] = s.is_available_at_location !== false;
+        });
+        setBranchPriceInputs(initialPrices);
+        setBranchAvailabilityInputs(initialAvail);
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -268,7 +337,17 @@ export default function AdminBarbershopPage() {
     setLoadingLocations(true);
     try {
       const res = await adminFetch('/api/locations');
-      if (res.ok) setLocations(await res.json());
+      if (res.ok) {
+        const locs: BarbershopLocation[] = await res.json();
+        setLocations(locs);
+        // If selected branch has operating hours, sync
+        if (selectedBranchId !== 'all') {
+          const cur = locs.find((l) => l.id === selectedBranchId);
+          if (cur?.operating_hours) {
+            setOperatingHoursState(cur.operating_hours as LocationOperatingHours);
+          }
+        }
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -296,12 +375,22 @@ export default function AdminBarbershopPage() {
           is_active: true,
           capacity_chairs: parseInt(newLocChairs || '2', 10),
           operating_hours_display: 'Mon-Fri: 09:00 - 18:00 | Sat: 09:00 - 17:00 | Sun: Closed',
+          operating_hours: {
+            monday: { open: '09:00', close: '18:00', is_closed: true },
+            tuesday: { open: '09:00', close: '19:00', is_closed: false },
+            wednesday: { open: '09:00', close: '19:00', is_closed: false },
+            thursday: { open: '09:00', close: '19:00', is_closed: false },
+            friday: { open: '09:00', close: '19:00', is_closed: false },
+            saturday: { open: '09:00', close: '17:00', is_closed: false },
+            sunday: { open: '10:00', close: '16:00', is_closed: true },
+          },
           google_maps_url: newLocGoogleMapsUrl.trim() || undefined,
           pos_terminal_id: newLocPosTerminalId.trim() || undefined,
         }),
       });
 
       if (res.ok) {
+        const createdLoc = await res.json();
         setShowAddLocationModal(false);
         setNewLocName('');
         setNewLocAddress('');
@@ -309,8 +398,11 @@ export default function AdminBarbershopPage() {
         setNewLocPhone('');
         setNewLocGoogleMapsUrl('');
         setNewLocPosTerminalId('');
-        setStatusMsg(`Branch location "${newLocName}" registered and logged to audit trail.`);
-        loadLocations();
+        setStatusMsg(`Branch location "${createdLoc.name || newLocName}" registered and logged to audit trail.`);
+        await loadLocations();
+        if (createdLoc.id) {
+          setSelectedBranchId(createdLoc.id);
+        }
       } else {
         const err = await res.json();
         setStatusMsg(err.error || 'Failed to register location');
@@ -320,11 +412,118 @@ export default function AdminBarbershopPage() {
     }
   }
 
+  // --- LOCATION-SPECIFIC PRICING & HOURS ACTIONS ---
+  async function handleSaveLocationPricing(
+    serviceId: string,
+    customPriceStr: string,
+    isAvailable: boolean
+  ) {
+    if (!selectedBranchId || selectedBranchId === 'all') return;
+    setSavingServiceId(serviceId);
+    setStatusMsg(null);
+    try {
+      const priceVal = customPriceStr.trim() === '' ? null : parseFloat(customPriceStr);
+      const res = await adminFetch('/api/services/location-pricing', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          service_id: serviceId,
+          location_id: selectedBranchId,
+          price: priceVal,
+          is_available: isAvailable,
+        }),
+      });
+
+      if (res.ok) {
+        const targetBranch = locations.find((l) => l.id === selectedBranchId)?.name || 'Studio';
+        setStatusMsg(
+          `Pricing override updated for ${targetBranch} (${priceVal !== null ? `R ${priceVal.toFixed(2)}` : 'Reset to Master Base Price'})`
+        );
+        loadServices(selectedBranchId);
+      } else {
+        const err = await res.json();
+        setStatusMsg(err.error || 'Failed to update studio pricing');
+      }
+    } catch {
+      setStatusMsg('Network error updating studio pricing');
+    } finally {
+      setSavingServiceId(null);
+    }
+  }
+
+  async function handleSaveOperatingHours(e: React.FormEvent) {
+    e.preventDefault();
+    if (!hoursEditingLocationId) return;
+    setSavingHours(true);
+    setStatusMsg(null);
+
+    const h = operatingHoursState;
+    const formatDay = (d: DayOperatingHours) => (d.is_closed ? 'Closed' : `${d.open} - ${d.close}`);
+    const displaySummary = `Tue-Fri: ${formatDay(h.tuesday)} | Sat: ${formatDay(h.saturday)} | Sun: ${formatDay(h.sunday)} | Mon: ${formatDay(h.monday)}`;
+
+    try {
+      const res = await adminFetch(`/api/locations/${hoursEditingLocationId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          operating_hours: operatingHoursState,
+          operating_hours_display: displaySummary,
+        }),
+      });
+
+      if (res.ok) {
+        const updated = await res.json();
+        setStatusMsg(`Operating hours updated and logged to audit trail for ${updated.name || 'Studio'}.`);
+        setShowHoursModal(false);
+        loadLocations();
+      } else {
+        const err = await res.json();
+        setStatusMsg(err.error || 'Failed to update operating hours');
+      }
+    } catch {
+      setStatusMsg('Network error saving operating hours');
+    } finally {
+      setSavingHours(false);
+    }
+  }
+
+  async function handleQuickReassignStaff(staffId: string, newLocationId: string, staffName: string) {
+    try {
+      const res = await adminFetch(`/api/staff/${staffId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ location_id: newLocationId }),
+      });
+      if (res.ok) {
+        const locName = locations.find((l) => l.id === newLocationId)?.name || newLocationId;
+        setStatusMsg(`Specialist ${staffName} reassigned to ${locName} & logged to audit trail.`);
+        loadStaff();
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
   useEffect(() => {
     loadStaff();
-    loadServices();
     loadLocations();
   }, []);
+
+  useEffect(() => {
+    loadServices(selectedBranchId);
+    if (selectedBranchId !== 'all') {
+      setFilterLocationId(selectedBranchId);
+      setStaffLocationId(selectedBranchId);
+      setHoursEditingLocationId(selectedBranchId);
+      const matched = locations.find((l) => l.id === selectedBranchId);
+      if (matched?.operating_hours) {
+        setOperatingHoursState(matched.operating_hours as LocationOperatingHours);
+      }
+    } else {
+      setFilterLocationId('all');
+      setStaffLocationId('loc-cpt-flagship');
+    }
+  }, [selectedBranchId]);
 
   useEffect(() => {
     loadBookings();
@@ -529,8 +728,6 @@ export default function AdminBarbershopPage() {
     setEditServicePrice(String(service.price));
     setEditServiceIsSubscription(Boolean(service.is_subscription));
     setEditServicePlanCode(service.plan_code || 'solo');
-    setEditServiceExtraSonPrice(String(service.extra_son_price ?? 60));
-    setEditServiceMaxSons(String(service.max_sons ?? 3));
     setEditServiceActive(service.is_active);
   }
 
@@ -540,7 +737,6 @@ export default function AdminBarbershopPage() {
     setEditServiceSubmitting(true);
     setStatusMsg(null);
     try {
-      const isFatherSon = editServiceIsSubscription && editServicePlanCode === 'father-son';
       const res = await adminFetch(`/api/services/${editingService.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -552,8 +748,6 @@ export default function AdminBarbershopPage() {
           price: parseFloat(editServicePrice) || 0,
           is_subscription: editServiceIsSubscription,
           plan_code: editServiceIsSubscription ? editServicePlanCode : null,
-          extra_son_price: isFatherSon ? parseFloat(editServiceExtraSonPrice) || 60 : null,
-          max_sons: isFatherSon ? parseInt(editServiceMaxSons, 10) || 3 : null,
           is_active: editServiceActive,
         }),
       });
@@ -578,7 +772,6 @@ export default function AdminBarbershopPage() {
     setStatusMsg(null);
 
     try {
-      const isFatherSon = isSubscription && planCode === 'father-son';
       const res = await adminFetch('/api/services', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -590,8 +783,6 @@ export default function AdminBarbershopPage() {
           price: parseFloat(servicePrice),
           is_subscription: isSubscription,
           plan_code: isSubscription ? planCode : null,
-          extra_son_price: isFatherSon ? parseFloat(serviceExtraSonPrice) || 60 : null,
-          max_sons: isFatherSon ? parseInt(serviceMaxSons, 10) || 3 : null,
           billing_frequency: 3,
           billing_cycles: 12,
           is_active: true,
@@ -718,9 +909,21 @@ export default function AdminBarbershopPage() {
 
   // Filter bookings by location
   const filteredBookings = bookings.filter((b) => {
+    if (selectedBranchId !== 'all') {
+      const bookingLocId = (b as any).location_id || (b.staff as any)?.location_id || 'loc-cpt-flagship';
+      return bookingLocId === selectedBranchId;
+    }
     if (filterLocationId === 'all') return true;
     const bookingLocId = (b as any).location_id || (b.staff as any)?.location_id || 'loc-cpt-flagship';
     return bookingLocId === filterLocationId;
+  });
+
+  const selectedLocationObj = locations.find((l) => l.id === selectedBranchId);
+
+  // Filter staff by selected branch
+  const displayedStaff = staffList.filter((s) => {
+    if (selectedBranchId === 'all') return true;
+    return (s.location_id || 'loc-cpt-flagship') === selectedBranchId;
   });
 
   // Metrics for appointments (Audit-Compliant: Memberships are separated from cash walk-ins)
@@ -738,22 +941,310 @@ export default function AdminBarbershopPage() {
   const confirmedCount = filteredBookings.filter((b) => b.status === 'confirmed').length;
   const completedCount = filteredBookings.filter((b) => b.status === 'completed').length;
 
+  const DAYS_OF_WEEK = [
+    { key: 'monday', label: 'Monday' },
+    { key: 'tuesday', label: 'Tuesday' },
+    { key: 'wednesday', label: 'Wednesday' },
+    { key: 'thursday', label: 'Thursday' },
+    { key: 'friday', label: 'Friday' },
+    { key: 'saturday', label: 'Saturday' },
+    { key: 'sunday', label: 'Sunday' },
+  ] as const;
+
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
+      {/* Top Breadcrumb & Branch Switcher Bar */}
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-stone-900/60 border border-stone-800 p-3.5 rounded-xl">
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="flex items-center space-x-2 text-xs font-mono text-stone-400">
+            <span>Barbershop Operations</span>
+            <span>/</span>
+            <span className="text-white font-bold">Studio Branches</span>
+          </div>
+
+          <div className="h-4 w-[1px] bg-stone-700 hidden sm:block" />
+
+          {/* Quick Branch Selector Dropdown */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-stone-400 font-mono">Branch:</span>
+            <select
+              value={selectedBranchId}
+              onChange={(e) => setSelectedBranchId(e.target.value)}
+              className="bg-stone-950 border border-stone-700 text-white text-xs font-mono rounded px-2.5 py-1.5 focus:outline-none focus:border-amber-500 font-semibold"
+            >
+              <option value="all">🏢 All Branches &amp; Studios (Global View)</option>
+              {locations.map((loc) => (
+                <option key={loc.id} value={loc.id}>
+                  📍 {loc.name} {loc.is_flagship ? '★ FLAGSHIP' : ''} — {loc.capacity_chairs} Chairs
+                </option>
+              ))}
+            </select>
+
+            {selectedBranchId !== 'all' ? (
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                <MapPin className="w-3 h-3 text-amber-500" />
+                Active Branch View
+              </span>
+            ) : (
+              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-stone-800 text-stone-400 border border-stone-700 flex items-center gap-1">
+                Global View
+              </span>
+            )}
+          </div>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <Button
+            size="sm"
+            onClick={() => setShowAddLocationModal(true)}
+            className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-8 px-3"
+          >
+            <Plus className="h-3.5 w-3.5 mr-1" />
+            Add Branch
+          </Button>
+
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => {
+              if (selectedBranchId !== 'all') {
+                setHoursEditingLocationId(selectedBranchId);
+                const loc = locations.find((l) => l.id === selectedBranchId);
+                if (loc?.operating_hours) {
+                  setOperatingHoursState(loc.operating_hours as LocationOperatingHours);
+                }
+              }
+              setShowHoursModal(true);
+            }}
+            className="border-stone-700 text-stone-300 hover:bg-stone-800 text-xs h-8 px-3"
+          >
+            <Clock className="h-3.5 w-3.5 mr-1 text-amber-500" />
+            Working Hours
+          </Button>
+        </div>
+      </div>
+
+      {/* Selected Branch Context Strip */}
+      {selectedLocationObj && (
+        <div className="rounded-xl border border-stone-800 bg-stone-900/40 p-4 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+          <div className="flex items-start md:items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0">
+              <Store className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-white">{selectedLocationObj.name}</h2>
+                {selectedLocationObj.is_flagship && (
+                  <span className="rounded bg-amber-500/10 text-amber-400 text-[10px] font-bold px-2 py-0.5 border border-amber-500/20 uppercase tracking-wider">
+                    Flagship Studio
+                  </span>
+                )}
+                <span className="rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-semibold px-2 py-0.5 border border-emerald-500/20">
+                  {selectedLocationObj.capacity_chairs} Barber Chairs
+                </span>
+              </div>
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-stone-400 mt-1">
+                <span className="flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5 text-amber-500 shrink-0" />
+                  {selectedLocationObj.address}, {selectedLocationObj.city}
+                </span>
+                <span className="flex items-center gap-1">
+                  <Clock className="h-3.5 w-3.5 text-stone-500 shrink-0" />
+                  {selectedLocationObj.operating_hours_display}
+                </span>
+                {selectedLocationObj.phone && (
+                  <span className="flex items-center gap-1">
+                    <Phone className="h-3.5 w-3.5 text-stone-500 shrink-0" />
+                    {selectedLocationObj.phone}
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end md:self-center">
+            {selectedLocationObj.google_maps_url && (
+              <a
+                href={selectedLocationObj.google_maps_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-xs text-amber-400 hover:text-amber-300 font-semibold px-2.5 py-1.5 rounded-lg border border-amber-500/30 hover:bg-amber-500/10 transition-colors"
+              >
+                🗺️ Directions
+              </a>
+            )}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => openEditLocationModal(selectedLocationObj)}
+              className="text-xs border-stone-700 text-stone-300 hover:bg-stone-800 h-8"
+            >
+              <Pencil className="h-3.5 w-3.5 mr-1" />
+              Edit Studio
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {/* Operating Hours Modal */}
+      {showHoursModal && (
+        <Card className="border-amber-500/40 bg-stone-900/95 p-6 shadow-2xl space-y-4">
+          <div className="flex items-center justify-between border-b border-stone-800 pb-3">
+            <div className="flex items-center gap-2">
+              <Clock className="h-5 w-5 text-amber-500" />
+              <div>
+                <CardTitle className="text-lg text-white">
+                  Studio Operating Hours: {locations.find((l) => l.id === hoursEditingLocationId)?.name || 'Studio'}
+                </CardTitle>
+                <CardDescription className="text-xs">
+                  Configure daily opening, closing, and off-schedule days. Slots in the booking engine automatically respect these hours.
+                </CardDescription>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <select
+                value={hoursEditingLocationId}
+                onChange={(e) => {
+                  const locId = e.target.value;
+                  setHoursEditingLocationId(locId);
+                  const loc = locations.find((l) => l.id === locId);
+                  if (loc?.operating_hours) {
+                    setOperatingHoursState(loc.operating_hours as LocationOperatingHours);
+                  }
+                }}
+                className="bg-stone-950 border border-stone-700 text-white text-xs font-mono rounded px-2 py-1"
+              >
+                {locations.map((l) => (
+                  <option key={l.id} value={l.id}>
+                    {l.name}
+                  </option>
+                ))}
+              </select>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowHoursModal(false)}
+                className="text-stone-400"
+              >
+                ✕
+              </Button>
+            </div>
+          </div>
+
+          <form onSubmit={handleSaveOperatingHours} className="space-y-3">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+              {DAYS_OF_WEEK.map((day) => {
+                const dayState = operatingHoursState[day.key] || {
+                  open: '09:00',
+                  close: '18:00',
+                  is_closed: false,
+                };
+                return (
+                  <div
+                    key={day.key}
+                    className={`flex items-center justify-between p-3 rounded-xl border transition-all ${
+                      dayState.is_closed
+                        ? 'bg-stone-950/40 border-stone-800/60 opacity-60'
+                        : 'bg-stone-950/80 border-stone-800'
+                    }`}
+                  >
+                    <div className="w-24 font-bold text-white text-xs">{day.label}</div>
+
+                    <label className="flex items-center gap-1.5 cursor-pointer text-stone-300">
+                      <input
+                        type="checkbox"
+                        checked={dayState.is_closed}
+                        onChange={(e) =>
+                          setOperatingHoursState({
+                            ...operatingHoursState,
+                            [day.key]: {
+                              ...dayState,
+                              is_closed: e.target.checked,
+                            },
+                          })
+                        }
+                        className="accent-amber-500 rounded"
+                      />
+                      <span className="text-[11px] font-mono">Closed</span>
+                    </label>
+
+                    <div className="flex items-center gap-1.5">
+                      <Input
+                        type="time"
+                        disabled={dayState.is_closed}
+                        value={dayState.open || '09:00'}
+                        onChange={(e) =>
+                          setOperatingHoursState({
+                            ...operatingHoursState,
+                            [day.key]: {
+                              ...dayState,
+                              open: e.target.value,
+                            },
+                          })
+                        }
+                        className="h-7 w-24 text-xs font-mono bg-stone-900 border-stone-700 text-white"
+                      />
+                      <span className="text-stone-500 text-xs">-</span>
+                      <Input
+                        type="time"
+                        disabled={dayState.is_closed}
+                        value={dayState.close || '19:00'}
+                        onChange={(e) =>
+                          setOperatingHoursState({
+                            ...operatingHoursState,
+                            [day.key]: {
+                              ...dayState,
+                              close: e.target.value,
+                            },
+                          })
+                        }
+                        className="h-7 w-24 text-xs font-mono bg-stone-900 border-stone-700 text-white"
+                      />
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="flex justify-end space-x-3 pt-3 border-t border-stone-800">
+              <Button
+                type="button"
+                variant="ghost"
+                onClick={() => setShowHoursModal(false)}
+                className="text-stone-400"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="submit"
+                disabled={savingHours}
+                className="bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs"
+              >
+                {savingHours ? 'Saving...' : 'Save Operating Hours'}
+              </Button>
+            </div>
+          </form>
+        </Card>
+      )}
+
       {/* Top Header */}
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <div className="flex flex-wrap items-center gap-3">
-            <h1 className="text-3xl font-bold text-white flex items-center">
-              <Scissors className="mr-3 h-8 w-8 text-amber-500" />
-              Bookings & Studio Operations
+            <h1 className="text-2xl sm:text-3xl font-bold text-white flex items-center">
+              <Scissors className="mr-3 h-7 w-7 text-amber-500" />
+              Bookings &amp; Studio Operations
             </h1>
             <div className="flex items-center space-x-1.5 text-xs text-stone-300 bg-stone-900 border border-stone-800 px-3 py-1.5 rounded-lg shadow-inner">
               <MapPin className="h-4 w-4 text-amber-500" />
-              <span className="font-semibold text-white">Dissafyt Studio, Cape Town</span>
-              <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/20 uppercase tracking-wider">
-                Flagship
+              <span className="font-semibold text-white">
+                {selectedLocationObj?.name || 'All Studios'}
               </span>
+              {selectedLocationObj?.is_flagship && (
+                <span className="rounded bg-amber-500/10 px-1.5 py-0.5 text-[10px] font-bold text-amber-400 border border-amber-500/20 uppercase tracking-wider">
+                  Flagship
+                </span>
+              )}
             </div>
             <div className="flex items-center space-x-1.5 text-[11px] text-emerald-400 bg-emerald-950/30 border border-emerald-500/30 px-2.5 py-1 rounded-lg font-mono">
               <ShieldCheck className="h-3.5 w-3.5" />
@@ -761,7 +1252,7 @@ export default function AdminBarbershopPage() {
             </div>
           </div>
           <p className="text-sm text-stone-400 mt-1">
-            Real-time appointment schedule, specialist management (Barbers, Nail Technicians & Beauticians), encrypted payout vault, and studio locations.
+            Real-time appointment schedule, specialist management (Barbers, Nail Technicians &amp; Beauticians), branch-specific pricing, and studio hours.
           </p>
         </div>
 
@@ -772,7 +1263,7 @@ export default function AdminBarbershopPage() {
             onClick={() => {
               loadBookings();
               loadStaff();
-              loadServices();
+              loadServices(selectedBranchId);
               loadLocations();
             }}
             className="border-stone-700 text-stone-300 hover:bg-stone-800"
@@ -831,7 +1322,7 @@ export default function AdminBarbershopPage() {
               : 'border-transparent text-stone-400 hover:text-stone-200'
           }`}
         >
-          <Calendar className="mr-2 h-4 w-4" /> Schedule & Appointments ({bookings.length})
+          <Calendar className="mr-2 h-4 w-4" /> Schedule & Appointments ({filteredBookings.length}{selectedBranchId !== 'all' ? ` / ${bookings.length}` : ''})
         </button>
 
         <button
@@ -842,7 +1333,7 @@ export default function AdminBarbershopPage() {
               : 'border-transparent text-stone-400 hover:text-stone-200'
           }`}
         >
-          <Users className="mr-2 h-4 w-4" /> Specialists & Staff ({staffList.length})
+          <Users className="mr-2 h-4 w-4" /> Specialists & Staff ({displayedStaff.length}{selectedBranchId !== 'all' ? ` / ${staffList.length}` : ''})
         </button>
 
         <button
@@ -1619,9 +2110,53 @@ export default function AdminBarbershopPage() {
             </Card>
           )}
 
+          {/* Staff Branch Context Banner */}
+          {selectedBranchId !== 'all' && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-stone-900/60 border border-stone-800 p-3.5 rounded-xl text-xs">
+              <div className="flex items-center gap-2 text-stone-300">
+                <MapPin className="h-4 w-4 text-amber-500 shrink-0" />
+                <span>
+                  Showing <strong className="text-white">{displayedStaff.length}</strong> specialists assigned to{' '}
+                  <strong className="text-amber-400">{selectedLocationObj?.name || 'this studio'}</strong>.
+                </span>
+              </div>
+              <div className="flex items-center gap-3">
+                <span className="text-stone-400">Total Specialists: {staffList.length}</span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedBranchId('all')}
+                  className="text-amber-400 hover:text-amber-300 underline font-mono text-[11px]"
+                >
+                  View All Branches
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Empty state if branch has no specialists */}
+          {displayedStaff.length === 0 && (
+            <div className="rounded-xl border border-dashed border-stone-800 bg-stone-900/30 p-8 text-center space-y-3">
+              <Users className="h-10 w-10 text-stone-600 mx-auto" />
+              <h3 className="text-base font-bold text-white">No Specialists Stationed at This Studio</h3>
+              <p className="text-xs text-stone-400 max-w-md mx-auto">
+                No specialists are currently assigned to {selectedLocationObj?.name || 'this studio'}. You can reassign staff stationed at other branches or register a new specialist below.
+              </p>
+              <Button
+                size="sm"
+                onClick={() => {
+                  setStaffLocationId(selectedBranchId);
+                  setShowAddStaffModal(true);
+                }}
+                className="bg-amber-500 hover:bg-amber-400 text-black font-semibold text-xs mt-2"
+              >
+                <Plus className="mr-1.5 h-3.5 w-3.5" /> Add Specialist to {selectedLocationObj?.name || 'this studio'}
+              </Button>
+            </div>
+          )}
+
           {/* Staff List Grid */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {staffList.map((staff) => {
+            {displayedStaff.map((staff) => {
               const roleLabel = SPECIALTY_LABELS[staff.specialty || 'barber'] || 'Barber';
               return (
                 <Card
@@ -1674,6 +2209,23 @@ export default function AdminBarbershopPage() {
                             'Dissafyt Studio, Cape Town (Flagship)'}
                         </span>
                       </div>
+
+                      {/* Quick Studio Reassignment Dropdown */}
+                      <div className="flex items-center justify-between bg-stone-950/80 border border-stone-800 rounded-lg p-2 mt-1">
+                        <span className="font-mono text-[10px] text-stone-400">Reassign Studio:</span>
+                        <select
+                          value={staff.location_id || 'loc-cpt-flagship'}
+                          onChange={(e) => handleQuickReassignStaff(staff.id, e.target.value, staff.display_name)}
+                          className="bg-stone-900 border border-stone-700 text-stone-200 text-xs rounded px-2 py-0.5 font-mono focus:border-amber-500 focus:outline-none"
+                        >
+                          {locations.map((loc) => (
+                            <option key={loc.id} value={loc.id}>
+                              {loc.name} {loc.is_flagship ? '★' : ''}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
                       <div>Standard Hours: Mon-Fri 09:00 - 18:00, Sat 09:00 - 17:00</div>
                     </div>
 
@@ -1834,10 +2386,10 @@ export default function AdminBarbershopPage() {
                 </div>
 
                 {isSubscription && (
-                  <div className="space-y-3 md:col-span-2 bg-stone-800/40 p-3 rounded-lg border border-stone-800">
+                  <div className="space-y-1 md:col-span-2 bg-stone-800/40 p-3 rounded-lg border border-stone-800">
                     <Label className="text-amber-400">PayFast Plan Identifier</Label>
-                    <div className="flex flex-wrap gap-4 pt-1">
-                      {['solo', 'twice', 'executive', 'father-son'].map((code) => (
+                    <div className="flex gap-4 pt-1">
+                      {['solo', 'twice', 'executive'].map((code) => (
                         <label key={code} className="flex items-center space-x-1.5 text-xs text-stone-300">
                           <input
                             type="radio"
@@ -1847,46 +2399,10 @@ export default function AdminBarbershopPage() {
                             onChange={(e) => setPlanCode(e.target.value)}
                             className="accent-amber-500"
                           />
-                          <span className="capitalize">{code.replace('-', ' & ')}</span>
+                          <span>{code}</span>
                         </label>
                       ))}
                     </div>
-
-                    {planCode === 'father-son' && (
-                      <div className="pt-3 border-t border-stone-800 space-y-3">
-                        <div className="flex items-center space-x-2 text-xs font-mono text-amber-400 font-bold uppercase">
-                          <Crown className="w-3.5 h-3.5 text-amber-500" />
-                          <span>Father &amp; Son Multi-Son Dynamic Pricing</span>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-xs text-stone-300">Extra Price Per Additional Son (ZAR)</Label>
-                            <Input
-                              type="number"
-                              step="5"
-                              value={serviceExtraSonPrice}
-                              onChange={(e) => setServiceExtraSonPrice(e.target.value)}
-                              placeholder="60.00"
-                              className="bg-stone-950 border-stone-800 text-white font-mono"
-                            />
-                            <p className="text-[10px] text-stone-400">Added to monthly fee for Son 2, Son 3, etc.</p>
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs text-stone-300">Maximum Sons Allowed</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="5"
-                              value={serviceMaxSons}
-                              onChange={(e) => setServiceMaxSons(e.target.value)}
-                              placeholder="3"
-                              className="bg-stone-950 border-stone-800 text-white font-mono"
-                            />
-                            <p className="text-[10px] text-stone-400">Upper limit for customer selection.</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -2005,10 +2521,10 @@ export default function AdminBarbershopPage() {
                 </div>
 
                 {editServiceIsSubscription && (
-                  <div className="space-y-3 md:col-span-2 bg-stone-800/40 p-3 rounded-lg border border-stone-800">
+                  <div className="space-y-1 md:col-span-2 bg-stone-800/40 p-3 rounded-lg border border-stone-800">
                     <Label className="text-amber-400">PayFast Plan Identifier</Label>
-                    <div className="flex flex-wrap gap-4 pt-1">
-                      {['solo', 'twice', 'executive', 'father-son'].map((code) => (
+                    <div className="flex gap-4 pt-1">
+                      {['solo', 'twice', 'executive'].map((code) => (
                         <label key={code} className="flex items-center space-x-1.5 text-xs text-stone-300">
                           <input
                             type="radio"
@@ -2018,46 +2534,10 @@ export default function AdminBarbershopPage() {
                             onChange={(e) => setEditServicePlanCode(e.target.value)}
                             className="accent-amber-500"
                           />
-                          <span className="capitalize">{code.replace('-', ' & ')}</span>
+                          <span>{code}</span>
                         </label>
                       ))}
                     </div>
-
-                    {editServicePlanCode === 'father-son' && (
-                      <div className="pt-3 border-t border-stone-800 space-y-3">
-                        <div className="flex items-center space-x-2 text-xs font-mono text-amber-400 font-bold uppercase">
-                          <Crown className="w-3.5 h-3.5 text-amber-500" />
-                          <span>Father &amp; Son Multi-Son Dynamic Pricing</span>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                          <div className="space-y-1">
-                            <Label className="text-xs text-stone-300">Extra Price Per Additional Son (ZAR)</Label>
-                            <Input
-                              type="number"
-                              step="5"
-                              value={editServiceExtraSonPrice}
-                              onChange={(e) => setEditServiceExtraSonPrice(e.target.value)}
-                              placeholder="60.00"
-                              className="bg-stone-950 border-stone-800 text-white font-mono"
-                            />
-                            <p className="text-[10px] text-stone-400">Added to monthly fee for Son 2, Son 3, etc.</p>
-                          </div>
-                          <div className="space-y-1">
-                            <Label className="text-xs text-stone-300">Maximum Sons Allowed</Label>
-                            <Input
-                              type="number"
-                              min="1"
-                              max="5"
-                              value={editServiceMaxSons}
-                              onChange={(e) => setEditServiceMaxSons(e.target.value)}
-                              placeholder="3"
-                              className="bg-stone-950 border-stone-800 text-white font-mono"
-                            />
-                            <p className="text-[10px] text-stone-400">Upper limit for customer selection.</p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
                   </div>
                 )}
 
@@ -2115,6 +2595,22 @@ export default function AdminBarbershopPage() {
             </Card>
           )}
 
+          {/* Service Branch Context Banner */}
+          {selectedBranchId !== 'all' && (
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-stone-900/60 border border-stone-800 p-3.5 rounded-xl text-xs">
+              <div className="flex items-center gap-2 text-stone-300">
+                <Scissors className="h-4 w-4 text-amber-500 shrink-0" />
+                <span>
+                  Configuring Studio Pricing &amp; Availability for{' '}
+                  <strong className="text-amber-400">{selectedLocationObj?.name || 'this studio'}</strong>.
+                </span>
+              </div>
+              <span className="text-[11px] text-stone-400">
+                Services without overrides default to their master base price.
+              </span>
+            </div>
+          )}
+
           {/* Services List */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {services.map((service) => (
@@ -2141,16 +2637,39 @@ export default function AdminBarbershopPage() {
                             {SPECIALTY_LABELS[service.specialty || 'barber'] || 'Barber'} Service
                           </span>
                         )}
+                        {selectedBranchId !== 'all' && service.is_available_at_location === false && (
+                          <span className="rounded bg-rose-500/10 text-rose-400 text-[10px] font-bold px-2 py-0.5 uppercase tracking-wider border border-rose-500/30">
+                            Disabled at Studio
+                          </span>
+                        )}
                       </div>
                       <CardTitle className="text-xl text-white mt-1">{service.name}</CardTitle>
                     </div>
 
-                    <span className="text-xl font-bold text-amber-400">
-                      R {Number(service.price).toFixed(2)}
-                      {service.is_subscription && (
-                        <span className="text-xs text-stone-500 font-normal">/mo</span>
+                    <div className="text-right">
+                      {selectedBranchId !== 'all' &&
+                      service.location_price !== null &&
+                      service.location_price !== undefined ? (
+                        <div>
+                          <span className="text-xl font-bold text-amber-400">
+                            R {Number(service.location_price).toFixed(2)}
+                            {service.is_subscription && (
+                              <span className="text-xs text-stone-500 font-normal">/mo</span>
+                            )}
+                          </span>
+                          <div className="text-[10px] text-stone-500 line-through">
+                            Master: R {Number(service.price).toFixed(2)}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="text-xl font-bold text-amber-400">
+                          R {Number(service.price).toFixed(2)}
+                          {service.is_subscription && (
+                            <span className="text-xs text-stone-500 font-normal">/mo</span>
+                          )}
+                        </span>
                       )}
-                    </span>
+                    </div>
                   </div>
 
                   <p className="text-sm text-stone-400">{service.description}</p>
@@ -2164,12 +2683,99 @@ export default function AdminBarbershopPage() {
                         <CreditCard className="mr-1 h-3.5 w-3.5" /> Plan: {service.plan_code}
                       </span>
                     )}
-                    {service.plan_code === 'father-son' && (
-                      <span className="flex items-center text-xs text-amber-400 font-medium">
-                        +R{Number(service.extra_son_price ?? 60).toFixed(0)}/extra son (max {service.max_sons ?? 3} sons)
-                      </span>
-                    )}
                   </div>
+
+                  {/* Branch-Specific Pricing & Availability Control Matrix */}
+                  {selectedBranchId !== 'all' && (
+                    <div className="mt-3 pt-3 border-t border-stone-800/80 space-y-2.5 bg-stone-950/70 -mx-6 px-6 py-3 border-b">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-mono font-bold text-amber-400 flex items-center gap-1">
+                          <MapPin className="h-3 w-3 text-amber-500" />
+                          {selectedLocationObj?.name} Override
+                        </span>
+                        {service.location_price !== null && service.location_price !== undefined ? (
+                          <span className="text-[10px] font-mono font-semibold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-1.5 py-0.5 rounded">
+                            Active Override
+                          </span>
+                        ) : (
+                          <span className="text-[10px] font-mono text-stone-400 bg-stone-800/80 px-1.5 py-0.5 rounded">
+                            Master Rate
+                          </span>
+                        )}
+                      </div>
+
+                      <label className="flex items-center space-x-2 text-xs text-stone-300 cursor-pointer select-none">
+                        <input
+                          type="checkbox"
+                          checked={branchAvailabilityInputs[service.id] ?? (service.is_available_at_location !== false)}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setBranchAvailabilityInputs((prev) => ({ ...prev, [service.id]: checked }));
+                          }}
+                          className="accent-amber-500 rounded h-3.5 w-3.5"
+                        />
+                        <span>Available for booking at this studio</span>
+                      </label>
+
+                      <div className="flex items-center gap-2">
+                        <div className="relative flex-1">
+                          <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-xs text-stone-500 font-mono">R</span>
+                          <Input
+                            type="number"
+                            step="0.01"
+                            placeholder={`Master: ${Number(service.price).toFixed(2)}`}
+                            value={branchPriceInputs[service.id] ?? ''}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              setBranchPriceInputs((prev) => ({ ...prev, [service.id]: val }));
+                            }}
+                            className="pl-7 h-8 text-xs font-mono bg-stone-900 border-stone-700 text-white placeholder:text-stone-600"
+                          />
+                        </div>
+
+                        <Button
+                          size="sm"
+                          disabled={savingServiceId === service.id}
+                          onClick={() =>
+                            handleSaveLocationPricing(
+                              service.id,
+                              branchPriceInputs[service.id] ?? '',
+                              branchAvailabilityInputs[service.id] ?? (service.is_available_at_location !== false)
+                            )
+                          }
+                          className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-8 px-2.5"
+                        >
+                          {savingServiceId === service.id ? 'Saving...' : 'Save'}
+                        </Button>
+
+                        {service.location_price !== null && service.location_price !== undefined && (
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            disabled={savingServiceId === service.id}
+                            onClick={() => {
+                              setBranchPriceInputs((prev) => ({ ...prev, [service.id]: '' }));
+                              handleSaveLocationPricing(
+                                service.id,
+                                '',
+                                branchAvailabilityInputs[service.id] ?? true
+                              );
+                            }}
+                            className="text-stone-400 hover:text-white text-xs h-8 px-2"
+                            title="Reset to Master Base Price"
+                          >
+                            Reset
+                          </Button>
+                        )}
+                      </div>
+
+                      {service.is_available_at_location === false && (
+                        <div className="text-[11px] text-rose-400 bg-rose-950/30 border border-rose-900/50 px-2 py-1 rounded flex items-center gap-1 font-mono">
+                          <span>⛔ Disabled at {selectedLocationObj?.name} (Hidden from booking)</span>
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
 
                 <div className="mt-6 pt-4 border-t border-stone-800 flex items-center justify-between">
