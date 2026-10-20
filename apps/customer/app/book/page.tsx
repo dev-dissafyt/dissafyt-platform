@@ -20,6 +20,8 @@ import {
   ShieldCheck,
   Crown,
   Lock,
+  Navigation,
+  Compass,
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -88,6 +90,40 @@ interface LocationOption {
   operating_hours_display?: string;
   google_maps_url?: string | null;
   google_maps_embed_url?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
+  distanceKm?: number | null;
+  distanceFormatted?: string | null;
+}
+
+// Fallback GPS coordinates for known branches (Cape Town / Kraaifontein)
+const STUDIO_COORDINATE_FALLBACKS: Record<string, { lat: number; lng: number }> = {
+  'loc-cpt-flagship': { lat: -33.865, lng: 18.726 }, // 1 Norwalk Way, Bernadino Heights, Kraaifontein
+  'loc-ace-of-fyt-belmont-park': { lat: -33.8481, lng: 18.7172 }, // 67 Voortrekker Rd, Belmont Park, Kraaifontein
+};
+
+/**
+ * Calculates great-circle distance in kilometers using the Haversine formula
+ */
+function calculateDistanceKm(lat1: number, lon1: number, lat2: number, lon2: number): number {
+  const R = 6371; // Earth radius in kilometers
+  const dLat = ((lat2 - lat1) * Math.PI) / 180;
+  const dLon = ((lon2 - lon1) * Math.PI) / 180;
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos((lat1 * Math.PI) / 180) *
+      Math.cos((lat2 * Math.PI) / 180) *
+      Math.sin(dLon / 2) *
+      Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+}
+
+function formatDistance(distKm: number): string {
+  if (distKm < 1) {
+    return `${Math.round(distKm * 1000)} m away`;
+  }
+  return `${distKm.toFixed(1)} km away`;
 }
 
 function BookContent() {
@@ -102,6 +138,13 @@ function BookContent() {
   const [locations, setLocations] = useState<LocationOption[]>([]);
   const [selectedLocation, setSelectedLocation] = useState<LocationOption | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Proximity & Geolocation Recommendation State
+  const [userCoords, setUserCoords] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [detectingLocation, setDetectingLocation] = useState(false);
+  const [locationError, setLocationError] = useState<string | null>(null);
+  const [suggestedStudio, setSuggestedStudio] = useState<LocationOption | null>(null);
+  const [suggestedBarber, setSuggestedBarber] = useState<StaffMember | null>(null);
 
   // Subscription Gating State
   const [checkingSubscription, setCheckingSubscription] = useState(false);
@@ -269,9 +312,49 @@ function BookContent() {
 
         if (locRes.ok && mounted) {
           const locData: LocationOption[] = await locRes.json();
-          setLocations(locData);
-          const flagship = locData.find((l) => l.is_flagship) || locData[0];
-          if (flagship) setSelectedLocation(flagship);
+          let initialSelected = locData.find((l) => l.is_flagship) || locData[0];
+
+          // Check if previously stored coordinates exist in sessionStorage
+          try {
+            const cached = sessionStorage.getItem('dissafyt_user_coords');
+            if (cached) {
+              const parsed = JSON.parse(cached);
+              if (parsed?.latitude && parsed?.longitude) {
+                setUserCoords(parsed);
+                const withDist = locData.map((loc) => {
+                  const locLat = loc.latitude ?? STUDIO_COORDINATE_FALLBACKS[loc.id]?.lat;
+                  const locLng = loc.longitude ?? STUDIO_COORDINATE_FALLBACKS[loc.id]?.lng;
+                  if (locLat !== undefined && locLng !== undefined) {
+                    const dist = calculateDistanceKm(parsed.latitude, parsed.longitude, locLat, locLng);
+                    return {
+                      ...loc,
+                      distanceKm: dist,
+                      distanceFormatted: formatDistance(dist),
+                    };
+                  }
+                  return { ...loc, distanceKm: null, distanceFormatted: null };
+                });
+                withDist.sort((a, b) => {
+                  if (a.distanceKm === null) return 1;
+                  if (b.distanceKm === null) return -1;
+                  return a.distanceKm - b.distanceKm;
+                });
+                setLocations(withDist);
+                if (withDist[0] && withDist[0].distanceKm !== null) {
+                  setSuggestedStudio(withDist[0]);
+                  initialSelected = withDist[0];
+                }
+              } else {
+                setLocations(locData);
+              }
+            } else {
+              setLocations(locData);
+            }
+          } catch {
+            setLocations(locData);
+          }
+
+          if (initialSelected) setSelectedLocation(initialSelected);
         }
 
         // Set default date to tomorrow or next valid day
@@ -427,6 +510,114 @@ function BookContent() {
       active = false;
     };
   }, [selectedLocation?.id]);
+
+  // 1c. Location proximity calculation and closest barber resolution
+  function applyLocationSorting(
+    userLat: number,
+    userLng: number,
+    baseLocations = locations,
+    autoSelect = true
+  ) {
+    if (!baseLocations || baseLocations.length === 0) return;
+
+    const withDistances = baseLocations.map((loc) => {
+      const locLat = loc.latitude ?? STUDIO_COORDINATE_FALLBACKS[loc.id]?.lat;
+      const locLng = loc.longitude ?? STUDIO_COORDINATE_FALLBACKS[loc.id]?.lng;
+      if (locLat !== undefined && locLng !== undefined) {
+        const dist = calculateDistanceKm(userLat, userLng, locLat, locLng);
+        return {
+          ...loc,
+          distanceKm: dist,
+          distanceFormatted: formatDistance(dist),
+        };
+      }
+      return { ...loc, distanceKm: null, distanceFormatted: null };
+    });
+
+    const sorted = [...withDistances].sort((a, b) => {
+      if (a.distanceKm === null) return 1;
+      if (b.distanceKm === null) return -1;
+      return a.distanceKm - b.distanceKm;
+    });
+
+    setLocations(sorted);
+
+    const closest = sorted[0];
+    if (closest && closest.distanceKm !== null) {
+      setSuggestedStudio(closest);
+      if (autoSelect) {
+        setSelectedLocation(closest);
+      }
+
+      // Find active staff stationed at this closest studio
+      const studioStaff = staffList.filter(
+        (s) => (s.location_id || 'loc-cpt-flagship') === closest.id && s.is_active
+      );
+      if (studioStaff.length > 0) {
+        const topBarber =
+          studioStaff.find((s) => (s.specialty || 'barber') === 'barber') || studioStaff[0];
+        setSuggestedBarber(topBarber);
+      }
+    }
+  }
+
+  function detectUserLocation(autoSelect = true) {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      setLocationError('Geolocation is not supported by your browser.');
+      return;
+    }
+
+    setDetectingLocation(true);
+    setLocationError(null);
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const { latitude, longitude } = pos.coords;
+        const coords = { latitude, longitude };
+        setUserCoords(coords);
+        try {
+          sessionStorage.setItem('dissafyt_user_coords', JSON.stringify(coords));
+        } catch {}
+
+        setDetectingLocation(false);
+        applyLocationSorting(latitude, longitude, locations, autoSelect);
+      },
+      (err) => {
+        setDetectingLocation(false);
+        if (err.code === err.PERMISSION_DENIED) {
+          setLocationError('Location permission denied. Please select your preferred studio below.');
+        } else if (err.code === err.POSITION_UNAVAILABLE) {
+          setLocationError('Location signal unavailable. Please select your preferred studio below.');
+        } else if (err.code === err.TIMEOUT) {
+          setLocationError('Location request timed out. Please choose your studio manually.');
+        } else {
+          setLocationError('Could not determine current location.');
+        }
+      },
+      { enableHighAccuracy: true, timeout: 9000, maximumAge: 60000 }
+    );
+  }
+
+  // Auto-detect when URL has ?locate=true
+  useEffect(() => {
+    if (searchParams.get('locate') === 'true' && locations.length > 0 && !detectingLocation && !userCoords) {
+      detectUserLocation(true);
+    }
+  }, [searchParams, locations.length]);
+
+  // Synchronize suggestedBarber when suggestedStudio or staffList updates
+  useEffect(() => {
+    if (suggestedStudio && staffList.length > 0) {
+      const studioStaff = staffList.filter(
+        (s) => (s.location_id || 'loc-cpt-flagship') === suggestedStudio.id && s.is_active
+      );
+      if (studioStaff.length > 0) {
+        const topBarber =
+          studioStaff.find((s) => (s.specialty || 'barber') === 'barber') || studioStaff[0];
+        setSuggestedBarber(topBarber);
+      }
+    }
+  }, [suggestedStudio, staffList]);
 
   // 2. Fetch Availability whenever Service, Barber, or Date changes
   useEffect(() => {
@@ -924,9 +1115,90 @@ function BookContent() {
               <h2 className="text-lg font-bold text-white">Choose Studio Location</h2>
             </div>
 
+            {/* Geolocation Detector & Nearest Barber Suggestion Box */}
+            <div className="rounded-xl border border-zinc-800 bg-gradient-to-r from-zinc-900 via-zinc-900 to-zinc-950 p-4 space-y-3 shadow-md">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                <div className="flex items-center space-x-3">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-400 shrink-0">
+                    <Navigation className="h-5 w-5" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-sm font-bold text-white">Find Closest Studio &amp; Barber</span>
+                      {suggestedStudio && (
+                        <span className="rounded-full bg-emerald-500/10 text-emerald-400 text-[10px] font-bold px-2 py-0.5 border border-emerald-500/20 flex items-center gap-1">
+                          <CheckCircle className="w-3 h-3" />
+                          Matched
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-xs text-zinc-400">
+                      {suggestedStudio
+                        ? `Closest studio: ${suggestedStudio.name} (${suggestedStudio.distanceFormatted})`
+                        : 'Share your location to automatically discover and select your nearest studio & specialist.'}
+                    </p>
+                  </div>
+                </div>
+
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={detectingLocation}
+                  onClick={() => detectUserLocation(true)}
+                  className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-9 px-3.5 shrink-0 shadow-sm shadow-amber-500/20"
+                >
+                  <MapPin className="mr-1.5 h-3.5 w-3.5" />
+                  {detectingLocation
+                    ? 'Locating...'
+                    : userCoords
+                    ? 'Refresh Location'
+                    : 'Use My Location'}
+                </Button>
+              </div>
+
+              {locationError && (
+                <div className="text-xs text-amber-300 bg-amber-500/10 border border-amber-500/20 rounded-lg p-2.5 flex items-center gap-2">
+                  <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
+                  <span>{locationError}</span>
+                </div>
+              )}
+
+              {suggestedStudio && (
+                <div className="rounded-lg bg-emerald-950/20 border border-emerald-500/30 p-3 flex flex-col sm:flex-row sm:items-center justify-between gap-2 text-xs">
+                  <div className="flex items-center gap-2 text-emerald-300">
+                    <Sparkles className="w-4 h-4 text-emerald-400 shrink-0" />
+                    <span>
+                      Closest Studio: <strong className="text-white font-semibold">{suggestedStudio.name}</strong>{' '}
+                      <span className="font-mono text-emerald-400 font-bold">({suggestedStudio.distanceFormatted})</span>
+                      {suggestedBarber && (
+                        <>
+                          {' '}• Suggested Barber:{' '}
+                          <strong className="text-amber-300">{suggestedBarber.display_name}</strong>
+                        </>
+                      )}
+                    </span>
+                  </div>
+                  {selectedLocation?.id === suggestedStudio.id ? (
+                    <span className="text-[11px] font-mono text-emerald-400 font-semibold bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 self-start sm:self-auto">
+                      ✓ Selected as Your Studio
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setSelectedLocation(suggestedStudio)}
+                      className="text-amber-400 hover:text-amber-300 font-semibold underline text-[11px] self-start sm:self-auto"
+                    >
+                      Switch to Closest
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               {locations.map((loc) => {
                 const isSelected = selectedLocation?.id === loc.id;
+                const isClosest = suggestedStudio?.id === loc.id;
                 return (
                   <div
                     key={loc.id}
@@ -943,17 +1215,24 @@ function BookContent() {
                     className={`cursor-pointer rounded-xl border p-4 transition-all duration-150 flex flex-col justify-between ${
                       isSelected
                         ? 'border-amber-500 bg-amber-500/10 shadow-lg shadow-amber-500/5'
+                        : isClosest
+                        ? 'border-emerald-500/50 bg-emerald-950/10 hover:border-emerald-500'
                         : 'border-zinc-800 bg-zinc-900/60 hover:border-zinc-700'
                     }`}
                   >
                     <div>
                       <div className="flex items-start justify-between">
                         <div>
-                          <div className="flex items-center gap-2">
+                          <div className="flex flex-wrap items-center gap-1.5">
                             <h3 className="text-base font-semibold text-white">{loc.name}</h3>
                             {loc.is_flagship && (
                               <span className="rounded bg-amber-500/10 text-amber-400 text-[10px] font-bold px-1.5 py-0.5 border border-amber-500/20 uppercase tracking-wider">
                                 Flagship
+                              </span>
+                            )}
+                            {isClosest && (
+                              <span className="rounded bg-emerald-500/10 text-emerald-400 text-[10px] font-bold px-1.5 py-0.5 border border-emerald-500/20 flex items-center gap-1">
+                                ★ Closest to You
                               </span>
                             )}
                           </div>
@@ -962,7 +1241,14 @@ function BookContent() {
                             <span>{loc.address}, {loc.city}</span>
                           </p>
                         </div>
-                        {isSelected && <CheckCircle className="h-4 w-4 text-amber-500 shrink-0" />}
+                        <div className="flex flex-col items-end gap-1 shrink-0">
+                          {isSelected && <CheckCircle className="h-4 w-4 text-amber-500 shrink-0" />}
+                          {loc.distanceFormatted && (
+                            <span className="text-[11px] font-mono font-bold text-amber-400 bg-amber-500/10 border border-amber-500/20 px-1.5 py-0.5 rounded">
+                              📍 {loc.distanceFormatted}
+                            </span>
+                          )}
+                        </div>
                       </div>
 
                       {loc.operating_hours_display && (
@@ -1115,23 +1401,33 @@ function BookContent() {
                 )
                 .map((barber) => {
                   const isSelected = selectedStaffId === barber.id;
+                  const isSuggested = suggestedBarber?.id === barber.id;
                   return (
                     <div
                       key={barber.id}
                       onClick={() => setSelectedStaffId(barber.id)}
                       className={`cursor-pointer rounded-xl border p-4 transition-all ${
                         isSelected
-                          ? 'border-amber-500 bg-amber-500/10'
+                          ? 'border-amber-500 bg-amber-500/10 shadow-lg shadow-amber-500/5'
+                          : isSuggested
+                          ? 'border-emerald-500/50 bg-emerald-950/10 hover:border-emerald-500'
                           : 'border-zinc-800 bg-zinc-900/60 hover:border-zinc-700'
                       }`}
                     >
                       <div className="flex items-center space-x-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 text-white font-bold text-sm">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-zinc-800 text-white font-bold text-sm shrink-0">
                           {barber.display_name.charAt(0)}
                         </div>
-                        <div className="truncate">
-                          <div className="text-sm font-semibold text-white truncate">
-                            {barber.display_name}
+                        <div className="truncate flex-1">
+                          <div className="flex items-center gap-1.5 truncate">
+                            <span className="text-sm font-semibold text-white truncate">
+                              {barber.display_name}
+                            </span>
+                            {isSuggested && (
+                              <span className="rounded bg-emerald-500/10 text-emerald-400 text-[9px] font-bold px-1.5 py-0.5 border border-emerald-500/20 shrink-0">
+                                ★ Suggested Closest
+                              </span>
+                            )}
                           </div>
                           <div className="text-xs text-zinc-400 truncate">
                             {barber.bio || SPECIALTY_BADGE[String(barber.specialty || 'barber').toLowerCase()] || 'Specialist'}

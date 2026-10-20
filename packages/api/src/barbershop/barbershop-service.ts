@@ -80,6 +80,8 @@ export const DEFAULT_LOCATIONS: BarbershopLocation[] = [
     operating_hours_display: 'Tue-Sat: 09:00 - 19:00 | Sun: 10:00 - 16:00 | Mon: By Appointment',
     google_maps_url: 'https://www.google.com/maps/search/?api=1&query=1+Norwalk+Way+Bernadino+Heights+Kraaifontein+7570',
     google_maps_embed_url: 'https://maps.google.com/maps?q=1%20Norwalk%20Way%20Bernadino%20Heights%20Kraaifontein%207570&t=&z=15&ie=UTF8&iwloc=&output=embed',
+    latitude: -33.8650,
+    longitude: 18.7260,
   },
 ];
 

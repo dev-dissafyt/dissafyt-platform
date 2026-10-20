@@ -15,6 +15,7 @@ import {
   ShieldCheck,
   Plus,
   Minus,
+  MapPin,
 } from 'lucide-react';
 
 interface HaircutServicesSectionProps {
@@ -104,14 +105,23 @@ export function HaircutServicesSection({
             The Sharpest Cut in Cape Town
           </h2>
         </div>
-        <Link
-          href="/book"
-          className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg shadow-amber-500/10 shrink-0"
-        >
-          <Scissors className="w-3.5 h-3.5" />
-          <span>Full Booking Calendar</span>
-          <ArrowRight className="w-3.5 h-3.5" />
-        </Link>
+        <div className="flex flex-wrap items-center gap-2.5 shrink-0">
+          <Link
+            href="/book?locate=true"
+            className="inline-flex items-center space-x-1.5 px-4 py-2.5 rounded-xl border border-emerald-500/40 bg-emerald-950/40 hover:bg-emerald-900/50 text-emerald-300 hover:text-emerald-200 font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg shadow-emerald-500/10 hover:border-emerald-400"
+          >
+            <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+            <span>Find Closest Barber</span>
+          </Link>
+          <Link
+            href="/book"
+            className="inline-flex items-center space-x-2 px-5 py-2.5 rounded-xl bg-amber-500 hover:bg-amber-400 text-black font-extrabold text-xs uppercase tracking-wider transition-all shadow-lg shadow-amber-500/10"
+          >
+            <Scissors className="w-3.5 h-3.5" />
+            <span>Full Booking Calendar</span>
+            <ArrowRight className="w-3.5 h-3.5" />
+          </Link>
+        </div>
       </div>
 
       {/* 2-Column Digestible Viewport (85vh) */}

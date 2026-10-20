@@ -147,6 +147,8 @@ interface BarbershopLocation {
   google_maps_url?: string | null;
   google_maps_embed_url?: string | null;
   pos_terminal_id?: string | null;
+  latitude?: number | null;
+  longitude?: number | null;
 }
 
 export default function AdminBarbershopPage() {
@@ -224,6 +226,8 @@ export default function AdminBarbershopPage() {
   const [newLocChairs, setNewLocChairs] = useState('2');
   const [newLocGoogleMapsUrl, setNewLocGoogleMapsUrl] = useState('');
   const [newLocPosTerminalId, setNewLocPosTerminalId] = useState('');
+  const [newLocLatitude, setNewLocLatitude] = useState('');
+  const [newLocLongitude, setNewLocLongitude] = useState('');
 
   // --- EDIT MODAL STATES ---
   // 1. Staff Edit State
@@ -269,6 +273,8 @@ export default function AdminBarbershopPage() {
   const [editLocActive, setEditLocActive] = useState(true);
   const [editLocGoogleMapsUrl, setEditLocGoogleMapsUrl] = useState('');
   const [editLocPosTerminalId, setEditLocPosTerminalId] = useState('');
+  const [editLocLatitude, setEditLocLatitude] = useState('');
+  const [editLocLongitude, setEditLocLongitude] = useState('');
   const [editLocSubmitting, setEditLocSubmitting] = useState(false);
 
   // --- LOAD DATA ---
@@ -386,6 +392,8 @@ export default function AdminBarbershopPage() {
           },
           google_maps_url: newLocGoogleMapsUrl.trim() || undefined,
           pos_terminal_id: newLocPosTerminalId.trim() || undefined,
+          latitude: newLocLatitude.trim() ? parseFloat(newLocLatitude.trim()) : undefined,
+          longitude: newLocLongitude.trim() ? parseFloat(newLocLongitude.trim()) : undefined,
         }),
       });
 
@@ -398,6 +406,8 @@ export default function AdminBarbershopPage() {
         setNewLocPhone('');
         setNewLocGoogleMapsUrl('');
         setNewLocPosTerminalId('');
+        setNewLocLatitude('');
+        setNewLocLongitude('');
         setStatusMsg(`Branch location "${createdLoc.name || newLocName}" registered and logged to audit trail.`);
         await loadLocations();
         if (createdLoc.id) {
@@ -851,6 +861,8 @@ export default function AdminBarbershopPage() {
     setEditLocActive(loc.is_active);
     setEditLocGoogleMapsUrl(loc.google_maps_url || '');
     setEditLocPosTerminalId(loc.pos_terminal_id || '');
+    setEditLocLatitude(loc.latitude != null ? String(loc.latitude) : '');
+    setEditLocLongitude(loc.longitude != null ? String(loc.longitude) : '');
   }
 
   async function handleSaveEditedLocation(e: React.FormEvent) {
@@ -874,6 +886,8 @@ export default function AdminBarbershopPage() {
           is_active: editLocActive,
           google_maps_url: editLocGoogleMapsUrl.trim() || undefined,
           pos_terminal_id: editLocPosTerminalId.trim() || undefined,
+          latitude: editLocLatitude.trim() ? parseFloat(editLocLatitude.trim()) : null,
+          longitude: editLocLongitude.trim() ? parseFloat(editLocLongitude.trim()) : null,
         }),
       });
       if (res.ok) {
@@ -2910,6 +2924,31 @@ export default function AdminBarbershopPage() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>GPS Latitude (Closest Studio Matching)</Label>
+                    <Input
+                      type="number"
+                      step="any"
+                      value={newLocLatitude}
+                      onChange={(e) => setNewLocLatitude(e.target.value)}
+                      placeholder="e.g. -33.8650"
+                    />
+                    <span className="text-[10px] text-stone-500">Decimal degrees (e.g. -33.8650). Powers user distance matching.</span>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>GPS Longitude (Closest Studio Matching)</Label>
+                    <Input
+                      type="number"
+                      step="any"
+                      value={newLocLongitude}
+                      onChange={(e) => setNewLocLongitude(e.target.value)}
+                      placeholder="e.g. 18.7260"
+                    />
+                    <span className="text-[10px] text-stone-500">Decimal degrees (e.g. 18.7260). Powers user distance matching.</span>
+                  </div>
+                </div>
+
                 <div className="flex justify-end space-x-3 pt-3">
                   <Button
                     type="button"
@@ -3042,6 +3081,31 @@ export default function AdminBarbershopPage() {
                   </div>
                 </div>
 
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-1">
+                    <Label>GPS Latitude (Closest Studio Matching)</Label>
+                    <Input
+                      type="number"
+                      step="any"
+                      value={editLocLatitude}
+                      onChange={(e) => setEditLocLatitude(e.target.value)}
+                      placeholder="e.g. -33.8650"
+                    />
+                    <span className="text-[10px] text-stone-500">Decimal degrees (e.g. -33.8650). Powers customer distance detection.</span>
+                  </div>
+                  <div className="space-y-1">
+                    <Label>GPS Longitude (Closest Studio Matching)</Label>
+                    <Input
+                      type="number"
+                      step="any"
+                      value={editLocLongitude}
+                      onChange={(e) => setEditLocLongitude(e.target.value)}
+                      placeholder="e.g. 18.7260"
+                    />
+                    <span className="text-[10px] text-stone-500">Decimal degrees (e.g. 18.7260). Powers customer distance detection.</span>
+                  </div>
+                </div>
+
                 <div className="flex items-center space-x-6 pt-2">
                   <label className="flex items-center space-x-2 text-sm text-stone-200 cursor-pointer">
                     <input
@@ -3112,7 +3176,7 @@ export default function AdminBarbershopPage() {
                     </div>
                   </div>
 
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 pt-2 text-xs border-t border-stone-800/80">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2 text-xs border-t border-stone-800/80">
                     <div>
                       <span className="text-stone-500 block">Operating Hours:</span>
                       <span className="text-stone-300 font-medium">{loc.operating_hours_display}</span>
@@ -3122,23 +3186,36 @@ export default function AdminBarbershopPage() {
                       <span className="text-stone-300 font-medium">{loc.capacity_chairs} Barber Chairs</span>
                     </div>
                     <div>
+                      <span className="text-stone-500 block">GPS Coordinates:</span>
+                      <span className="text-amber-400 font-mono font-medium text-[11px]">
+                        {loc.latitude != null && loc.longitude != null
+                          ? `${loc.latitude.toFixed(4)}, ${loc.longitude.toFixed(4)}`
+                          : 'Not set'}
+                      </span>
+                    </div>
+                    <div>
                       <span className="text-stone-500 block">POS Terminal:</span>
                       <span className="text-amber-400 font-mono font-medium">{loc.pos_terminal_id || 'Not Assigned'}</span>
                     </div>
                   </div>
 
                   <div className="pt-2">
-                    <span className="text-xs text-stone-500 block mb-1.5">Stationed Master Barbers:</span>
+                    <span className="text-xs text-stone-500 block mb-1.5">Stationed Specialists:</span>
                     <div className="flex flex-wrap gap-2">
-                      {staffList.map((s) => (
-                        <span
-                          key={s.id}
-                          className="inline-flex items-center text-xs bg-stone-950 border border-stone-800 text-stone-300 px-2.5 py-1 rounded-md"
-                        >
-                          <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 mr-2" />
-                          {s.display_name}
-                        </span>
-                      ))}
+                      {staffList
+                        .filter((s) => (s.location_id || 'loc-cpt-flagship') === loc.id)
+                        .map((s) => (
+                          <span
+                            key={s.id}
+                            className="inline-flex items-center text-xs bg-stone-950 border border-stone-800 text-stone-300 px-2.5 py-1 rounded-md"
+                          >
+                            <span className="h-1.5 w-1.5 rounded-full bg-emerald-500 mr-2" />
+                            {s.display_name}
+                          </span>
+                        ))}
+                      {staffList.filter((s) => (s.location_id || 'loc-cpt-flagship') === loc.id).length === 0 && (
+                        <span className="text-xs text-stone-500 italic">No specialists assigned yet</span>
+                      )}
                     </div>
                   </div>
                 </div>
