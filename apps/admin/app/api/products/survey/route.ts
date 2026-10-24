@@ -93,7 +93,7 @@ export async function PATCH(request: NextRequest) {
       );
     }
 
-    if (Array.isArray(body.product_ids)) {
+    if (Array.isArray(body.product_ids) && !body.status && !body.title && !body.description) {
       const updated = await SurveyService.updateSurveyRunProducts(
         runId,
         body.product_ids,
@@ -111,6 +111,7 @@ export async function PATCH(request: NextRequest) {
         title: body.title,
         description: body.description,
         status: body.status,
+        product_ids: Array.isArray(body.product_ids) ? body.product_ids : undefined,
       },
       {
         email: auth.email,

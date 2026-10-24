@@ -360,6 +360,8 @@ export class SurveyService {
     };
     if (input.status === 'completed' || input.status === 'archived') {
       payload.completed_at = new Date().toISOString();
+    } else if (input.status === 'active') {
+      payload.completed_at = null;
     }
 
     const { data: updated, error } = await supabase
@@ -390,8 +392,15 @@ export class SurveyService {
   /**
    * Fetches active products formatted for the public customer pricing survey.
    * If a survey run is specified or active, filters ONLY to selected products for that run.
+   * If no survey run is active (e.g. marked complete), indicates that the survey is closed.
    */
-  public static async getPublicSurveyProducts(runId?: string) {
+  public static async getPublicSurveyProducts(runId?: string): Promise<{
+    active: boolean;
+    status: string;
+    runId: string | null;
+    runTitle: string | null;
+    products: any[];
+  }> {
     const supabase = getSupabaseAdminClient();
 
     let targetRun: SurveyRun | null = null;
@@ -408,22 +417,46 @@ export class SurveyService {
       targetRun = await this.getActiveSurveyRun();
     }
 
-    let productQuery = supabase
+    // If no run found or the run is NOT active, public survey is deactivated/closed
+    if (!targetRun || targetRun.status !== 'active') {
+      return {
+        active: false,
+        status: targetRun?.status || 'completed',
+        runId: targetRun?.id || null,
+        runTitle: targetRun?.title || null,
+        products: [],
+      };
+    }
+
+    // If targetRun has no products selected, survey is active but has no products yet
+    if (!targetRun.product_ids || targetRun.product_ids.length === 0) {
+      return {
+        active: true,
+        status: 'active',
+        runId: targetRun.id,
+        runTitle: targetRun.title,
+        products: [],
+      };
+    }
+
+    const { data: products, error } = await supabase
       .from('products')
       .select('id, name, slug, description, base_price, cost_price, images, is_preorder, preorder_message, category_id')
-      .eq('is_active', true);
-
-    if (targetRun && targetRun.product_ids && targetRun.product_ids.length > 0) {
-      productQuery = productQuery.in('id', targetRun.product_ids);
-    }
-
-    const { data: products, error } = await productQuery.order('created_at', { ascending: false });
+      .eq('is_active', true)
+      .in('id', targetRun.product_ids)
+      .order('created_at', { ascending: false });
 
     if (error || !products) {
-      return [];
+      return {
+        active: true,
+        status: 'active',
+        runId: targetRun.id,
+        runTitle: targetRun.title,
+        products: [],
+      };
     }
 
-    return products.map((prod) => {
+    const formattedProducts = products.map((prod) => {
       const tierData = this.calculateTiers(prod);
       return {
         id: prod.id,
@@ -458,6 +491,14 @@ export class SurveyService {
         ],
       };
     });
+
+    return {
+      active: true,
+      status: 'active',
+      runId: targetRun.id,
+      runTitle: targetRun.title,
+      products: formattedProducts,
+    };
   }
 
   /**
@@ -471,12 +512,25 @@ export class SurveyService {
       throw new Error('At least one product price vote is required.');
     }
 
-    // Resolve survey_run_id
-    let runId = input.survey_run_id || null;
-    if (!runId) {
-      const activeRun = await this.getActiveSurveyRun();
-      if (activeRun) runId = activeRun.id;
+    // Resolve survey_run_id and enforce active survey
+    let targetRun: SurveyRun | null = null;
+    if (input.survey_run_id) {
+      const { data } = await supabase
+        .from('survey_runs')
+        .select('*')
+        .eq('id', input.survey_run_id)
+        .maybeSingle();
+      if (data) targetRun = data as SurveyRun;
     }
+    if (!targetRun) {
+      targetRun = await this.getActiveSurveyRun();
+    }
+
+    if (!targetRun || targetRun.status !== 'active') {
+      throw new Error('The pricing survey is currently closed. No submissions are being accepted at this time.');
+    }
+
+    const runId = targetRun.id;
 
     // 1. Insert parent survey response record
     const { data: responseData, error: respError } = await supabase
@@ -572,14 +626,14 @@ export class SurveyService {
 
     // 1. Fetch runs history
     const allRuns = await this.listSurveyRuns();
-    const activeRun = allRuns.find((r) => r.status === 'active') || allRuns[0] || null;
+    const activeRun = allRuns.find((r) => r.status === 'active') || null;
 
     let selectedRun: SurveyRun | null = null;
     if (runId && runId !== 'active') {
       selectedRun = allRuns.find((r) => r.id === runId) || null;
     }
     if (!selectedRun) {
-      selectedRun = activeRun;
+      selectedRun = activeRun || allRuns[0] || null;
     }
 
     // 2. Fetch products to include in analytics

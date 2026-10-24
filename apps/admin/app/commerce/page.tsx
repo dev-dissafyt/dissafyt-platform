@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input, Label } from '@dissafyt/ui';
-import { ShoppingBag, Plus, Trash2, CheckCircle, XCircle, Tag, Layers, RefreshCw, Package, Pencil, Copy, Check, ExternalLink, Share2, HelpCircle, Upload, Image as ImageIcon, Palette, Loader2, Sparkles, X, MessageSquare, TrendingUp, Percent, AlertCircle, Phone, Send, DollarSign, BarChart3, Vote, Sliders, History, Calendar, CheckSquare, Square, Archive } from 'lucide-react';
+import { ShoppingBag, Plus, Trash2, CheckCircle, CheckCircle2, Play, XCircle, Tag, Layers, RefreshCw, Package, Pencil, Copy, Check, ExternalLink, Share2, HelpCircle, Upload, Image as ImageIcon, Palette, Loader2, Sparkles, X, MessageSquare, TrendingUp, Percent, AlertCircle, Phone, Send, DollarSign, BarChart3, Vote, Sliders, History, Calendar, CheckSquare, Square, Archive } from 'lucide-react';
 
 import { adminFetch } from '@/lib/operator';
 
@@ -621,6 +621,78 @@ export default function AdminCommercePage() {
     }
     setSurveyActionMsg(null);
     setShowProductSelectionModal(true);
+  }
+
+  function openNewRunModalWithCurrentSelection() {
+    setShowProductSelectionModal(false);
+    setNewRunTitle(`Run #${(surveyData?.runs?.length || 0) + 1}: Catalog Drop Survey (${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })})`);
+    setNewRunDescription('');
+    setShowNewRunModal(true);
+  }
+
+  async function handleCompleteSurveyRun(runId?: string) {
+    const targetId = runId || selectedRunId || surveyData?.activeRun?.id;
+    if (!targetId) return;
+    const targetRun = surveyData?.runs?.find((r) => r.id === targetId);
+    const title = targetRun?.title || 'current run';
+    if (!confirm(`Mark "${title}" as Complete? This will immediately DEACTIVATE the public survey storefront (/survey) until a new run is activated.`)) {
+      return;
+    }
+    setSurveyLoading(true);
+    setSurveyActionMsg(null);
+    try {
+      const res = await adminFetch('/api/products/survey', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          runId: targetId,
+          status: 'completed',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSurveyActionMsg(`Survey run "${title}" is now marked as COMPLETED. The public survey is deactivated.`);
+        await loadSurveyFeedback(targetId);
+      } else {
+        alert(data.error || 'Failed to complete survey run');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error completing survey run');
+    } finally {
+      setSurveyLoading(false);
+    }
+  }
+
+  async function handleActivateSurveyRun(runId: string) {
+    const targetRun = surveyData?.runs?.find((r) => r.id === runId);
+    const title = targetRun?.title || 'survey run';
+    if (!confirm(`Reactivate "${title}" as the Live Survey? This will make its selected products available to customers at /survey and archive any currently active run.`)) {
+      return;
+    }
+    setSurveyLoading(true);
+    setSurveyActionMsg(null);
+    try {
+      const res = await adminFetch('/api/products/survey', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          runId,
+          status: 'active',
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSurveyActionMsg(`Survey run "${title}" is now LIVE on /survey.`);
+        setSelectedRunId(runId);
+        await loadSurveyFeedback(runId);
+      } else {
+        alert(data.error || 'Failed to activate survey run');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error activating survey run');
+    } finally {
+      setSurveyLoading(false);
+    }
   }
 
   function handleToggleProductInSelection(productId: string) {
@@ -3295,12 +3367,47 @@ export default function AdminCommercePage() {
                     >
                       {(surveyData?.runs || []).map((r) => (
                         <option key={r.id} value={r.id} className="bg-stone-900 text-stone-200">
-                          {r.status === 'active' ? '🟢 LIVE: ' : '📜 PAST: '}
+                          {r.status === 'active' ? '🟢 LIVE: ' : r.status === 'completed' ? '🏁 COMPLETED: ' : '📜 ARCHIVED: '}
                           {r.title} ({r.totalResponses || 0} votes)
                         </option>
                       ))}
                     </select>
                   </div>
+
+                  {/* Dynamic Action Button for Selected Run */}
+                  {(() => {
+                    const currentRun = surveyData?.selectedRun || surveyData?.activeRun;
+                    if (!currentRun) return null;
+                    if (currentRun.status === 'active') {
+                      return (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleCompleteSurveyRun(currentRun.id)}
+                          disabled={surveyLoading}
+                          className="border-red-500/40 bg-red-500/10 text-red-300 hover:bg-red-500/20 text-xs font-semibold"
+                          title="Mark this run as complete and deactivate the public survey storefront"
+                        >
+                          <CheckCircle2 className="mr-1.5 h-3.5 w-3.5 text-red-400" />
+                          <span>Complete Run (Deactivate)</span>
+                        </Button>
+                      );
+                    } else {
+                      return (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          onClick={() => handleActivateSurveyRun(currentRun.id)}
+                          disabled={surveyLoading}
+                          className="border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 text-xs font-semibold"
+                          title="Reactivate this run as the Live Active survey on /survey"
+                        >
+                          <Play className="mr-1.5 h-3.5 w-3.5 text-emerald-400" />
+                          <span>Set as Live Active</span>
+                        </Button>
+                      );
+                    }
+                  })()}
 
                   {/* Configure Products for Survey Button */}
                   <Button
@@ -3395,10 +3502,23 @@ export default function AdminCommercePage() {
                   <span className="text-amber-400 font-bold text-lg">{surveyData?.totalVotesCast || 0}</span>
                 </div>
                 <div className="bg-stone-950/60 border border-stone-800/80 rounded-xl p-3">
-                  <span className="text-stone-500 block text-[11px]">Survey Status:</span>
-                  <span className={`font-bold text-sm ${surveyData?.selectedRun?.status === 'active' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                    {surveyData?.selectedRun?.status === 'active' ? 'Active & Live' : (surveyData?.selectedRun?.status ? surveyData.selectedRun.status.toUpperCase() : 'Active & Live')}
-                  </span>
+                  <span className="text-stone-500 block text-[11px]">Public Survey Status:</span>
+                  <div className="flex items-center gap-1.5 mt-0.5">
+                    {surveyData?.activeRun ? (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                        <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                        Live &amp; Accepting Votes
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold bg-red-500/10 text-red-400 border border-red-500/30">
+                        <span className="h-1.5 w-1.5 rounded-full bg-red-400" />
+                        Deactivated / Closed
+                      </span>
+                    )}
+                  </div>
+                  <div className="text-[10px] text-stone-400 font-sans mt-1 truncate">
+                    {surveyData?.selectedRun ? `Viewing: ${surveyData.selectedRun.title}` : 'No run selected'}
+                  </div>
                 </div>
                 <div className="bg-stone-950/60 border border-stone-800/80 rounded-xl p-3">
                   <span className="text-stone-500 block text-[11px]">Surveyed Garments:</span>
@@ -3865,7 +3985,30 @@ export default function AdminCommercePage() {
                                 {run.totalVotesCast || 0} item votes
                               </div>
                             </td>
-                            <td className="py-3.5 px-4 text-right space-x-1 font-sans whitespace-nowrap">
+                            <td className="py-3.5 px-4 text-right space-x-1.5 font-sans whitespace-nowrap">
+                              {run.status === 'active' ? (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleCompleteSurveyRun(run.id)}
+                                  className="text-xs h-7 px-2 border-red-500/30 text-red-300 hover:bg-red-500/20"
+                                  title="Complete this run and deactivate public survey"
+                                >
+                                  <CheckCircle2 className="mr-1 h-3 w-3 text-red-400" />
+                                  Complete
+                                </Button>
+                              ) : (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => handleActivateSurveyRun(run.id)}
+                                  className="text-xs h-7 px-2 border-emerald-500/30 text-emerald-300 hover:bg-emerald-500/20"
+                                  title="Set this run as the Live Active survey on /survey"
+                                >
+                                  <Play className="mr-1 h-3 w-3 text-emerald-400" />
+                                  Set Live
+                                </Button>
+                              )}
                               <Button
                                 size="sm"
                                 variant="outline"
@@ -3905,7 +4048,12 @@ export default function AdminCommercePage() {
                         <CardTitle className="text-lg text-white">Select Products for Survey</CardTitle>
                       </div>
                       <CardDescription className="text-xs text-stone-400 mt-1">
-                        Select and deselect garments included in the pricing elasticity survey. When adding new products to your catalog, deselect older products and select new garments to test.
+                        Select and deselect garments included in the pricing elasticity survey.
+                        {surveyData?.selectedRun && (
+                          <span className="block text-amber-400 font-mono mt-0.5">
+                            Target Run: &ldquo;{surveyData.selectedRun.title}&rdquo; ({surveyData.selectedRun.status.toUpperCase()})
+                          </span>
+                        )}
                       </CardDescription>
                     </div>
                     <Button
@@ -4039,9 +4187,9 @@ export default function AdminCommercePage() {
 
                 <div className="border-t border-stone-800 p-4 bg-stone-950/80 flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
                   <div className="text-xs text-stone-400">
-                    Applying changes will immediately update the live public survey form.
+                    Update current run directly, or launch this selection as a brand new documented run.
                   </div>
-                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto justify-end">
                     <Button
                       variant="ghost"
                       size="sm"
@@ -4052,9 +4200,11 @@ export default function AdminCommercePage() {
                     </Button>
                     <Button
                       size="sm"
+                      variant="outline"
                       onClick={handleSaveRunProducts}
                       disabled={savingRunProducts}
-                      className="bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-md"
+                      className="border-stone-700 bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-semibold"
+                      title="Update the product list of the currently selected run"
                     >
                       {savingRunProducts ? (
                         <>
@@ -4064,6 +4214,15 @@ export default function AdminCommercePage() {
                       ) : (
                         <span>Save to Current Run ({selectedProductIds.length})</span>
                       )}
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={openNewRunModalWithCurrentSelection}
+                      className="bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-md"
+                      title="Branch these selected products into a brand new documented survey run"
+                    >
+                      <Plus className="mr-1.5 h-3.5 w-3.5" />
+                      <span>Launch as New Run ({selectedProductIds.length})...</span>
                     </Button>
                   </div>
                 </div>

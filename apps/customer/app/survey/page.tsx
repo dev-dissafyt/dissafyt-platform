@@ -42,6 +42,11 @@ export default function PricingSurveyPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
 
+  // Survey Run Status
+  const [surveyActive, setSurveyActive] = useState(true);
+  const [surveyRunTitle, setSurveyRunTitle] = useState('');
+  const [surveyRunId, setSurveyRunId] = useState<string | null>(null);
+
   // Form State
   const [respondentName, setRespondentName] = useState('');
   const [respondentEmail, setRespondentEmail] = useState('');
@@ -59,14 +64,24 @@ export default function PricingSurveyPage() {
         const res = await fetch('/api/survey');
         if (res.ok) {
           const data = await res.json();
-          setProducts(data);
+          let prods: SurveyProduct[] = [];
+          if (Array.isArray(data)) {
+            prods = data;
+            setSurveyActive(data.length > 0);
+          } else {
+            setSurveyActive(data.active !== false && (data.products?.length || 0) > 0);
+            setSurveyRunTitle(data.runTitle || '');
+            setSurveyRunId(data.runId || null);
+            prods = data.products || [];
+          }
+          setProducts(prods);
+
           // Initialize empty votes map
           const initialVotes: Record<
             string,
             { tier: string; price: number; notes?: string }
           > = {};
-          data.forEach((p: SurveyProduct) => {
-            // Default to empty selection so customer explicitly chooses
+          prods.forEach((p: SurveyProduct) => {
             initialVotes[p.id] = { tier: '', price: 0, notes: '' };
           });
           setVotes(initialVotes);
@@ -134,6 +149,7 @@ export default function PricingSurveyPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          survey_run_id: surveyRunId || undefined,
           respondent_name: respondentName,
           respondent_email: respondentEmail,
           respondent_phone: respondentPhone,
@@ -302,6 +318,41 @@ export default function PricingSurveyPage() {
           <div className="py-20 text-center space-y-3 text-stone-400">
             <div className="inline-block h-8 w-8 animate-spin rounded-full border-2 border-amber-500 border-t-transparent" />
             <p className="font-mono text-xs">Loading catalogue pieces...</p>
+          </div>
+        ) : !surveyActive ? (
+          <div className="p-8 sm:p-14 text-center rounded-2xl border border-stone-800 bg-stone-900/60 shadow-2xl backdrop-blur max-w-2xl mx-auto space-y-6">
+            <div className="mx-auto h-16 w-16 rounded-full bg-stone-800 border border-stone-700 flex items-center justify-center text-amber-400">
+              <Lock className="h-8 w-8" />
+            </div>
+            <div className="space-y-2">
+              <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-mono bg-amber-500/10 text-amber-400 border border-amber-500/30 uppercase font-semibold">
+                Survey Cycle Concluded
+              </div>
+              <h2 className="text-2xl sm:text-3xl font-black uppercase tracking-tight text-white">
+                Pricing Survey Is Currently Closed
+              </h2>
+              <p className="text-stone-300 text-sm leading-relaxed max-w-lg mx-auto">
+                {surveyRunTitle ? `"${surveyRunTitle}" has concluded. ` : ''}
+                Our pricing advisory cycle for this drop has wrapped up, and our team has locked in production orders based on community votes.
+              </p>
+              <p className="text-stone-400 text-xs leading-relaxed max-w-md mx-auto">
+                Check back soon when we launch our next garment survey run, or explore our active streetwear pieces in the shop.
+              </p>
+            </div>
+            <div className="pt-4 flex flex-wrap items-center justify-center gap-3">
+              <Link
+                href="/shop"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg bg-amber-500 text-black text-xs font-bold hover:bg-amber-400 transition-colors shadow-lg"
+              >
+                Browse Shop <ChevronRight className="h-4 w-4" />
+              </Link>
+              <Link
+                href="/"
+                className="inline-flex items-center gap-2 px-5 py-2.5 rounded-lg border border-stone-700 bg-stone-800 text-stone-200 text-xs font-semibold hover:bg-stone-700 hover:text-white transition-colors"
+              >
+                Back to Home
+              </Link>
+            </div>
           </div>
         ) : products.length === 0 ? (
           <div className="p-12 text-center rounded-2xl border border-stone-800 bg-stone-900/40 text-stone-400 space-y-3">
