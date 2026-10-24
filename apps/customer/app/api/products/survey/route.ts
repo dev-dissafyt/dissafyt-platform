@@ -122,9 +122,10 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: true, run: updated });
   } catch (err: any) {
     console.error('[API /api/products/survey PATCH] Error:', err);
+    const status = err.message?.includes('immutable') ? 409 : 400;
     return NextResponse.json(
       { error: err.message || 'Failed to update survey run' },
-      { status: 500 }
+      { status }
     );
   }
 }

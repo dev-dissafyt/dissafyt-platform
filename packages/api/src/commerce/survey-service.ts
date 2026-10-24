@@ -298,6 +298,23 @@ export class SurveyService {
   ): Promise<SurveyRun> {
     const supabase = getSupabaseAdminClient();
 
+    // Verify run exists and is not immutable (completed or archived)
+    const { data: existingRun } = await supabase
+      .from('survey_runs')
+      .select('id, title, status')
+      .eq('id', runId)
+      .maybeSingle();
+
+    if (!existingRun) {
+      throw new Error('Survey run not found.');
+    }
+
+    if (existingRun.status === 'completed' || existingRun.status === 'archived') {
+      throw new Error(
+        `Survey run "${existingRun.title}" is ${existingRun.status} and immutable. Its products cannot be modified. Please launch a new survey run.`
+      );
+    }
+
     const { data: updated, error } = await supabase
       .from('survey_runs')
       .update({
@@ -340,6 +357,24 @@ export class SurveyService {
     actor?: { email?: string; role?: string }
   ): Promise<SurveyRun> {
     const supabase = getSupabaseAdminClient();
+
+    // Verify run exists and is not already immutable
+    const { data: existingRun } = await supabase
+      .from('survey_runs')
+      .select('id, title, status')
+      .eq('id', runId)
+      .maybeSingle();
+
+    if (!existingRun) {
+      throw new Error('Survey run not found.');
+    }
+
+    // Once a run is marked completed or archived, it is permanently locked and cannot be edited or reactivated
+    if (existingRun.status === 'completed' || existingRun.status === 'archived') {
+      throw new Error(
+        `Survey run "${existingRun.title}" is ${existingRun.status} and immutable. Completed runs cannot be edited or reactivated. Please start a new survey run.`
+      );
+    }
 
     // If making this run active, archive any other active runs
     if (input.status === 'active') {
