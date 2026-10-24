@@ -3,7 +3,7 @@
 import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input, Label } from '@dissafyt/ui';
-import { ShoppingBag, Plus, Trash2, CheckCircle, XCircle, Tag, Layers, RefreshCw, Package, Pencil, Copy, Check, ExternalLink, Share2, HelpCircle, Upload, Image as ImageIcon, Palette, Loader2, Sparkles, X, MessageSquare, TrendingUp, Percent, AlertCircle, Phone, Send, DollarSign, BarChart3, Vote } from 'lucide-react';
+import { ShoppingBag, Plus, Trash2, CheckCircle, XCircle, Tag, Layers, RefreshCw, Package, Pencil, Copy, Check, ExternalLink, Share2, HelpCircle, Upload, Image as ImageIcon, Palette, Loader2, Sparkles, X, MessageSquare, TrendingUp, Percent, AlertCircle, Phone, Send, DollarSign, BarChart3, Vote, Sliders, History, Calendar, CheckSquare, Square, Archive } from 'lucide-react';
 
 import { adminFetch } from '@/lib/operator';
 
@@ -118,11 +118,29 @@ interface SurveySubmission {
   }[];
 }
 
+interface SurveyRun {
+  id: string;
+  title: string;
+  description?: string | null;
+  status: 'active' | 'completed' | 'archived' | 'draft';
+  product_ids: string[];
+  created_at: string;
+  updated_at: string;
+  completed_at?: string | null;
+  created_by?: string | null;
+  totalResponses?: number;
+  totalVotesCast?: number;
+  products?: Product[];
+}
+
 interface SurveyAnalyticsSummary {
   totalResponses: number;
   totalVotesCast: number;
   productInsights: ProductSurveyInsight[];
   recentSubmissions: SurveySubmission[];
+  activeRun?: SurveyRun | null;
+  selectedRun?: SurveyRun | null;
+  runs?: SurveyRun[];
 }
 
 
@@ -215,6 +233,17 @@ export default function AdminCommercePage() {
   const [surveyData, setSurveyData] = useState<SurveyAnalyticsSummary | null>(null);
   const [applyingPriceProductId, setApplyingPriceProductId] = useState<string | null>(null);
   const [copiedSurveyUrl, setCopiedSurveyUrl] = useState(false);
+
+  // Survey Runs & Product Selection Workflow State
+  const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [showProductSelectionModal, setShowProductSelectionModal] = useState(false);
+  const [showNewRunModal, setShowNewRunModal] = useState(false);
+  const [selectedProductIds, setSelectedProductIds] = useState<string[]>([]);
+  const [newRunTitle, setNewRunTitle] = useState('');
+  const [newRunDescription, setNewRunDescription] = useState('');
+  const [savingRunProducts, setSavingRunProducts] = useState(false);
+  const [creatingRun, setCreatingRun] = useState(false);
+  const [surveyActionMsg, setSurveyActionMsg] = useState<string | null>(null);
 
 
   // Colorways & Size Matrix (Add Product)
@@ -561,18 +590,124 @@ export default function AdminCommercePage() {
     );
   }
 
-  async function loadSurveyFeedback() {
+  async function loadSurveyFeedback(runId?: string) {
     setSurveyLoading(true);
+    setSurveyActionMsg(null);
     try {
-      const res = await adminFetch('/api/products/survey');
+      const url = runId ? `/api/products/survey?runId=${encodeURIComponent(runId)}` : '/api/products/survey';
+      const res = await adminFetch(url);
       if (res.ok) {
-        const data = await res.json();
+        const data: SurveyAnalyticsSummary = await res.json();
         setSurveyData(data);
+        if (data.selectedRun) {
+          setSelectedRunId(data.selectedRun.id);
+        } else if (data.activeRun) {
+          setSelectedRunId(data.activeRun.id);
+        }
       }
     } catch (err) {
       console.error('Failed to load survey feedback:', err);
     } finally {
       setSurveyLoading(false);
+    }
+  }
+
+  function openProductSelectionModal() {
+    const currentRun = surveyData?.selectedRun || surveyData?.activeRun;
+    if (currentRun && Array.isArray(currentRun.product_ids) && currentRun.product_ids.length > 0) {
+      setSelectedProductIds([...currentRun.product_ids]);
+    } else {
+      setSelectedProductIds(products.filter((p) => p.is_active).map((p) => p.id));
+    }
+    setSurveyActionMsg(null);
+    setShowProductSelectionModal(true);
+  }
+
+  function handleToggleProductInSelection(productId: string) {
+    setSelectedProductIds((prev) =>
+      prev.includes(productId) ? prev.filter((id) => id !== productId) : [...prev, productId]
+    );
+  }
+
+  function handleSelectAllProducts() {
+    setSelectedProductIds(products.map((p) => p.id));
+  }
+
+  function handleDeselectAllProducts() {
+    setSelectedProductIds([]);
+  }
+
+  function handleSelectOnlyActiveProducts() {
+    setSelectedProductIds(products.filter((p) => p.is_active).map((p) => p.id));
+  }
+
+  async function handleSaveRunProducts() {
+    const targetRun = surveyData?.selectedRun || surveyData?.activeRun;
+    if (!targetRun) {
+      alert('No active or selected survey run to update.');
+      return;
+    }
+
+    setSavingRunProducts(true);
+    setSurveyActionMsg(null);
+    try {
+      const res = await adminFetch('/api/products/survey', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          runId: targetRun.id,
+          product_ids: selectedProductIds,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSurveyActionMsg(`Updated survey products for "${targetRun.title}" (${selectedProductIds.length} items selected). Public survey will now feature this exact set.`);
+        setShowProductSelectionModal(false);
+        await loadSurveyFeedback(targetRun.id);
+      } else {
+        alert(data.error || 'Failed to update survey products');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error updating survey products');
+    } finally {
+      setSavingRunProducts(false);
+    }
+  }
+
+  async function handleCreateNewRun(e: React.FormEvent) {
+    e.preventDefault();
+    if (!newRunTitle.trim()) {
+      alert('Please provide a title for the new survey run.');
+      return;
+    }
+
+    setCreatingRun(true);
+    setSurveyActionMsg(null);
+    try {
+      const res = await adminFetch('/api/products/survey', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newRunTitle.trim(),
+          description: newRunDescription.trim() || undefined,
+          product_ids: selectedProductIds,
+          setAsActive: true,
+        }),
+      });
+      const data = await res.json();
+      if (res.ok && data.success) {
+        setSurveyActionMsg(`New survey run "${data.run.title}" activated with ${selectedProductIds.length} product(s). Previous run archived.`);
+        setShowNewRunModal(false);
+        setNewRunTitle('');
+        setNewRunDescription('');
+        await loadSurveyFeedback(data.run.id);
+      } else {
+        alert(data.error || 'Failed to create new survey run');
+      }
+    } catch (err: any) {
+      alert(err.message || 'Error creating survey run');
+    } finally {
+      setCreatingRun(false);
     }
   }
 
@@ -590,7 +725,7 @@ export default function AdminCommercePage() {
       if (res.ok) {
         setStatusMsg(`Product price updated to R ${newPrice.toFixed(2)} based on survey feedback.`);
         loadData();
-        loadSurveyFeedback();
+        loadSurveyFeedback(selectedRunId || undefined);
       } else {
         const json = await res.json();
         alert(json.error || 'Failed to update price');
@@ -625,7 +760,15 @@ export default function AdminCommercePage() {
       ]);
       if (prodRes.ok) setProducts(await prodRes.json());
       if (catRes.ok) setCategories(await catRes.json());
-      if (surveyRes && surveyRes.ok) setSurveyData(await surveyRes.json());
+      if (surveyRes && surveyRes.ok) {
+        const sData = await surveyRes.json();
+        setSurveyData(sData);
+        if (sData.selectedRun) {
+          setSelectedRunId(sData.selectedRun.id);
+        } else if (sData.activeRun) {
+          setSelectedRunId(sData.activeRun.id);
+        }
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -3057,37 +3200,153 @@ export default function AdminCommercePage() {
       {/* Subtab 2: Survey Feedback & Pricing Insights */}
       {activeSubtab === 'survey_feedback' && (
         <div className="space-y-6">
+          {surveyActionMsg && (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 text-xs text-emerald-300 flex items-center justify-between shadow-lg">
+              <div className="flex items-center gap-2">
+                <CheckCircle className="h-4 w-4 text-emerald-400 shrink-0" />
+                <span>{surveyActionMsg}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setSurveyActionMsg(null)}
+                className="text-stone-400 hover:text-white"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
+          {/* Historical Run Banner (when viewing archived/completed runs) */}
+          {surveyData?.selectedRun && surveyData.selectedRun.status !== 'active' && (
+            <div className="rounded-xl border border-amber-500/40 bg-amber-500/10 p-4 text-xs text-amber-300 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 shadow-lg">
+              <div className="flex items-center gap-2.5">
+                <History className="h-5 w-5 text-amber-400 shrink-0" />
+                <div>
+                  <span className="font-bold text-white uppercase tracking-wider text-[11px] block sm:inline mr-2">
+                    Viewing Historical Run:
+                  </span>
+                  <span className="font-semibold text-amber-200">"{surveyData.selectedRun.title}"</span>
+                  <span className="text-stone-400 text-[11px] ml-2 font-mono">
+                    ({surveyData.selectedRun.status.toUpperCase()} &bull; Created {new Date(surveyData.selectedRun.created_at).toLocaleDateString()} &bull; {surveyData.totalResponses} respondents)
+                  </span>
+                </div>
+              </div>
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => {
+                  if (surveyData.activeRun) {
+                    loadSurveyFeedback(surveyData.activeRun.id);
+                  } else {
+                    loadSurveyFeedback();
+                  }
+                }}
+                className="border-amber-500/40 bg-amber-500/20 text-amber-200 hover:bg-amber-500/30 text-xs shrink-0 font-semibold"
+              >
+                Return to Live Active Run
+              </Button>
+            </div>
+          )}
+
           {/* Survey Feedback Header & Quick Actions */}
           <Card className="border-amber-500/20 bg-stone-900/60 shadow-xl">
             <CardHeader className="border-b border-stone-800/60 pb-4">
-              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <div className="flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
                 <div className="flex items-center space-x-3">
                   <div className="p-2.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-400">
                     <BarChart3 className="h-6 w-6" />
                   </div>
                   <div>
-                    <CardTitle className="text-lg text-white flex items-center gap-2">
+                    <CardTitle className="text-lg text-white flex items-center gap-2 flex-wrap">
                       <span>Pricing Survey Feedback &amp; Demand Elasticity</span>
                       <span className="text-[10px] font-mono px-2 py-0.5 rounded-full bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 uppercase font-semibold">
                         Blind Interval Engine (50% &bull; 75% &bull; 100%)
                       </span>
+                      {surveyData?.selectedRun && (
+                        <span className={`text-[10px] font-mono px-2 py-0.5 rounded-full uppercase font-semibold border ${
+                          surveyData.selectedRun.status === 'active'
+                            ? 'bg-emerald-500/20 border-emerald-500/40 text-emerald-300'
+                            : 'bg-stone-800 border-stone-700 text-stone-300'
+                        }`}>
+                          Run: {surveyData.selectedRun.title}
+                        </span>
+                      )}
                     </CardTitle>
                     <CardDescription className="text-xs text-stone-400 mt-1">
                       Prospect responses test price sensitivity without revealing profit margin tiers. Review community votes and apply sweet-spot pricing before launching.
                     </CardDescription>
                   </div>
                 </div>
+
+                {/* Workflow Toolbar: Run switcher, product selection modal, new run, refresh, links */}
                 <div className="flex flex-wrap items-center gap-2">
+                  {/* Documented Run Switcher */}
+                  <div className="flex items-center gap-1.5 bg-stone-950 border border-stone-800 rounded-lg px-2.5 py-1">
+                    <History className="h-3.5 w-3.5 text-stone-400 shrink-0" />
+                    <span className="text-[11px] text-stone-400 font-mono hidden sm:inline">Run:</span>
+                    <select
+                      value={selectedRunId || surveyData?.selectedRun?.id || surveyData?.activeRun?.id || ''}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSelectedRunId(val);
+                        loadSurveyFeedback(val);
+                      }}
+                      className="bg-transparent text-xs text-stone-200 font-medium focus:outline-none cursor-pointer max-w-[180px] sm:max-w-[220px] truncate"
+                    >
+                      {(surveyData?.runs || []).map((r) => (
+                        <option key={r.id} value={r.id} className="bg-stone-900 text-stone-200">
+                          {r.status === 'active' ? '🟢 LIVE: ' : '📜 PAST: '}
+                          {r.title} ({r.totalResponses || 0} votes)
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Configure Products for Survey Button */}
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={loadSurveyFeedback}
+                    onClick={openProductSelectionModal}
+                    className="border-amber-500/40 bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 text-xs font-semibold"
+                    title="Select and deselect products featured in this survey run"
+                  >
+                    <Sliders className="mr-1.5 h-3.5 w-3.5 text-amber-400" />
+                    <span>Select Products ({surveyData?.selectedRun?.product_ids?.length ?? surveyData?.activeRun?.product_ids?.length ?? products.filter(p => p.is_active).length}/{products.length})</span>
+                  </Button>
+
+                  {/* Start New Survey Run Button */}
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      setSelectedProductIds(
+                        surveyData?.selectedRun?.product_ids ||
+                        surveyData?.activeRun?.product_ids ||
+                        products.filter((p) => p.is_active).map((p) => p.id)
+                      );
+                      setNewRunTitle(`Run #${(surveyData?.runs?.length || 0) + 1}: Catalog Drop Survey (${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })})`);
+                      setNewRunDescription('');
+                      setShowNewRunModal(true);
+                    }}
+                    className="border-stone-700 bg-stone-800 text-stone-200 hover:text-white hover:bg-stone-700 text-xs font-semibold"
+                    title="Start a new documented survey run to reset feedback for newly selected products"
+                  >
+                    <Plus className="mr-1.5 h-3.5 w-3.5 text-stone-300" />
+                    <span>New Run...</span>
+                  </Button>
+
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => loadSurveyFeedback(selectedRunId || undefined)}
                     disabled={surveyLoading}
                     className="border-stone-700 text-stone-300 hover:text-white hover:bg-stone-800 text-xs"
+                    title="Refresh survey feedback and votes"
                   >
                     <RefreshCw className={`mr-1.5 h-3.5 w-3.5 ${surveyLoading ? 'animate-spin' : ''}`} />
-                    Refresh Feedback
+                    Refresh
                   </Button>
+
                   <Button
                     size="sm"
                     onClick={() => {
@@ -3101,25 +3360,25 @@ export default function AdminCommercePage() {
                     {copiedSurveyUrl ? (
                       <>
                         <Check className="mr-1.5 h-3.5 w-3.5 text-emerald-400" />
-                        <span>Link Copied!</span>
+                        <span>Copied!</span>
                       </>
                     ) : (
                       <>
                         <Copy className="mr-1.5 h-3.5 w-3.5 text-amber-400" />
-                        <span>Copy Survey URL</span>
+                        <span>Copy URL</span>
                       </>
                     )}
                   </Button>
+
                   <a
                     href={getStorefrontSurveyUrl()}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition"
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold transition shadow-sm"
                   >
-                    <span>Open Survey Form</span>
+                    <span>Open Form</span>
                     <ExternalLink className="h-3.5 w-3.5" />
                   </a>
-
                 </div>
               </div>
             </CardHeader>
@@ -3128,7 +3387,7 @@ export default function AdminCommercePage() {
               {/* KPI Stats Bar */}
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 font-mono text-xs">
                 <div className="bg-stone-950/60 border border-stone-800/80 rounded-xl p-3">
-                  <span className="text-stone-500 block text-[11px]">Total Respondents:</span>
+                  <span className="text-stone-500 block text-[11px]">Run Submissions:</span>
                   <span className="text-white font-bold text-lg">{surveyData?.totalResponses || 0}</span>
                 </div>
                 <div className="bg-stone-950/60 border border-stone-800/80 rounded-xl p-3">
@@ -3137,11 +3396,15 @@ export default function AdminCommercePage() {
                 </div>
                 <div className="bg-stone-950/60 border border-stone-800/80 rounded-xl p-3">
                   <span className="text-stone-500 block text-[11px]">Survey Status:</span>
-                  <span className="text-emerald-400 font-bold text-sm">Active &amp; Collecting</span>
+                  <span className={`font-bold text-sm ${surveyData?.selectedRun?.status === 'active' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {surveyData?.selectedRun?.status === 'active' ? 'Active & Live' : (surveyData?.selectedRun?.status ? surveyData.selectedRun.status.toUpperCase() : 'Active & Live')}
+                  </span>
                 </div>
                 <div className="bg-stone-950/60 border border-stone-800/80 rounded-xl p-3">
-                  <span className="text-stone-500 block text-[11px]">Profit Intervals:</span>
-                  <span className="text-stone-300 font-bold text-sm">+25% (50% / 75% / 100%)</span>
+                  <span className="text-stone-500 block text-[11px]">Surveyed Garments:</span>
+                  <span className="text-stone-300 font-bold text-sm">
+                    {surveyData?.productInsights.length || 0} Selected ({products.length} in Catalog)
+                  </span>
                 </div>
               </div>
             </CardContent>
@@ -3470,6 +3733,463 @@ export default function AdminCommercePage() {
               )}
             </CardContent>
           </Card>
+
+          {/* Documented Survey Runs History */}
+          <Card className="border-stone-800 bg-stone-900/50">
+            <CardHeader className="border-b border-stone-800/60 pb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base text-white flex items-center gap-2">
+                    <History className="h-4 w-4 text-amber-400" />
+                    <span>Documented Survey Runs History</span>
+                    <span className="text-xs font-mono text-stone-400 font-normal">
+                      ({surveyData?.runs?.length || 0} Runs Documented)
+                    </span>
+                  </CardTitle>
+                  <CardDescription className="text-xs text-stone-400 mt-0.5">
+                    Audit trail of all pricing survey iterations, selected catalog garments, and community elasticity metrics.
+                  </CardDescription>
+                </div>
+                <Button
+                  size="sm"
+                  variant="outline"
+                  onClick={() => {
+                    setSelectedProductIds(
+                      surveyData?.selectedRun?.product_ids ||
+                      surveyData?.activeRun?.product_ids ||
+                      products.filter((p) => p.is_active).map((p) => p.id)
+                    );
+                    setNewRunTitle(`Run #${(surveyData?.runs?.length || 0) + 1}: Catalog Drop Survey (${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })})`);
+                    setNewRunDescription('');
+                    setShowNewRunModal(true);
+                  }}
+                  className="border-stone-700 bg-stone-800 text-stone-200 hover:text-white hover:bg-stone-700 text-xs font-semibold"
+                >
+                  <Plus className="mr-1.5 h-3.5 w-3.5 text-stone-300" />
+                  <span>Start New Run</span>
+                </Button>
+              </div>
+            </CardHeader>
+            <CardContent className="pt-4">
+              {!surveyData || !surveyData.runs || surveyData.runs.length === 0 ? (
+                <div className="py-8 text-center text-stone-500 text-xs">
+                  No survey runs recorded yet.
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs">
+                    <thead className="border-b border-stone-800 text-[11px] font-mono text-stone-400 uppercase bg-stone-950/60">
+                      <tr>
+                        <th className="py-3 px-4">Run Title &amp; Description</th>
+                        <th className="py-3 px-3">Status</th>
+                        <th className="py-3 px-3">Created / Archived</th>
+                        <th className="py-3 px-3">Included Garments</th>
+                        <th className="py-3 px-3 text-center">Submissions / Votes</th>
+                        <th className="py-3 px-4 text-right">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-stone-800/60 font-mono">
+                      {surveyData.runs.map((run) => {
+                        const isCurrentSelected = (selectedRunId || surveyData.selectedRun?.id) === run.id;
+                        const isLiveActive = run.status === 'active';
+                        const createdStr = new Date(run.created_at).toLocaleDateString('en-ZA', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        });
+
+                        return (
+                          <tr
+                            key={run.id}
+                            className={`hover:bg-stone-800/30 transition-colors ${
+                              isCurrentSelected ? 'bg-amber-500/5' : ''
+                            }`}
+                          >
+                            <td className="py-3.5 px-4 font-sans">
+                              <div className="flex items-center gap-2">
+                                <span className="font-bold text-white text-xs">{run.title}</span>
+                                {isCurrentSelected && (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] font-bold bg-amber-500/20 text-amber-300 border border-amber-500/30 uppercase font-mono">
+                                    Current View
+                                  </span>
+                                )}
+                              </div>
+                              {run.description && (
+                                <p className="text-[11px] text-stone-400 mt-0.5 line-clamp-1">
+                                  {run.description}
+                                </p>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-3">
+                              <span
+                                className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase tracking-wider border ${
+                                  isLiveActive
+                                    ? 'bg-emerald-500/20 text-emerald-400 border-emerald-500/30'
+                                    : 'bg-stone-800 text-stone-400 border-stone-700'
+                                }`}
+                              >
+                                {isLiveActive ? 'Live Active' : run.status}
+                              </span>
+                            </td>
+                            <td className="py-3.5 px-3 text-stone-400 text-[11px]">
+                              <div>{createdStr}</div>
+                              {run.completed_at && (
+                                <div className="text-[10px] text-stone-500">
+                                  Ended: {new Date(run.completed_at).toLocaleDateString()}
+                                </div>
+                              )}
+                            </td>
+                            <td className="py-3.5 px-3">
+                              <div className="flex flex-wrap gap-1 max-w-xs font-sans">
+                                {run.products && run.products.length > 0 ? (
+                                  run.products.map((p) => (
+                                    <span
+                                      key={p.id}
+                                      className="px-1.5 py-0.5 rounded text-[10px] bg-stone-800 text-stone-300 border border-stone-700"
+                                    >
+                                      {p.name}
+                                    </span>
+                                  ))
+                                ) : (
+                                  <span className="text-[11px] text-stone-400 font-mono">
+                                    {run.product_ids?.length || 0} products
+                                  </span>
+                                )}
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-3 text-center">
+                              <div className="font-bold text-white text-xs">
+                                {run.totalResponses || 0} submissions
+                              </div>
+                              <div className="text-[10px] text-amber-400">
+                                {run.totalVotesCast || 0} item votes
+                              </div>
+                            </td>
+                            <td className="py-3.5 px-4 text-right space-x-1 font-sans whitespace-nowrap">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => {
+                                  setSelectedRunId(run.id);
+                                  loadSurveyFeedback(run.id);
+                                  window.scrollTo({ top: 300, behavior: 'smooth' });
+                                }}
+                                className={`text-xs h-7 px-2.5 ${
+                                  isCurrentSelected
+                                    ? 'border-amber-500/50 bg-amber-500/10 text-amber-300'
+                                    : 'border-stone-700 text-stone-300 hover:text-white hover:bg-stone-800'
+                                }`}
+                              >
+                                {isCurrentSelected ? 'Viewing' : 'View Data'}
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </CardContent>
+          </Card>
+
+          {/* Configure Survey Products Modal (Select / Deselect Products) */}
+          {showProductSelectionModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+              <Card className="w-full max-w-2xl max-h-[90vh] overflow-hidden flex flex-col border-amber-500/40 bg-stone-900 shadow-2xl">
+                <CardHeader className="border-b border-stone-800 pb-3 flex-shrink-0">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Sliders className="h-5 w-5 text-amber-400" />
+                        <CardTitle className="text-lg text-white">Select Products for Survey</CardTitle>
+                      </div>
+                      <CardDescription className="text-xs text-stone-400 mt-1">
+                        Select and deselect garments included in the pricing elasticity survey. When adding new products to your catalog, deselect older products and select new garments to test.
+                      </CardDescription>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowProductSelectionModal(false)}
+                      className="text-stone-400 hover:text-white"
+                    >
+                      <X className="h-5 w-5" />
+                    </Button>
+                  </div>
+
+                  {/* Quick selection bar */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-3 mt-1 border-t border-stone-800/60">
+                    <div className="flex items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        type="button"
+                        onClick={handleSelectAllProducts}
+                        className="h-7 text-[11px] border-stone-700 text-stone-300 hover:text-white hover:bg-stone-800"
+                      >
+                        Select All ({products.length})
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        type="button"
+                        onClick={handleDeselectAllProducts}
+                        className="h-7 text-[11px] border-stone-700 text-stone-300 hover:text-white hover:bg-stone-800"
+                      >
+                        Deselect All
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        type="button"
+                        onClick={handleSelectOnlyActiveProducts}
+                        className="h-7 text-[11px] border-stone-700 text-stone-300 hover:text-white hover:bg-stone-800"
+                      >
+                        Only Active ({products.filter((p) => p.is_active).length})
+                      </Button>
+                    </div>
+                    <div className="text-xs font-mono text-amber-400 font-semibold">
+                      {selectedProductIds.length} of {products.length} Selected
+                    </div>
+                  </div>
+                </CardHeader>
+
+                <CardContent className="flex-1 overflow-y-auto p-4 space-y-2">
+                  {products.length === 0 ? (
+                    <div className="py-12 text-center text-stone-500 text-xs">
+                      No products found in the catalog. Add garments first in the Catalog tab.
+                    </div>
+                  ) : (
+                    products.map((product) => {
+                      const isSelected = selectedProductIds.includes(product.id);
+                      return (
+                        <div
+                          key={product.id}
+                          onClick={() => handleToggleProductInSelection(product.id)}
+                          className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all ${
+                            isSelected
+                              ? 'bg-amber-500/10 border-amber-500/40 text-white'
+                              : 'bg-stone-950/40 border-stone-800 hover:border-stone-700 text-stone-400'
+                          }`}
+                        >
+                          <div className="flex items-center gap-3 min-w-0">
+                            <div className="text-amber-400 shrink-0">
+                              {isSelected ? (
+                                <CheckSquare className="h-5 w-5 text-amber-400" />
+                              ) : (
+                                <Square className="h-5 w-5 text-stone-600" />
+                              )}
+                            </div>
+                            <div className="h-10 w-10 rounded-lg bg-stone-950 border border-stone-800 overflow-hidden shrink-0 flex items-center justify-center">
+                              {product.images && product.images[0] ? (
+                                <img
+                                  src={product.images[0]}
+                                  alt={product.name}
+                                  className="h-full w-full object-cover"
+                                />
+                              ) : (
+                                <ShoppingBag className="h-4 w-4 text-stone-600" />
+                              )}
+                            </div>
+                            <div className="min-w-0">
+                              <div className="flex items-center gap-2">
+                                <span className={`text-xs font-bold truncate ${isSelected ? 'text-white' : 'text-stone-300'}`}>
+                                  {product.name}
+                                </span>
+                                {!product.is_active && (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-red-500/20 text-red-400 border border-red-500/30">
+                                    Inactive
+                                  </span>
+                                )}
+                                {product.is_preorder && (
+                                  <span className="px-1.5 py-0.2 rounded text-[9px] bg-amber-500/20 text-amber-400 border border-amber-500/30">
+                                    Pre-order
+                                  </span>
+                                )}
+                              </div>
+                              <div className="text-[11px] font-mono text-stone-400 flex items-center gap-2 mt-0.5">
+                                <span>Retail: R {Number(product.base_price).toFixed(2)}</span>
+                                {product.cost_price != null && (
+                                  <>
+                                    <span>&bull;</span>
+                                    <span>Cost: R {Number(product.cost_price).toFixed(2)}</span>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="shrink-0 text-right font-mono text-xs pl-3">
+                            {isSelected ? (
+                              <span className="px-2 py-0.5 rounded bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 text-[10px] font-bold uppercase">
+                                In Survey
+                              </span>
+                            ) : (
+                              <span className="text-stone-600 text-[10px] uppercase">
+                                Excluded
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </CardContent>
+
+                <div className="border-t border-stone-800 p-4 bg-stone-950/80 flex flex-col sm:flex-row items-center justify-between gap-3 flex-shrink-0">
+                  <div className="text-xs text-stone-400">
+                    Applying changes will immediately update the live public survey form.
+                  </div>
+                  <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowProductSelectionModal(false)}
+                      className="text-stone-400 hover:text-white text-xs"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={handleSaveRunProducts}
+                      disabled={savingRunProducts}
+                      className="bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-md"
+                    >
+                      {savingRunProducts ? (
+                        <>
+                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          <span>Saving...</span>
+                        </>
+                      ) : (
+                        <span>Save to Current Run ({selectedProductIds.length})</span>
+                      )}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          )}
+
+          {/* Start New Survey Run Modal */}
+          {showNewRunModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-md p-4 overflow-y-auto">
+              <Card className="w-full max-w-lg border-amber-500/40 bg-stone-900 shadow-2xl">
+                <CardHeader className="border-b border-stone-800 pb-3">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <Plus className="h-5 w-5 text-amber-400" />
+                        <CardTitle className="text-lg text-white">Start New Survey Run</CardTitle>
+                      </div>
+                      <CardDescription className="text-xs text-stone-400 mt-1">
+                        Creates a new documented survey run. The previous run's responses are safely archived in your history, giving you clean demand testing for your selected garments.
+                      </CardDescription>
+                    </div>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => setShowNewRunModal(false)}
+                      className="text-stone-400 hover:text-white"
+                    >
+                      <X className="h-5 w-5" />
+                    </Button>
+                  </div>
+                </CardHeader>
+
+                <form onSubmit={handleCreateNewRun}>
+                  <CardContent className="p-4 space-y-4">
+                    <div className="space-y-1.5">
+                      <Label htmlFor="newRunTitle" className="text-xs text-stone-300 font-semibold">
+                        Survey Run Title *
+                      </Label>
+                      <Input
+                        id="newRunTitle"
+                        value={newRunTitle}
+                        onChange={(e) => setNewRunTitle(e.target.value)}
+                        placeholder="e.g. Run #2: Winter 2026 Hoodies & Trackpants Drop"
+                        required
+                        className="bg-stone-950 border-stone-800 text-white text-xs"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <Label htmlFor="newRunDescription" className="text-xs text-stone-300 font-semibold">
+                        Description / Objective (Optional)
+                      </Label>
+                      <Input
+                        id="newRunDescription"
+                        value={newRunDescription}
+                        onChange={(e) => setNewRunDescription(e.target.value)}
+                        placeholder="e.g. Testing willingness to pay for heavyweight fleece blanks"
+                        className="bg-stone-950 border-stone-800 text-white text-xs"
+                      />
+                    </div>
+
+                    <div className="rounded-xl border border-stone-800 bg-stone-950/60 p-3 space-y-2">
+                      <div className="flex items-center justify-between text-xs">
+                        <span className="font-semibold text-stone-300">Selected Garments:</span>
+                        <span className="font-mono text-amber-400 font-bold">{selectedProductIds.length} Products</span>
+                      </div>
+                      <div className="flex flex-wrap gap-1 max-h-24 overflow-y-auto">
+                        {products
+                          .filter((p) => selectedProductIds.includes(p.id))
+                          .map((p) => (
+                            <span
+                              key={p.id}
+                              className="px-2 py-0.5 rounded text-[10px] bg-stone-800 text-stone-200 border border-stone-700"
+                            >
+                              {p.name}
+                            </span>
+                          ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setShowNewRunModal(false);
+                          setShowProductSelectionModal(true);
+                        }}
+                        className="text-[11px] text-amber-400 hover:underline flex items-center gap-1 font-semibold pt-1"
+                      >
+                        <Sliders className="h-3 w-3" /> Adjust selected products
+                      </button>
+                    </div>
+
+                    <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-3 text-[11px] text-emerald-300">
+                      ✓ This new run will become the <strong>Active Live Survey</strong> on the public <code>/survey</code> storefront page. Past submissions remain intact in your history table.
+                    </div>
+                  </CardContent>
+
+                  <div className="border-t border-stone-800 p-4 bg-stone-950/80 flex items-center justify-end gap-2">
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      onClick={() => setShowNewRunModal(false)}
+                      className="text-stone-400 hover:text-white text-xs"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      type="submit"
+                      disabled={creatingRun || !newRunTitle.trim()}
+                      className="bg-amber-500 hover:bg-amber-400 text-black text-xs font-bold shadow-md"
+                    >
+                      {creatingRun ? (
+                        <>
+                          <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                          <span>Creating Run...</span>
+                        </>
+                      ) : (
+                        <span>Create &amp; Activate Run</span>
+                      )}
+                    </Button>
+                  </div>
+                </form>
+              </Card>
+            </div>
+          )}
         </div>
       )}
 

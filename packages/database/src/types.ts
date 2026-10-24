@@ -516,6 +516,7 @@ export interface ProductSurveyVote {
 
 export interface ProductSurveyResponse {
   id: string;
+  survey_run_id?: string | null;
   respondent_name?: string | null;
   respondent_email?: string | null;
   respondent_phone?: string | null;
@@ -533,6 +534,21 @@ export interface ProductSurveyPricingTier {
   price: number;
   marginPct: number;
   estimatedProfit: number;
+}
+
+export interface SurveyRun {
+  id: string;
+  title: string;
+  description?: string | null;
+  status: 'active' | 'completed' | 'archived' | 'draft';
+  product_ids: string[];
+  created_at: string;
+  updated_at: string;
+  completed_at?: string | null;
+  created_by?: string | null;
+  totalResponses?: number;
+  totalVotesCast?: number;
+  products?: Product[];
 }
 
 

@@ -4,6 +4,7 @@ import {
   ProductSurveyResponse,
   ProductSurveyVote,
   SurveyTierType,
+  SurveyRun,
 } from '@dissafyt/database';
 import { AuditService } from '../audit/audit-service';
 import { EmailService } from '../notifications/email-service';
@@ -23,6 +24,7 @@ export interface CalculatedSurveyTiers {
 }
 
 export interface SurveySubmissionInput {
+  survey_run_id?: string;
   respondent_name?: string;
   respondent_email?: string;
   respondent_phone?: string;
@@ -65,6 +67,9 @@ export interface ProductSurveyInsight {
 }
 
 export interface SurveyAnalyticsSummary {
+  activeRun: SurveyRun | null;
+  selectedRun: SurveyRun | null;
+  runs: SurveyRun[];
   totalResponses: number;
   totalVotesCast: number;
   productInsights: ProductSurveyInsight[];
@@ -140,16 +145,279 @@ export class SurveyService {
   }
 
   /**
-   * Fetches active products formatted for the public customer pricing survey.
-   * Blindly computes the 3 price intervals for the user dropdown without revealing margin % or backend math.
+   * Retrieves the currently active pricing survey run, or null if none active.
    */
-  public static async getPublicSurveyProducts() {
+  public static async getActiveSurveyRun(): Promise<SurveyRun | null> {
     const supabase = getSupabaseAdminClient();
-    const { data: products, error } = await supabase
+    const { data, error } = await supabase
+      .from('survey_runs')
+      .select('*')
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (error) {
+      console.error('[SurveyService.getActiveSurveyRun] DB error:', error);
+      return null;
+    }
+    return data as SurveyRun | null;
+  }
+
+  /**
+   * Lists all documented survey runs with aggregate response & vote counts and included product items.
+   */
+  public static async listSurveyRuns(): Promise<SurveyRun[]> {
+    const supabase = getSupabaseAdminClient();
+    const { data: runs, error } = await supabase
+      .from('survey_runs')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error || !runs) {
+      console.error('[SurveyService.listSurveyRuns] DB error:', error);
+      return [];
+    }
+
+    // Fetch response and vote aggregations
+    const { data: responses } = await supabase
+      .from('product_survey_responses')
+      .select('id, survey_run_id');
+
+    const { data: votes } = await supabase
+      .from('product_survey_votes')
+      .select('id, response_id');
+
+    const { data: allProducts } = await supabase
+      .from('products')
+      .select('id, name, slug, images, base_price, cost_price, is_active');
+
+    const prodMap = new Map((allProducts || []).map((p) => [p.id, p]));
+
+    const responseRunMap = new Map<string, string>();
+    const responseCountByRun = new Map<string, number>();
+    for (const r of responses || []) {
+      if (r.survey_run_id) {
+        responseRunMap.set(r.id, r.survey_run_id);
+        responseCountByRun.set(
+          r.survey_run_id,
+          (responseCountByRun.get(r.survey_run_id) || 0) + 1
+        );
+      }
+    }
+
+    const votesCountByRun = new Map<string, number>();
+    for (const v of votes || []) {
+      const runId = responseRunMap.get(v.response_id);
+      if (runId) {
+        votesCountByRun.set(runId, (votesCountByRun.get(runId) || 0) + 1);
+      }
+    }
+
+    return runs.map((run) => {
+      const pIds = run.product_ids || [];
+      const prods = pIds.map((id: string) => prodMap.get(id)).filter(Boolean) as Product[];
+      return {
+        ...run,
+        totalResponses: responseCountByRun.get(run.id) || 0,
+        totalVotesCast: votesCountByRun.get(run.id) || 0,
+        products: prods,
+      };
+    });
+  }
+
+  /**
+   * Creates a new documented survey run, optionally setting it as active (which archives previous active runs).
+   */
+  public static async createSurveyRun(
+    input: {
+      title: string;
+      description?: string;
+      product_ids: string[];
+      setAsActive?: boolean;
+    },
+    actor?: { email?: string; role?: string }
+  ): Promise<SurveyRun> {
+    const supabase = getSupabaseAdminClient();
+
+    if (!input.title?.trim()) {
+      throw new Error('Survey Run title is required.');
+    }
+
+    const setAsActive = input.setAsActive !== false;
+
+    // If setting as active, archive previously active runs
+    if (setAsActive) {
+      await supabase
+        .from('survey_runs')
+        .update({
+          status: 'archived',
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('status', 'active');
+    }
+
+    const { data: newRun, error } = await supabase
+      .from('survey_runs')
+      .insert({
+        title: input.title.trim(),
+        description: input.description?.trim() || null,
+        status: setAsActive ? 'active' : 'draft',
+        product_ids: input.product_ids || [],
+        created_by: actor?.email || 'admin',
+      })
+      .select('*')
+      .single();
+
+    if (error || !newRun) {
+      console.error('[SurveyService.createSurveyRun] DB error:', error);
+      throw new Error(error?.message || 'Failed to create survey run.');
+    }
+
+    await AuditService.recordLog({
+      actor_email: actor?.email || 'admin@dissafyt.com',
+      actor_role: actor?.role || 'admin',
+      action: 'service.create' as any,
+      entity_type: 'survey_run',
+      entity_id: newRun.id,
+      entity_name: newRun.title,
+      changes: newRun,
+    });
+
+    return newRun as SurveyRun;
+  }
+
+  /**
+   * Updates product selection (select/deselect) for a survey run.
+   */
+  public static async updateSurveyRunProducts(
+    runId: string,
+    product_ids: string[],
+    actor?: { email?: string; role?: string }
+  ): Promise<SurveyRun> {
+    const supabase = getSupabaseAdminClient();
+
+    const { data: updated, error } = await supabase
+      .from('survey_runs')
+      .update({
+        product_ids,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', runId)
+      .select('*')
+      .single();
+
+    if (error || !updated) {
+      console.error('[SurveyService.updateSurveyRunProducts] DB error:', error);
+      throw new Error(error?.message || 'Failed to update survey run products.');
+    }
+
+    await AuditService.recordLog({
+      actor_email: actor?.email || 'admin@dissafyt.com',
+      actor_role: actor?.role || 'admin',
+      action: 'service.update' as any,
+      entity_type: 'survey_run',
+      entity_id: runId,
+      entity_name: updated.title,
+      changes: { product_ids },
+    });
+
+    return updated as SurveyRun;
+  }
+
+  /**
+   * Updates survey run details (title, description, status).
+   */
+  public static async updateSurveyRun(
+    runId: string,
+    input: {
+      title?: string;
+      description?: string;
+      status?: 'active' | 'completed' | 'archived' | 'draft';
+      product_ids?: string[];
+    },
+    actor?: { email?: string; role?: string }
+  ): Promise<SurveyRun> {
+    const supabase = getSupabaseAdminClient();
+
+    // If making this run active, archive any other active runs
+    if (input.status === 'active') {
+      await supabase
+        .from('survey_runs')
+        .update({
+          status: 'archived',
+          completed_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+        })
+        .eq('status', 'active')
+        .neq('id', runId);
+    }
+
+    const payload: any = {
+      ...input,
+      updated_at: new Date().toISOString(),
+    };
+    if (input.status === 'completed' || input.status === 'archived') {
+      payload.completed_at = new Date().toISOString();
+    }
+
+    const { data: updated, error } = await supabase
+      .from('survey_runs')
+      .update(payload)
+      .eq('id', runId)
+      .select('*')
+      .single();
+
+    if (error || !updated) {
+      console.error('[SurveyService.updateSurveyRun] DB error:', error);
+      throw new Error(error?.message || 'Failed to update survey run.');
+    }
+
+    await AuditService.recordLog({
+      actor_email: actor?.email || 'admin@dissafyt.com',
+      actor_role: actor?.role || 'admin',
+      action: 'service.update' as any,
+      entity_type: 'survey_run',
+      entity_id: runId,
+      entity_name: updated.title,
+      changes: payload,
+    });
+
+    return updated as SurveyRun;
+  }
+
+  /**
+   * Fetches active products formatted for the public customer pricing survey.
+   * If a survey run is specified or active, filters ONLY to selected products for that run.
+   */
+  public static async getPublicSurveyProducts(runId?: string) {
+    const supabase = getSupabaseAdminClient();
+
+    let targetRun: SurveyRun | null = null;
+    if (runId) {
+      const { data } = await supabase
+        .from('survey_runs')
+        .select('*')
+        .eq('id', runId)
+        .maybeSingle();
+      if (data) targetRun = data as SurveyRun;
+    }
+
+    if (!targetRun) {
+      targetRun = await this.getActiveSurveyRun();
+    }
+
+    let productQuery = supabase
       .from('products')
       .select('id, name, slug, description, base_price, cost_price, images, is_preorder, preorder_message, category_id')
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
+      .eq('is_active', true);
+
+    if (targetRun && targetRun.product_ids && targetRun.product_ids.length > 0) {
+      productQuery = productQuery.in('id', targetRun.product_ids);
+    }
+
+    const { data: products, error } = await productQuery.order('created_at', { ascending: false });
 
     if (error || !products) {
       return [];
@@ -184,7 +452,7 @@ export class SurveyService {
           },
           {
             tier: 'not_interested',
-            label: 'Above my budget / Wouldn\'t buy',
+            label: "Above my budget / Wouldn't buy",
             price: 0,
           },
         ],
@@ -193,7 +461,8 @@ export class SurveyService {
   }
 
   /**
-   * Submits prospect pricing survey responses and votes to the database.
+   * Submits prospect pricing survey responses and votes to the database,
+   * linking them to the active survey run.
    */
   public static async submitSurveyResponse(input: SurveySubmissionInput) {
     const supabase = getSupabaseAdminClient();
@@ -202,10 +471,18 @@ export class SurveyService {
       throw new Error('At least one product price vote is required.');
     }
 
+    // Resolve survey_run_id
+    let runId = input.survey_run_id || null;
+    if (!runId) {
+      const activeRun = await this.getActiveSurveyRun();
+      if (activeRun) runId = activeRun.id;
+    }
+
     // 1. Insert parent survey response record
     const { data: responseData, error: respError } = await supabase
       .from('product_survey_responses')
       .insert({
+        survey_run_id: runId,
         respondent_name: input.respondent_name?.trim() || null,
         respondent_email: input.respondent_email?.trim() || null,
         respondent_phone: input.respondent_phone?.trim() || null,
@@ -286,43 +563,64 @@ export class SurveyService {
     };
   }
 
-
   /**
    * Retrieves comprehensive survey feedback analytics and product insights for the admin dashboard.
+   * Supports filtering by a specific survey run ID to review historical runs or view the current active run.
    */
-  public static async getSurveyAnalytics(): Promise<SurveyAnalyticsSummary> {
+  public static async getSurveyAnalytics(runId?: string): Promise<SurveyAnalyticsSummary> {
     const supabase = getSupabaseAdminClient();
 
-    // Fetch all products
-    const { data: products, error: prodError } = await supabase
-      .from('products')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // 1. Fetch runs history
+    const allRuns = await this.listSurveyRuns();
+    const activeRun = allRuns.find((r) => r.status === 'active') || allRuns[0] || null;
 
-    if (prodError || !products) {
-      return {
-        totalResponses: 0,
-        totalVotesCast: 0,
-        productInsights: [],
-        recentSubmissions: [],
-      };
+    let selectedRun: SurveyRun | null = null;
+    if (runId && runId !== 'active') {
+      selectedRun = allRuns.find((r) => r.id === runId) || null;
+    }
+    if (!selectedRun) {
+      selectedRun = activeRun;
     }
 
-    // Fetch all survey votes
-    const { data: votes, error: votesError } = await supabase
-      .from('product_survey_votes')
-      .select('*')
-      .order('created_at', { ascending: false });
+    // 2. Fetch products to include in analytics
+    let productQuery = supabase.from('products').select('*');
+    if (selectedRun && selectedRun.product_ids && selectedRun.product_ids.length > 0) {
+      productQuery = productQuery.in('id', selectedRun.product_ids);
+    }
+    const { data: products, error: prodError } = await productQuery.order('created_at', { ascending: false });
 
-    // Fetch recent survey submissions
-    const { data: responses, error: respError } = await supabase
-      .from('product_survey_responses')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50);
+    // 3. Fetch responses filtered by selected run
+    let respQuery = supabase.from('product_survey_responses').select('*');
+    if (selectedRun) {
+      respQuery = respQuery.eq('survey_run_id', selectedRun.id);
+    }
+    const { data: responses } = await respQuery.order('created_at', { ascending: false }).limit(100);
 
-    const allVotes = votes || [];
     const allResponses = responses || [];
+    const responseIds = allResponses.map((r) => r.id);
+
+    // 4. Fetch votes belonging to those responses
+    let allVotes: ProductSurveyVote[] = [];
+    if (responseIds.length > 0) {
+      const { data: votes } = await supabase
+        .from('product_survey_votes')
+        .select('*')
+        .in('response_id', responseIds)
+        .order('created_at', { ascending: false });
+      allVotes = votes || [];
+    }
+
+    if (prodError || !products || products.length === 0) {
+      return {
+        activeRun,
+        selectedRun,
+        runs: allRuns,
+        totalResponses: allResponses.length,
+        totalVotesCast: allVotes.length,
+        productInsights: [],
+        recentSubmissions: allResponses,
+      };
+    }
 
     // Group votes by product
     const votesByProduct = new Map<string, ProductSurveyVote[]>();
@@ -400,7 +698,7 @@ export class SurveyService {
       if (totalVotes === 0) {
         optimalTier = 'tier_50';
         optimalPrice = price50;
-        recommendationReason = 'Awaiting survey votes. 50% markup provides low entry barrier for inaugural drop.';
+        recommendationReason = 'Awaiting survey votes for this run. 50% markup provides low entry barrier for launch.';
       } else if (projectedProfit75 >= projectedProfit50 && projectedProfit75 >= projectedProfit100) {
         optimalTier = 'tier_75';
         optimalPrice = price75;
@@ -435,6 +733,9 @@ export class SurveyService {
     });
 
     return {
+      activeRun,
+      selectedRun,
+      runs: allRuns,
       totalResponses: allResponses.length,
       totalVotesCast: allVotes.length,
       productInsights,

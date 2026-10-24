@@ -25,9 +25,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   }
 
   return (
-    <div className="min-h-screen bg-stone-950 text-stone-100 flex antialiased w-full">
-      {/* Admin Sidebar */}
-      <aside className="w-64 border-r border-stone-800 bg-stone-900/50 flex flex-col justify-between p-4 flex-shrink-0">
+    <div className="fixed inset-0 h-screen h-[100dvh] bg-stone-950 text-stone-100 flex antialiased w-full overflow-hidden">
+      {/* Admin Sidebar - Pinned to Viewport */}
+      <aside className="w-64 border-r border-stone-800 bg-stone-900/50 flex flex-col justify-between p-4 flex-shrink-0 h-full overflow-y-auto">
         <div className="space-y-6">
           <div className="flex items-center justify-between px-2 py-3 border-b border-stone-800">
             <Link href="/">
@@ -142,9 +142,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main Content View */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <header className="h-16 border-b border-stone-800 bg-stone-950/80 px-8 flex items-center justify-between sticky top-0 z-40 backdrop-blur-md">
+      {/* Main Content View - Pinned Header with Scrollable Canvas */}
+      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
+        <header className="h-16 flex-shrink-0 border-b border-stone-800 bg-stone-950/80 px-8 flex items-center justify-between z-40 backdrop-blur-md">
           <div className="text-sm font-semibold text-stone-300">
             Platform Administration
           </div>
@@ -152,7 +152,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
             <OperatorSwitcher />
           </div>
         </header>
-        <main className="flex-1 p-8 overflow-auto">{children}</main>
+        <main className="flex-1 p-8 overflow-y-auto min-w-0 max-w-full">{children}</main>
       </div>
     </div>
   );

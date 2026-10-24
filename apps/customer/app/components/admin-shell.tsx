@@ -145,7 +145,7 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
   const currentTitle = currentItem?.name || 'Administration';
 
   return (
-    <div className="min-h-screen bg-stone-950 text-stone-100 flex antialiased w-full">
+    <div className="fixed inset-0 h-screen h-[100dvh] bg-stone-950 text-stone-100 flex antialiased w-full overflow-hidden">
       {/* Mobile Backdrop */}
       {mobileOpen && (
         <div
@@ -155,9 +155,9 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* Admin Sidebar / Collapsible Mobile Drawer */}
+      {/* Admin Sidebar / Collapsible Mobile Drawer - Pinned to Viewport */}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 bg-stone-900 border-r border-stone-800 flex flex-col justify-between p-4 transition-transform duration-300 ease-in-out lg:static lg:w-64 lg:translate-x-0 lg:bg-stone-900/50 lg:z-auto flex-shrink-0 ${
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-stone-900 border-r border-stone-800 flex flex-col justify-between p-4 transition-transform duration-300 ease-in-out lg:static lg:h-full lg:w-64 lg:translate-x-0 lg:bg-stone-900/50 lg:z-auto flex-shrink-0 overflow-y-auto ${
           mobileOpen ? 'translate-x-0 shadow-2xl' : '-translate-x-full lg:translate-x-0'
         }`}
       >
@@ -244,10 +244,10 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
         </div>
       </aside>
 
-      {/* Main Content View */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* Top Header Bar (Responsive) */}
-        <header className="h-16 border-b border-stone-800 bg-stone-950/80 px-4 sm:px-6 lg:px-8 flex items-center justify-between sticky top-0 z-30 backdrop-blur-md">
+      {/* Main Content View - Pinned Header with Scrollable Canvas */}
+      <div className="flex-1 flex flex-col h-full min-w-0 overflow-hidden">
+        {/* Top Header Bar (Fixed / Pinned) */}
+        <header className="h-16 flex-shrink-0 border-b border-stone-800 bg-stone-950/80 px-4 sm:px-6 lg:px-8 flex items-center justify-between z-30 backdrop-blur-md">
           <div className="flex items-center space-x-3">
             {/* Hamburger button on mobile */}
             <button
@@ -275,8 +275,8 @@ export function AdminShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        {/* Content Container */}
-        <main className="flex-1 p-4 sm:p-6 lg:p-8 overflow-auto min-w-0 max-w-full">
+        {/* Content Container - Scrollable Canvas */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8 min-w-0 max-w-full">
           {children}
         </main>
       </div>

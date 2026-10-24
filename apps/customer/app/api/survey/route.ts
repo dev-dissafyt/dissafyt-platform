@@ -7,10 +7,14 @@ export const revalidate = 0;
 /**
  * GET /api/survey
  * Public endpoint to fetch active catalog products with blind price options.
+ * Selects products from the active survey run or requested runId.
  */
-export async function GET() {
+export async function GET(request: NextRequest) {
   try {
-    const products = await SurveyService.getPublicSurveyProducts();
+    const { searchParams } = new URL(request.url);
+    const runId = searchParams.get('runId') || undefined;
+
+    const products = await SurveyService.getPublicSurveyProducts(runId);
     return NextResponse.json(products, {
       headers: {
         'Cache-Control': 'no-store, no-cache, must-revalidate, max-age=0',
@@ -28,6 +32,7 @@ export async function GET() {
 /**
  * POST /api/survey
  * Public endpoint for prospective customers to submit pricing feedback.
+ * Tags responses with the active or specified survey run.
  */
 export async function POST(request: NextRequest) {
   try {
@@ -40,13 +45,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const ip =
-      request.headers.get('x-forwarded-for')?.split(',')[0].trim() ||
-      request.headers.get('x-real-ip') ||
-      '';
-    const userAgent = request.headers.get('user-agent') || '';
-
     const result = await SurveyService.submitSurveyResponse({
+      survey_run_id: body.survey_run_id,
       respondent_name: body.respondent_name,
       respondent_email: body.respondent_email,
       respondent_phone: body.respondent_phone,
