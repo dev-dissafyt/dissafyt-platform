@@ -7,6 +7,8 @@ export interface AdminAuthSession {
   email: string;
   role: AppRole;
   userId: string;
+  locationId?: string | null;
+  locationName?: string | null;
 }
 
 /**
@@ -68,18 +70,45 @@ export async function requireAdminAuth(
   }
 
   const isAdmin = roles.includes('admin');
+  const isManager = roles.includes('barbershop_manager');
   const isStaff = roles.includes('staff');
+  const isBarber = roles.includes('barber');
 
-  if (!isAdmin && !isStaff) {
+  if (!isAdmin && !isManager && !isStaff && !isBarber) {
     return NextResponse.json(
-      { error: 'Forbidden: Access restricted to platform administrators and operational staff.' },
+      { error: 'Forbidden: Access restricted to platform administrators, branch managers, and operational staff.' },
       { status: 403 }
     );
   }
 
-  const role: AppRole = isAdmin ? 'admin' : 'staff';
+  const role: AppRole = isAdmin
+    ? 'admin'
+    : isManager
+    ? 'barbershop_manager'
+    : isStaff
+    ? 'staff'
+    : 'barber';
 
-  // 4. Verify RBAC permission if requested
+  // 4. Resolve location assignment if user is tied to a specific branch
+  let locationId: string | null = null;
+  let locationName: string | null = null;
+
+  try {
+    const { data: staffMember } = await admin
+      .from('staff')
+      .select('location_id, location:locations(id, name)')
+      .eq('user_id', authCtx.userId)
+      .maybeSingle();
+
+    if (staffMember) {
+      locationId = staffMember.location_id || null;
+      locationName = (staffMember.location as any)?.name || null;
+    }
+  } catch (err) {
+    console.error('Failed to query staff location in auth-guard:', err);
+  }
+
+  // 5. Verify RBAC permission if requested
   if (requiredPermission && !RBACService.hasPermission(role, requiredPermission)) {
     return NextResponse.json(
       { error: `Forbidden: RBAC restricts '${requiredPermission}' to authorized roles.` },
@@ -95,6 +124,8 @@ export async function requireAdminAuth(
     email: effectiveEmail,
     role,
     userId: authCtx.userId,
+    locationId,
+    locationName,
   };
 }
 

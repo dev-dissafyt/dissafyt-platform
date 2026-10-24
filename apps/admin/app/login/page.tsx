@@ -49,26 +49,61 @@ function AdminLoginContent() {
         .eq('user_id', userId);
 
       const roles = (roleRecords || []).map((r: any) => r.role);
-      const isAdmin = roles.includes('admin');
+      const isMasterAdmin = userEmail === 'curtislee@dissafyt.com' || userEmail === 'dissafyt@gmail.com';
+      const isAdmin = roles.includes('admin') || isMasterAdmin;
+      const isManager = roles.includes('barbershop_manager');
       const isStaff = roles.includes('staff');
+      const isBarber = roles.includes('barber');
 
-      if (!isAdmin && !isStaff && userEmail !== 'curtislee@dissafyt.com' && userEmail !== 'dissafyt@gmail.com') {
+      if (!isAdmin && !isManager && !isStaff && !isBarber) {
         await supabase.auth.signOut();
-        throw new Error('Access Denied: This portal is restricted to authorized platform administrators.');
+        throw new Error('Access Denied: This portal is restricted to authorized platform administrators and branch operators.');
       }
 
-      const assignedRole = isAdmin ? 'admin' : isStaff ? 'staff' : 'admin';
+      const assignedRole = isAdmin
+        ? 'admin'
+        : isManager
+        ? 'barbershop_manager'
+        : isStaff
+        ? 'staff'
+        : 'barber';
+
+      // Resolve branch location assignment for branch managers and barbers
+      let locationId: string | null = null;
+      let locationName: string | null = null;
+
+      try {
+        const { data: staffData } = await supabase
+          .from('staff')
+          .select('location_id, location:locations(id, name)')
+          .eq('user_id', userId)
+          .maybeSingle();
+
+        if (staffData) {
+          locationId = staffData.location_id || null;
+          locationName = (staffData.location as any)?.name || null;
+        }
+      } catch (err) {
+        console.warn('Failed to query staff location on login:', err);
+      }
 
       // Set cookie for Next.js edge middleware
       const maxAge = 60 * 60 * 24 * 7; // 7 days
       document.cookie = `dissafyt_admin_token=${encodeURIComponent(token)}; path=/; max-age=${maxAge}; SameSite=Lax`;
       document.cookie = `dissafyt_admin_email=${encodeURIComponent(userEmail)}; path=/; max-age=${maxAge}; SameSite=Lax`;
       document.cookie = `dissafyt_admin_role=${encodeURIComponent(assignedRole)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+      if (locationId) {
+        document.cookie = `dissafyt_admin_location_id=${encodeURIComponent(locationId)}; path=/; max-age=${maxAge}; SameSite=Lax`;
+      } else {
+        document.cookie = `dissafyt_admin_location_id=; path=/; max-age=0; SameSite=Lax`;
+      }
 
       // Update operator state
       setActiveOperator({
         email: userEmail,
         role: assignedRole,
+        locationId,
+        locationName,
       });
 
       if (redirectUrl && !redirectUrl.startsWith('/login')) {

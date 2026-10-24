@@ -3,7 +3,7 @@
  * Aligned with docs/02-architecture/DATABASE.md and docs/05-users/USER_SYSTEM.md
  */
 
-export type AppRole = 'customer' | 'barber' | 'staff' | 'admin' | 'creator';
+export type AppRole = 'customer' | 'barber' | 'barbershop_manager' | 'staff' | 'admin' | 'creator';
 
 export interface Profile {
   id: string; // References auth.users(id)
@@ -319,6 +319,8 @@ export interface Booking {
   end_time: string;
   status: BookingStatus;
   total_amount: number;
+  base_service_amount?: number;
+  admin_fee_amount?: number;
   payment_status?: BookingPaymentStatus;
   is_subscription_covered?: boolean;
   subscription_id?: string | null;
@@ -379,6 +381,7 @@ export interface BarbershopLocation {
   latitude?: number | null;
   longitude?: number | null;
   pos_terminal_id?: string | null;
+  admin_fee_pct?: number;
   created_at?: string;
   updated_at?: string;
 }

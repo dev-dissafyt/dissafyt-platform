@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { AdminBarbershopService } from '@dissafyt/api';
+import { getSupabaseAdminClient } from '@dissafyt/database';
 import { requireAdminAuth, isAuthFailure } from '@/lib/auth-guard';
 
 export const dynamic = 'force-dynamic';
@@ -17,13 +18,17 @@ export async function GET(request: NextRequest) {
     const date = searchParams.get('date') || undefined;
     const staffId = searchParams.get('staffId') || undefined;
     const status = searchParams.get('status') || undefined;
-    const locationId = searchParams.get('locationId') || undefined;
+    const locationParam = searchParams.get('locationId') || undefined;
+    let targetLocationId = locationParam;
+    if (auth.role === 'barbershop_manager' || auth.role === 'barber') {
+      targetLocationId = auth.locationId || undefined;
+    }
 
     const bookings = await AdminBarbershopService.listBookings({
       date,
       staffId,
       status,
-      locationId,
+      locationId: targetLocationId,
     });
 
     return NextResponse.json(bookings);
@@ -47,6 +52,23 @@ export async function PATCH(request: NextRequest) {
 
     if (!id) {
       return NextResponse.json({ error: 'ID is required' }, { status: 400 });
+    }
+
+    // If branch manager, ensure the booking belongs to their assigned location
+    if (auth.role === 'barbershop_manager' && auth.locationId) {
+      const admin = getSupabaseAdminClient();
+      const { data: existing } = await admin
+        .from('bookings')
+        .select('location_id')
+        .eq('id', id)
+        .maybeSingle();
+
+      if (existing && existing.location_id && existing.location_id !== auth.locationId) {
+        return NextResponse.json(
+          { error: 'Forbidden: You cannot modify appointments for other branch locations.' },
+          { status: 403 }
+        );
+      }
     }
 
     const result = await AdminBarbershopService.updateBookingStatus(

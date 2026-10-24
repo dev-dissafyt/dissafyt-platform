@@ -37,8 +37,9 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
-  // 4. Role Enforcement: Only 'admin' or 'staff' allowed in Admin Portal
-  if (role && role !== 'admin' && role !== 'staff') {
+  // 4. Role Enforcement: Only authorized staff and branch managers allowed in Admin Portal
+  const ALLOWED_ADMIN_ROLES = ['admin', 'staff', 'barbershop_manager', 'barber'];
+  if (role && !ALLOWED_ADMIN_ROLES.includes(role)) {
     const url = request.nextUrl.clone();
     url.pathname = '/login';
     url.searchParams.set('error', 'unauthorized_role');
@@ -46,6 +47,7 @@ export function middleware(request: NextRequest) {
     response.cookies.delete('dissafyt_admin_token');
     response.cookies.delete('dissafyt_admin_role');
     response.cookies.delete('dissafyt_admin_email');
+    response.cookies.delete('dissafyt_admin_location_id');
     return response;
   }
 

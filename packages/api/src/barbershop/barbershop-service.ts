@@ -82,6 +82,26 @@ export const DEFAULT_LOCATIONS: BarbershopLocation[] = [
     google_maps_embed_url: 'https://maps.google.com/maps?q=1%20Norwalk%20Way%20Bernadino%20Heights%20Kraaifontein%207570&t=&z=15&ie=UTF8&iwloc=&output=embed',
     latitude: -33.8650,
     longitude: 18.7260,
+    admin_fee_pct: 5.00,
+  },
+  {
+    id: 'loc-ace-of-fyt-belmont-park',
+    name: 'Ace of Fyt - Belmont Park',
+    slug: 'ace-of-fyt-belmont-park',
+    address: '67 Voortrekker Rd, Belmont Park, Kraaifontein, 7570',
+    city: 'Cape Town',
+    province: 'Western Cape',
+    country: 'South Africa',
+    phone: '+27 21 000 0000',
+    is_flagship: false,
+    is_active: true,
+    capacity_chairs: 2,
+    operating_hours_display: 'Mon-Fri: 09:00 - 18:00 | Sat: 09:00 - 17:00 | Sun: Closed',
+    google_maps_url: 'https://www.google.com/maps/search/?api=1&query=67+Voortrekker+Rd+Belmont+Park+Kraaifontein',
+    google_maps_embed_url: 'https://maps.google.com/maps?q=67%20Voortrekker%20Rd%20Belmont%20Park%20Kraaifontein&t=&z=15&ie=UTF8&iwloc=&output=embed',
+    latitude: -33.8580,
+    longitude: 18.7180,
+    admin_fee_pct: 5.00,
   },
 ];
 
@@ -1164,7 +1184,28 @@ export class BarbershopService {
       console.warn('Location pricing lookup fallback:', locErr);
     }
 
-    const totalAmount = isCoveredBySubscription ? 0.00 : effectiveServicePrice;
+    const baseServiceAmount = isCoveredBySubscription ? 0.00 : effectiveServicePrice;
+    let adminFeePct = 5.00;
+    try {
+      const { data: locData } = await admin
+        .from('locations')
+        .select('admin_fee_pct')
+        .eq('id', resolvedLocationId)
+        .maybeSingle();
+
+      if (locData && locData.admin_fee_pct !== null && locData.admin_fee_pct !== undefined) {
+        adminFeePct = Number(locData.admin_fee_pct);
+      }
+    } catch {
+      // Fallback 5%
+    }
+
+    const adminFeeAmount = isCoveredBySubscription
+      ? 0.00
+      : Number(((baseServiceAmount * adminFeePct) / 100).toFixed(2));
+    const totalAmount = isCoveredBySubscription
+      ? 0.00
+      : Number((baseServiceAmount + adminFeeAmount).toFixed(2));
     const paymentStatus: 'membership_covered' | 'unpaid' = isCoveredBySubscription ? 'membership_covered' : 'unpaid';
 
     // 3b. Anti-Hoarding & No-Show Protection when customer selects "Pay in Chair"
@@ -1217,14 +1258,14 @@ export class BarbershopService {
       if (input.payment_choice === 'payfast') {
         bookingStatus = 'pending';
         statusNote = coverageNote
-          ? `${coverageNote} [PayFast payment pending]`
-          : 'PayFast payment pending';
+          ? `${coverageNote} [PayFast payment pending: R ${totalAmount.toFixed(2)}]`
+          : `PayFast payment pending: R ${totalAmount.toFixed(2)}`;
       } else {
         // 'pay_in_chair' or unspecified
         bookingStatus = 'confirmed';
         statusNote = coverageNote
-          ? `${coverageNote} [Pay in chair: R ${totalAmount.toFixed(2)} due on arrival]`
-          : `Pay in chair: R ${totalAmount.toFixed(2)} due on arrival`;
+          ? `${coverageNote} [Pay in chair: R ${totalAmount.toFixed(2)} due on arrival (R ${baseServiceAmount.toFixed(2)} + R ${adminFeeAmount.toFixed(2)} platform fee)]`
+          : `Pay in chair: R ${totalAmount.toFixed(2)} due on arrival (R ${baseServiceAmount.toFixed(2)} + R ${adminFeeAmount.toFixed(2)} platform fee)`;
       }
     }
 
@@ -1245,6 +1286,8 @@ export class BarbershopService {
           start_time: startTime.toISOString(),
           end_time: endTime.toISOString(),
           status: bookingStatus,
+          base_service_amount: baseServiceAmount,
+          admin_fee_amount: adminFeeAmount,
           total_amount: totalAmount,
           payment_status: paymentStatus,
           is_subscription_covered: isCoveredBySubscription,

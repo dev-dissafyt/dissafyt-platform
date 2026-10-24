@@ -192,6 +192,11 @@ export async function POST(request: NextRequest) {
         m_payment_id: result.booking.id,
         amount: Number(result.booking.total_amount).toFixed(2),
         item_name: `Dissafyt Cut - ${serviceData?.name || 'Haircut'}`,
+        ...(result.booking.admin_fee_amount
+          ? {
+              item_description: `Haircut Service: R ${Number(result.booking.base_service_amount).toFixed(2)}, Platform Admin Fee: R ${Number(result.booking.admin_fee_amount).toFixed(2)}`,
+            }
+          : {}),
         custom_str1: result.booking.id,
         custom_str2: authCtx.userId,
         custom_str3: 'booking',

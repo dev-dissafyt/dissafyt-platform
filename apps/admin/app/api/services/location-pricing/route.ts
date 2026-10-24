@@ -24,6 +24,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    if (auth.role === 'barbershop_manager' && auth.locationId && location_id !== auth.locationId) {
+      return NextResponse.json(
+        { error: 'Forbidden: Branch managers can only configure pricing overrides for their assigned location.' },
+        { status: 403 }
+      );
+    }
+
     const result = await AdminBarbershopService.updateServiceLocationPricing(
       service_id,
       location_id,

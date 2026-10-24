@@ -39,7 +39,7 @@ import {
   Sliders,
   Store,
 } from 'lucide-react';
-import { adminFetch } from '@/lib/operator';
+import { adminFetch, getActiveOperator, AdminOperator, DEFAULT_OPERATOR } from '@/lib/operator';
 
 const SPECIALTY_LABELS: Record<string, string> = {
   barber: 'Barber',
@@ -152,6 +152,8 @@ interface BarbershopLocation {
 }
 
 export default function AdminBarbershopPage() {
+  const [operator, setOperator] = useState<AdminOperator>(DEFAULT_OPERATOR);
+  const [isBranchScoped, setIsBranchScoped] = useState(false);
   const [activeTab, setActiveTab] = useState<'appointments' | 'staff' | 'services' | 'locations'>('appointments');
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
 
@@ -296,10 +298,18 @@ export default function AdminBarbershopPage() {
     }
   }
 
-  async function loadStaff() {
+  async function loadStaff(targetBranchId?: string) {
     setLoadingStaff(true);
     try {
-      const res = await adminFetch('/api/staff');
+      const op = getActiveOperator();
+      const effectiveLoc =
+        (op.role === 'barbershop_manager' || op.role === 'barber') && op.locationId
+          ? op.locationId
+          : targetBranchId && targetBranchId !== 'all'
+          ? targetBranchId
+          : undefined;
+      const url = effectiveLoc ? `/api/staff?locationId=${effectiveLoc}` : '/api/staff';
+      const res = await adminFetch(url);
       if (res.ok) setStaffList(await res.json());
     } catch (e) {
       console.error(e);
@@ -515,7 +525,17 @@ export default function AdminBarbershopPage() {
   }
 
   useEffect(() => {
-    loadStaff();
+    const op = getActiveOperator();
+    setOperator(op);
+    const branchScoped = op.role === 'barbershop_manager' || op.role === 'barber';
+    setIsBranchScoped(branchScoped);
+    if (branchScoped && op.locationId) {
+      setSelectedBranchId(op.locationId);
+      setFilterLocationId(op.locationId);
+      setStaffLocationId(op.locationId);
+      setHoursEditingLocationId(op.locationId);
+    }
+    loadStaff(branchScoped && op.locationId ? op.locationId : undefined);
     loadLocations();
   }, []);
 
@@ -981,41 +1001,52 @@ export default function AdminBarbershopPage() {
           {/* Quick Branch Selector Dropdown */}
           <div className="flex items-center gap-2">
             <span className="text-xs text-stone-400 font-mono">Branch:</span>
-            <select
-              value={selectedBranchId}
-              onChange={(e) => setSelectedBranchId(e.target.value)}
-              className="bg-stone-950 border border-stone-700 text-white text-xs font-mono rounded px-2.5 py-1.5 focus:outline-none focus:border-amber-500 font-semibold"
-            >
-              <option value="all">🏢 All Branches &amp; Studios (Global View)</option>
-              {locations.map((loc) => (
-                <option key={loc.id} value={loc.id}>
-                  📍 {loc.name} {loc.is_flagship ? '★ FLAGSHIP' : ''} — {loc.capacity_chairs} Chairs
-                </option>
-              ))}
-            </select>
-
-            {selectedBranchId !== 'all' ? (
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1">
-                <MapPin className="w-3 h-3 text-amber-500" />
-                Active Branch View
+            {isBranchScoped ? (
+              <span className="bg-amber-500/10 border border-amber-500/30 text-amber-400 text-xs font-mono rounded px-2.5 py-1.5 font-bold flex items-center gap-1.5">
+                <MapPin className="w-3.5 h-3.5 text-amber-500" />
+                {locations.find((l) => l.id === operator.locationId)?.name || operator.locationName || 'Assigned Branch'} (Scoped View)
               </span>
             ) : (
-              <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-stone-800 text-stone-400 border border-stone-700 flex items-center gap-1">
-                Global View
-              </span>
+              <select
+                value={selectedBranchId}
+                onChange={(e) => setSelectedBranchId(e.target.value)}
+                className="bg-stone-950 border border-stone-700 text-white text-xs font-mono rounded px-2.5 py-1.5 focus:outline-none focus:border-amber-500 font-semibold"
+              >
+                <option value="all">🏢 All Branches &amp; Studios (Global View)</option>
+                {locations.map((loc) => (
+                  <option key={loc.id} value={loc.id}>
+                    📍 {loc.name} {loc.is_flagship ? '★ FLAGSHIP' : ''} — {loc.capacity_chairs} Chairs
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {!isBranchScoped && (
+              selectedBranchId !== 'all' ? (
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-amber-500/10 text-amber-400 border border-amber-500/30 flex items-center gap-1">
+                  <MapPin className="w-3 h-3 text-amber-500" />
+                  Active Branch View
+                </span>
+              ) : (
+                <span className="px-2 py-0.5 rounded text-[10px] font-mono font-bold uppercase bg-stone-800 text-stone-400 border border-stone-700 flex items-center gap-1">
+                  Global View
+                </span>
+              )
             )}
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          <Button
-            size="sm"
-            onClick={() => setShowAddLocationModal(true)}
-            className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-8 px-3"
-          >
-            <Plus className="h-3.5 w-3.5 mr-1" />
-            Add Branch
-          </Button>
+          {!isBranchScoped && (
+            <Button
+              size="sm"
+              onClick={() => setShowAddLocationModal(true)}
+              className="bg-amber-500 hover:bg-amber-400 text-black font-bold text-xs h-8 px-3"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1" />
+              Add Branch
+            </Button>
+          )}
 
           <Button
             variant="outline"

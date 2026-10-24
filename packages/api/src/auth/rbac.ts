@@ -88,8 +88,20 @@ export const ROLE_PERMISSIONS: Record<AppRole, Permission[]> = {
     'factory:update_job',
     'factory:dispatch',
   ],
+  barbershop_manager: [
+    'service:create',
+    'service:edit',
+    'staff:create',
+    'staff:edit',
+    'user:view',
+    'booking:view',
+    'booking:edit',
+    'reporting:view',
+    'payment:view',
+  ],
   barber: [
     'staff:edit', // restricted to own profile in application logic
+    'booking:view',
   ],
   creator: [
     'brand:manage_own',

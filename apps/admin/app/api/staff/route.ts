@@ -14,9 +14,13 @@ export async function GET(request: NextRequest) {
 
   try {
     const { searchParams } = new URL(request.url);
-    const locationId = searchParams.get('locationId') || undefined;
-    const staff = await AdminBarbershopService.listStaff(locationId);
-    if (auth.role === 'admin') {
+    const locationParam = searchParams.get('locationId') || undefined;
+    let targetLocationId = locationParam;
+    if ((auth.role === 'barbershop_manager' || auth.role === 'barber') && auth.locationId) {
+      targetLocationId = auth.locationId;
+    }
+    const staff = await AdminBarbershopService.listStaff(targetLocationId);
+    if (auth.role === 'admin' || auth.role === 'barbershop_manager') {
       return NextResponse.json(staff);
     }
     const scopedStaff = staff.map((s) =>
@@ -58,6 +62,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Display name is required' }, { status: 400 });
     }
 
+    const assignedLocationId = auth.role === 'barbershop_manager' ? (auth.locationId || location_id) : (location_id || undefined);
+
     const result = await AdminBarbershopService.createStaff(
       {
         display_name,
@@ -65,7 +71,7 @@ export async function POST(request: NextRequest) {
         phone: phone || undefined,
         is_active: is_active !== undefined ? is_active : true,
         user_id: user_id || null,
-        location_id: location_id || undefined,
+        location_id: assignedLocationId,
         commission_split_pct: commission_split_pct !== undefined ? Number(commission_split_pct) : undefined,
         payfast_merchant_id: payfast_merchant_id || undefined,
         bank_name: bank_name || undefined,

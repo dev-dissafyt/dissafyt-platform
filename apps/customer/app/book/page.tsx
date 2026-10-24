@@ -94,6 +94,7 @@ interface LocationOption {
   longitude?: number | null;
   distanceKm?: number | null;
   distanceFormatted?: string | null;
+  admin_fee_pct?: number;
 }
 
 // Fallback GPS coordinates for known branches (Cape Town / Kraaifontein)
@@ -833,6 +834,22 @@ function BookContent() {
                 </span>
               )}
             </div>
+            {confirmedBooking.base_service_amount && confirmedBooking.admin_fee_amount && (
+              <div className="space-y-1 pt-2 border-t border-zinc-800 text-xs text-zinc-400">
+                <div className="flex justify-between">
+                  <span>Haircut Service:</span>
+                  <span className="font-mono text-zinc-200">
+                    R {Number(confirmedBooking.base_service_amount).toFixed(2)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Platform Admin Fee:</span>
+                  <span className="font-mono text-zinc-200">
+                    R {Number(confirmedBooking.admin_fee_amount).toFixed(2)}
+                  </span>
+                </div>
+              </div>
+            )}
             <div className="flex justify-between pt-1">
               <span className="text-xs text-zinc-400 uppercase tracking-wider">Total</span>
               <span className="text-sm font-bold text-white">
@@ -1340,11 +1357,24 @@ function BookContent() {
                             </span>
                           );
                         }
+                        const effectivePrice = Number(service.effective_price ?? service.price);
+                        const hasCustomPrice =
+                          service.effective_price !== undefined &&
+                          service.effective_price !== null &&
+                          Number(service.effective_price) !== Number(service.price);
+
                         return (
                           <div className="text-right">
-                            <span className="text-sm font-bold text-white">
-                              R {Number(service.price).toFixed(2)}
-                            </span>
+                            <div className="flex items-baseline justify-end gap-1.5">
+                              <span className="text-sm font-bold text-white">
+                                R {effectivePrice.toFixed(2)}
+                              </span>
+                              {hasCustomPrice && (
+                                <span className="text-[10px] text-zinc-500 line-through">
+                                  R {Number(service.price).toFixed(2)}
+                                </span>
+                              )}
+                            </div>
                             {hasActiveSubscription && cov.reason && (
                               <div className="text-[9px] text-zinc-400">{cov.reason}</div>
                             )}
@@ -1578,24 +1608,66 @@ function BookContent() {
               </div>
             </div>
 
-            <div className="flex justify-between items-center text-sm font-bold">
-              <span className="text-zinc-300">Appointment Fee</span>
+            {/* Transparent Pricing Breakdown: Haircut + Platform Admin Fee */}
+            <div className="space-y-2.5 pt-3 border-t border-zinc-800">
+              <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-zinc-400">
+                <span>Fee Breakdown</span>
+                <span className="text-[10px] text-amber-400 font-mono font-bold bg-amber-500/10 px-2 py-0.5 rounded border border-amber-500/20">
+                  {selectedLocation?.admin_fee_pct ?? 5}% Platform Fee Included
+                </span>
+              </div>
+
               {(() => {
                 const cov = isServiceCovered(selectedService);
                 if (hasActiveSubscription && cov.covered) {
                   return (
-                    <span className="text-lg text-emerald-400">
-                      Included <span className="text-[10px] text-zinc-500 font-normal">in Membership (R0.00)</span>
-                    </span>
+                    <div className="flex justify-between items-center text-sm font-bold">
+                      <span className="text-zinc-300">Appointment Fee</span>
+                      <span className="text-lg text-emerald-400">
+                        Included <span className="text-[10px] text-zinc-500 font-normal">in Membership (R0.00)</span>
+                      </span>
+                    </div>
                   );
                 }
+
+                const basePrice = selectedService
+                  ? Number(selectedService.effective_price ?? selectedService.price)
+                  : 0;
+                const adminFeePct = Number(selectedLocation?.admin_fee_pct ?? 5.00);
+                const adminFeeAmount = Number(((basePrice * adminFeePct) / 100).toFixed(2));
+                const totalAmount = Number((basePrice + adminFeeAmount).toFixed(2));
+
                 return (
-                  <div className="text-right">
-                    <span className="text-lg text-white">
-                      R {selectedService ? Number(selectedService.price).toFixed(2) : '0.00'}
-                    </span>
+                  <div className="space-y-2 text-xs rounded-xl bg-zinc-950/60 border border-zinc-800/80 p-3">
+                    <div className="flex justify-between items-center text-zinc-300">
+                      <span className="flex items-center gap-1.5 font-medium">
+                        <Scissors className="h-3.5 w-3.5 text-amber-500" />
+                        <span>{selectedService?.name || 'Haircut Service'}</span>
+                      </span>
+                      <span className="font-mono text-white">
+                        R {basePrice.toFixed(2)}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center text-zinc-400">
+                      <span className="flex items-center gap-1.5">
+                        <ShieldCheck className="h-3.5 w-3.5 text-amber-500/70" />
+                        <span>Platform Admin Fee ({adminFeePct}%)</span>
+                      </span>
+                      <span className="font-mono text-zinc-300">
+                        R {adminFeeAmount.toFixed(2)}
+                      </span>
+                    </div>
+
+                    <div className="flex justify-between items-center pt-2 border-t border-zinc-800 text-sm font-bold">
+                      <span className="text-white">Total Due Today</span>
+                      <span className="text-lg font-mono text-amber-400">
+                        R {totalAmount.toFixed(2)}
+                      </span>
+                    </div>
+
                     {hasActiveSubscription && cov.reason && (
-                      <div className="text-[10px] text-amber-400 font-normal">
+                      <div className="text-[10px] text-amber-400 pt-1">
                         {cov.reason}
                       </div>
                     )}
@@ -1671,8 +1743,12 @@ function BookContent() {
                     if (hasActiveSubscription && cov.covered) {
                       return 'Confirm Appointment (Included in Membership)';
                     }
-                    const priceStr = `R ${selectedService ? Number(selectedService.price).toFixed(2) : '0.00'}`;
-                    return `Pay with PayFast (${priceStr})`;
+                    const basePrice = selectedService
+                      ? Number(selectedService.effective_price ?? selectedService.price)
+                      : 0;
+                    const adminFeePct = Number(selectedLocation?.admin_fee_pct ?? 5.00);
+                    const totalAmount = Number((basePrice + (basePrice * adminFeePct) / 100).toFixed(2));
+                    return `Pay with PayFast (R ${totalAmount.toFixed(2)})`;
                   })()}
             </Button>
           </Card>
