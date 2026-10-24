@@ -10,7 +10,7 @@ export default function PrivacyPolicyPage() {
   const lastUpdated = 'September 11, 2026';
 
   return (
-    <div className="min-h-screen bg-black text-zinc-300 py-16 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background text-foreground py-16 px-4 sm:px-6 lg:px-8">
       <div className="max-w-4xl mx-auto space-y-12">
         {/* Header */}
         <div className="border-b border-zinc-800 pb-8">

@@ -8,7 +8,7 @@ export const metadata: Metadata = {
 
 export default function DataDeletionPage() {
   return (
-    <div className="min-h-screen bg-black text-zinc-300 py-16 px-4 sm:px-6 lg:px-8">
+    <div className="min-h-screen bg-background text-foreground py-16 px-4 sm:px-6 lg:px-8">
       <div className="max-w-3xl mx-auto space-y-10">
         <div className="border-b border-zinc-800 pb-8">
           <div className="flex items-center space-x-2 text-xs font-mono text-amber-500 uppercase tracking-widest mb-3">

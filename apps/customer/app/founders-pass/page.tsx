@@ -58,7 +58,7 @@ export default async function FoundersPassPage() {
   const pricePerCut = (pricePerPass / (totalCuts || 1)).toFixed(0);
 
   return (
-    <div className="min-h-screen bg-black text-white selection:bg-[#ff5500] selection:text-black">
+    <div className="min-h-screen bg-background text-foreground selection:bg-[#ff5500] selection:text-black">
       {/* Top Banner Navigation / Breadcrumb */}
       <div className="border-b border-zinc-900 bg-zinc-950/70 backdrop-blur sticky top-0 z-40">
         <div className="container mx-auto max-w-7xl px-4 sm:px-6 py-3 flex items-center justify-between text-xs font-mono">

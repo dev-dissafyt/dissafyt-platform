@@ -46,7 +46,7 @@ export default async function HomePage() {
   const maxSons = fatherSonService?.max_sons ? Number(fatherSonService.max_sons) : 3;
 
   return (
-    <div className="space-y-16 sm:space-y-24 pb-24 overflow-x-hidden bg-black text-white">
+    <div className="space-y-16 sm:space-y-24 pb-24 overflow-x-hidden bg-background text-foreground">
       {/* ============================================================== */}
       {/* 1. SECTION 1: THE FOUNDER'S PASS BANNER (Milestone Campaign)   */}
       {/* ============================================================== */}

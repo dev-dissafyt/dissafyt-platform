@@ -13,8 +13,9 @@
 :root.light,
 html.light,
 .light {
-  --background: #f8fafc;
+  --background: #fafafa;
   --foreground: #09090b;
+  color-scheme: light;
 }
 
 :root.dark,
@@ -22,14 +23,287 @@ html.dark,
 .dark {
   --background: #000000;
   --foreground: #fafafa;
+  color-scheme: dark;
 }
 
 body {
   color: var(--foreground);
-  background: var(--background);
+  background-color: var(--background);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans', 'Helvetica Neue', sans-serif;
   overflow-x: hidden;
   transition: background-color 0.25s ease, color 0.25s ease;
+}
+
+/* ========================================================================== */
+/* LIGHT MODE THEME OVERRIDES (CRISP EDITORIAL / LUXURY GALLERY AESTHETIC)    */
+/* ========================================================================== */
+
+html.light body {
+  background-color: #fafafa !important;
+  color: #09090b !important;
+}
+
+/* Base Surfaces: Map pitch black & dark zincs to clean white / slate */
+html.light .bg-black {
+  background-color: #ffffff !important;
+}
+
+html.light .bg-zinc-950,
+html.light .bg-stone-950,
+html.light .bg-neutral-950 {
+  background-color: #ffffff !important;
+}
+
+html.light .bg-zinc-900,
+html.light .bg-stone-900,
+html.light .bg-neutral-900 {
+  background-color: #f8fafc !important;
+}
+
+html.light .bg-zinc-800,
+html.light .bg-stone-800,
+html.light .bg-neutral-800 {
+  background-color: #f1f5f9 !important;
+}
+
+/* Translucent Surface Variants */
+html.light .bg-black\/95,
+html.light .bg-zinc-950\/95,
+html.light .bg-zinc-950\/98 {
+  background-color: rgba(255, 255, 255, 0.95) !important;
+}
+
+html.light .bg-black\/90,
+html.light .bg-zinc-950\/90 {
+  background-color: rgba(255, 255, 255, 0.92) !important;
+}
+
+html.light .bg-black\/80,
+html.light .bg-zinc-950\/80 {
+  background-color: rgba(255, 255, 255, 0.88) !important;
+}
+
+html.light .bg-black\/60,
+html.light .bg-zinc-950\/70,
+html.light .bg-zinc-950\/60 {
+  background-color: rgba(255, 255, 255, 0.82) !important;
+}
+
+html.light .bg-zinc-900\/95,
+html.light .bg-zinc-900\/90,
+html.light .bg-zinc-900\/80,
+html.light .bg-zinc-900\/70 {
+  background-color: rgba(248, 250, 252, 0.94) !important;
+}
+
+html.light .bg-zinc-900\/60,
+html.light .bg-zinc-900\/50 {
+  background-color: rgba(241, 245, 249, 0.88) !important;
+}
+
+html.light .bg-zinc-800\/90,
+html.light .bg-zinc-800\/80,
+html.light .bg-zinc-800\/70,
+html.light .bg-zinc-800\/60,
+html.light .bg-zinc-800\/50 {
+  background-color: rgba(226, 232, 240, 0.85) !important;
+}
+
+/* Dialog / Modal Scrim Overlays */
+html.light div.fixed.inset-0.bg-black\/80,
+html.light .fixed.inset-0[class*="bg-black"] {
+  background-color: rgba(15, 23, 42, 0.5) !important;
+}
+
+/* Subtle Borders */
+html.light .border-zinc-900,
+html.light .border-stone-900,
+html.light .border-neutral-900,
+html.light .border-zinc-800,
+html.light .border-stone-800,
+html.light .border-neutral-800 {
+  border-color: #e2e8f0 !important;
+}
+
+html.light .border-zinc-700,
+html.light .border-stone-700,
+html.light .border-neutral-700 {
+  border-color: #cbd5e1 !important;
+}
+
+html.light .border-zinc-800\/90,
+html.light .border-zinc-800\/80,
+html.light .border-zinc-800\/60,
+html.light .border-zinc-900\/80 {
+  border-color: rgba(226, 232, 240, 0.9) !important;
+}
+
+/* High-Contrast Typography */
+html.light .text-white,
+html.light .text-zinc-50,
+html.light .text-zinc-100 {
+  color: #09090b !important;
+}
+
+html.light .text-zinc-200,
+html.light .text-zinc-300 {
+  color: #1e293b !important;
+}
+
+html.light .text-zinc-400 {
+  color: #475569 !important;
+}
+
+html.light .text-zinc-500 {
+  color: #64748b !important;
+}
+
+html.light .text-zinc-600 {
+  color: #475569 !important;
+}
+
+/* Interactive Hover States */
+html.light .hover\:text-white:hover {
+  color: #09090b !important;
+}
+
+html.light .hover\:bg-zinc-900:hover {
+  background-color: #f1f5f9 !important;
+}
+
+html.light .hover\:bg-zinc-800:hover {
+  background-color: #e2e8f0 !important;
+}
+
+html.light .hover\:border-zinc-700:hover,
+html.light .hover\:border-zinc-600:hover {
+  border-color: #cbd5e1 !important;
+}
+
+html.light .hover\:border-white:hover {
+  border-color: #09090b !important;
+}
+
+/* Dark CTA buttons that invert on hover: e.g. "Enter Full Drop Room" */
+html.light .bg-zinc-900.text-white {
+  background-color: #09090b !important;
+  color: #ffffff !important;
+}
+html.light .bg-zinc-900.text-white:hover {
+  background-color: #27272a !important;
+  color: #ffffff !important;
+}
+
+/* Brand Button Integrity: Amber & Voltage Orange Buttons Always Have Deep Ink Text */
+html.light .bg-amber-500,
+html.light .bg-amber-400,
+html.light .bg-orange-500,
+html.light [class*="bg-amber-500"],
+html.light [class*="bg-amber-400"] {
+  color: #000000 !important;
+}
+
+html.light .bg-amber-500 *,
+html.light .bg-amber-400 *,
+html.light .bg-orange-500 * {
+  color: #000000 !important;
+}
+
+/* High-Contrast Accessible Text for Amber Badges on Light Backgrounds */
+html.light .text-amber-400 {
+  color: #d97706 !important;
+}
+
+html.light .text-amber-300 {
+  color: #b45309 !important;
+}
+
+html.light .text-orange-400 {
+  color: #ea580c !important;
+}
+
+html.light .bg-amber-500\/10 {
+  background-color: rgba(245, 158, 11, 0.12) !important;
+}
+
+html.light .border-amber-500\/20,
+html.light .border-amber-500\/30 {
+  border-color: rgba(217, 119, 6, 0.3) !important;
+}
+
+/* Tailwind Gradient Stops Translation for Hero Banners */
+html.light .from-black {
+  --tw-gradient-from: #f8fafc var(--tw-gradient-from-position) !important;
+  --tw-gradient-to: rgb(248 250 252 / 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to) !important;
+}
+
+html.light .via-zinc-950 {
+  --tw-gradient-to: rgb(255 255 255 / 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), #ffffff var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+}
+
+html.light .to-black {
+  --tw-gradient-to: #f8fafc var(--tw-gradient-to-position) !important;
+}
+
+html.light .via-zinc-900 {
+  --tw-gradient-to: rgb(241 245 249 / 0) var(--tw-gradient-to-position) !important;
+  --tw-gradient-stops: var(--tw-gradient-from), #f1f5f9 var(--tw-gradient-via-position), var(--tw-gradient-to) !important;
+}
+
+html.light .to-zinc-950 {
+  --tw-gradient-to: #ffffff var(--tw-gradient-to-position) !important;
+}
+
+/* Form Inputs & Fields in Light Mode */
+html.light input:not([type="checkbox"]):not([type="radio"]),
+html.light select,
+html.light textarea {
+  background-color: #ffffff !important;
+  color: #09090b !important;
+  border-color: #e2e8f0 !important;
+}
+
+html.light input::placeholder,
+html.light textarea::placeholder {
+  color: #94a3b8 !important;
+}
+
+/* Elevated Light Mode Shadows */
+html.light .shadow-xl {
+  box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 8px 10px -6px rgba(0, 0, 0, 0.03) !important;
+}
+
+html.light .shadow-2xl {
+  box-shadow: 0 20px 40px -12px rgba(0, 0, 0, 0.08) !important;
+}
+
+/* Brand Dissafyt Logo Inversion in Light Mode (Crisp Deep Ink on White) */
+html.light img[src*="logo.png"],
+html.light [alt="Dissafyt"] {
+  filter: invert(1) brightness(0.08) !important;
+}
+
+/* Founder Pass 3D Metal Card Protection: Keep the VIP Metallic Card Dark & Luxurious */
+html.light .card-scene .card {
+  background: linear-gradient(145deg, #181512, #0d0a08) !important;
+  border: 1px solid rgba(255, 85, 0, 0.5) !important;
+}
+
+html.light .card-scene .card-number,
+html.light .card-scene .card-name,
+html.light .card-scene .card-expiry {
+  color: rgba(255, 255, 255, 0.95) !important;
+}
+
+html.light .card-scene .card-type {
+  color: #ff5500 !important;
+}
+
+/* Dot grid background in light mode */
+html.light .bg-grid {
+  background-image: radial-gradient(rgba(255, 85, 0, 0.14) 1px, transparent 1px) !important;
 }
 
 .font-display {

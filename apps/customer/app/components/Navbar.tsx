@@ -68,8 +68,8 @@ export function Navbar() {
     <header
       className={`sticky top-0 z-50 w-full transition-all duration-250 ease-out border-b ${
         scrolled
-          ? 'border-zinc-800/90 bg-zinc-950/95 backdrop-blur-md shadow-lg shadow-black/40 dark:bg-zinc-950/95 dark:border-zinc-800/90 light:bg-white/95 light:border-zinc-200'
-          : 'border-zinc-800/60 bg-zinc-950/80 backdrop-blur-sm dark:bg-zinc-950/80 dark:border-zinc-800/60 light:bg-white/80 light:border-zinc-200/80'
+          ? 'border-zinc-200/90 bg-white/95 dark:border-zinc-800/90 dark:bg-zinc-950/95 backdrop-blur-md shadow-md shadow-zinc-200/50 dark:shadow-black/40'
+          : 'border-zinc-200/60 bg-white/80 dark:border-zinc-800/60 dark:bg-zinc-950/80 backdrop-blur-sm'
       }`}
     >
       <div className="container mx-auto flex h-16 max-w-7xl items-center justify-between px-4 sm:px-6">
@@ -85,7 +85,7 @@ export function Navbar() {
               priority
             />
           </Link>
-          <span className="hidden sm:inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full border border-zinc-800 bg-zinc-900/80 text-[10px] font-mono tracking-widest text-zinc-400">
+          <span className="hidden sm:inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full border border-zinc-200 bg-zinc-100/80 dark:border-zinc-800 dark:bg-zinc-900/80 text-[10px] font-mono tracking-widest text-zinc-600 dark:text-zinc-400">
             <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
             <span>CPT // FLAGSHIP</span>
           </span>
@@ -102,11 +102,11 @@ export function Navbar() {
                 href={link.href}
                 className={`inline-flex items-center space-x-1.5 py-1 border-b-2 transition-all duration-200 hover:scale-[1.03] active:scale-95 ${
                   isActive
-                    ? 'border-amber-500 text-white font-bold'
-                    : 'border-transparent text-zinc-400 hover:text-white hover:border-zinc-600'
+                    ? 'border-amber-500 text-zinc-900 dark:text-white font-bold'
+                    : 'border-transparent text-zinc-600 hover:text-black hover:border-zinc-300 dark:text-zinc-400 dark:hover:text-white dark:hover:border-zinc-600'
                 }`}
               >
-                <Icon className={`h-3.5 w-3.5 transition-colors ${isActive ? 'text-amber-500' : 'text-zinc-400 group-hover:text-white'}`} />
+                <Icon className={`h-3.5 w-3.5 transition-colors ${isActive ? 'text-amber-500' : 'text-zinc-500 group-hover:text-black dark:text-zinc-400 dark:group-hover:text-white'}`} />
                 <span>{link.label}</span>
               </Link>
             );
@@ -119,13 +119,13 @@ export function Navbar() {
           <button
             type="button"
             onClick={handleOpenSearch}
-            className="inline-flex h-9 items-center space-x-2 rounded-lg border border-zinc-800 bg-zinc-900/90 px-3 text-xs font-medium text-zinc-400 transition-all duration-200 hover:border-zinc-700 hover:bg-zinc-800 hover:text-white hover:scale-[1.02] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            className="inline-flex h-9 items-center space-x-2 rounded-lg border border-zinc-200 bg-zinc-100/90 dark:border-zinc-800 dark:bg-zinc-900/90 px-3 text-xs font-medium text-zinc-600 dark:text-zinc-400 transition-all duration-200 hover:border-zinc-300 hover:bg-zinc-200 hover:text-black dark:hover:border-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-white hover:scale-[1.02] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
             aria-label="Search platform"
             title="Search garments and services (Cmd+K)"
           >
-            <Search className="h-3.5 w-3.5 text-zinc-400" />
+            <Search className="h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
             <span className="hidden lg:inline">Search</span>
-            <kbd className="rounded border border-zinc-700 bg-zinc-800/80 px-1.5 py-0.5 text-[9px] font-mono text-zinc-400">
+            <kbd className="rounded border border-zinc-300 bg-zinc-200/80 dark:border-zinc-700 dark:bg-zinc-800/80 px-1.5 py-0.5 text-[9px] font-mono text-zinc-600 dark:text-zinc-400">
               ⌘K
             </kbd>
           </button>
@@ -137,10 +137,10 @@ export function Navbar() {
           <button
             type="button"
             onClick={openCart}
-            className="relative inline-flex h-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/90 px-3 text-xs font-medium text-zinc-300 transition-all duration-200 hover:border-zinc-700 hover:bg-zinc-800 hover:text-white hover:scale-[1.02] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            className="relative inline-flex h-9 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-100/90 dark:border-zinc-800 dark:bg-zinc-900/90 px-3 text-xs font-medium text-zinc-700 dark:text-zinc-300 transition-all duration-200 hover:border-zinc-300 hover:bg-zinc-200 hover:text-black dark:hover:border-zinc-700 dark:hover:bg-zinc-800 dark:hover:text-white hover:scale-[1.02] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
             aria-label={`Open shopping cart (${totalCount} items)`}
           >
-            <ShoppingBag className="mr-1.5 h-3.5 w-3.5 text-zinc-400" />
+            <ShoppingBag className="mr-1.5 h-3.5 w-3.5 text-zinc-500 dark:text-zinc-400" />
             <span>Cart</span>
             {totalCount > 0 && (
               <span className="ml-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-amber-500 px-1.5 text-[10px] font-black text-black animate-in zoom-in-50">
@@ -152,7 +152,7 @@ export function Navbar() {
           {user ? (
             <Link
               href="/account"
-              className="inline-flex h-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/90 px-3.5 text-xs font-semibold text-zinc-200 transition-all duration-200 hover:border-zinc-700 hover:bg-zinc-800 hover:scale-[1.02] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              className="inline-flex h-9 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-100/90 dark:border-zinc-800 dark:bg-zinc-900/90 px-3.5 text-xs font-semibold text-zinc-700 dark:text-zinc-200 transition-all duration-200 hover:border-zinc-300 hover:bg-zinc-200 dark:hover:border-zinc-700 dark:hover:bg-zinc-800 hover:scale-[1.02] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
             >
               <User className="mr-1.5 h-3.5 w-3.5 text-amber-500" />
               Account
@@ -160,7 +160,7 @@ export function Navbar() {
           ) : (
             <Link
               href="/auth/login"
-              className="inline-flex h-9 items-center justify-center rounded-lg border border-zinc-800 bg-zinc-900/90 px-3.5 text-xs font-medium text-zinc-200 transition-all duration-200 hover:border-zinc-700 hover:bg-zinc-800 hover:scale-[1.02] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+              className="inline-flex h-9 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-100/90 dark:border-zinc-800 dark:bg-zinc-900/90 px-3.5 text-xs font-medium text-zinc-700 dark:text-zinc-200 transition-all duration-200 hover:border-zinc-300 hover:bg-zinc-200 dark:hover:border-zinc-700 dark:hover:bg-zinc-800 hover:scale-[1.02] active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
             >
               Sign In
             </Link>
@@ -181,7 +181,7 @@ export function Navbar() {
           <button
             type="button"
             onClick={handleOpenSearch}
-            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-zinc-300 hover:text-white transition-all active:scale-95"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-zinc-200 bg-zinc-100 text-zinc-700 hover:text-black dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:text-white transition-all active:scale-95"
             aria-label="Search site"
           >
             <Search className="h-4 w-4" />
@@ -194,7 +194,7 @@ export function Navbar() {
           <button
             type="button"
             onClick={openCart}
-            className="relative inline-flex h-8 w-8 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-zinc-300 hover:text-white transition-all active:scale-95"
+            className="relative inline-flex h-8 w-8 items-center justify-center rounded-md border border-zinc-200 bg-zinc-100 text-zinc-700 hover:text-black dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:text-white transition-all active:scale-95"
             aria-label={`Open shopping cart (${totalCount} items)`}
           >
             <ShoppingBag className="h-4 w-4" />
@@ -208,7 +208,7 @@ export function Navbar() {
           {/* Mobile Menu Toggle Button */}
           <button
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-zinc-800 bg-zinc-900 text-zinc-300 hover:text-white transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
+            className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-zinc-200 bg-zinc-100 text-zinc-700 hover:text-black dark:border-zinc-800 dark:bg-zinc-900 dark:text-zinc-300 dark:hover:text-white transition-all active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-amber-500"
             aria-label="Toggle Menu"
             aria-expanded={mobileMenuOpen}
           >
@@ -219,7 +219,7 @@ export function Navbar() {
 
       {/* Mobile Dropdown / Slide-Down Menu */}
       {mobileMenuOpen && (
-        <div className="md:hidden border-b border-zinc-800 bg-zinc-950/98 backdrop-blur-xl px-4 py-5 space-y-4 animate-in slide-in-from-top-3 duration-200">
+        <div className="md:hidden border-b border-zinc-200 bg-white/98 dark:border-zinc-800 dark:bg-zinc-950/98 backdrop-blur-xl px-4 py-5 space-y-4 animate-in slide-in-from-top-3 duration-200">
           <nav className="flex flex-col space-y-2.5 text-sm font-medium">
             {navLinks.map((link) => {
               const isActive = pathname === link.href;
@@ -231,15 +231,15 @@ export function Navbar() {
                   onClick={() => setMobileMenuOpen(false)}
                   className={`flex items-center justify-between px-3 py-2.5 rounded-lg transition-all active:scale-98 ${
                     isActive
-                      ? 'bg-amber-500/10 text-amber-400 font-bold border border-amber-500/20'
-                      : 'text-zinc-300 hover:bg-zinc-900'
+                      ? 'bg-amber-500/10 text-amber-500 dark:text-amber-400 font-bold border border-amber-500/20'
+                      : 'text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900'
                   }`}
                 >
                   <span className="flex items-center space-x-3">
-                    <Icon className={`h-4 w-4 ${isActive ? 'text-amber-400' : 'text-zinc-400'}`} />
+                    <Icon className={`h-4 w-4 ${isActive ? 'text-amber-500 dark:text-amber-400' : 'text-zinc-500 dark:text-zinc-400'}`} />
                     <span>{link.label}</span>
                   </span>
-                  <ArrowRight className="h-4 w-4 text-zinc-600" />
+                  <ArrowRight className="h-4 w-4 text-zinc-400 dark:text-zinc-600" />
                 </Link>
               );
             })}
@@ -251,13 +251,13 @@ export function Navbar() {
                 setMobileMenuOpen(false);
                 handleOpenSearch();
               }}
-              className="flex items-center justify-between px-3 py-2.5 rounded-lg text-zinc-300 hover:bg-zinc-900 w-full text-left transition-all active:scale-98"
+              className="flex items-center justify-between px-3 py-2.5 rounded-lg text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900 w-full text-left transition-all active:scale-98"
             >
               <span className="flex items-center space-x-2.5">
                 <Search className="h-4 w-4 text-amber-500" />
                 <span>Search Garments & Cuts</span>
               </span>
-              <span className="rounded bg-zinc-800 border border-zinc-700 px-1.5 py-0.5 text-[10px] font-mono text-zinc-400">
+              <span className="rounded bg-zinc-100 border border-zinc-200 dark:bg-zinc-800 dark:border-zinc-700 px-1.5 py-0.5 text-[10px] font-mono text-zinc-600 dark:text-zinc-400">
                 ⌘K
               </span>
             </button>
@@ -269,7 +269,7 @@ export function Navbar() {
                 setMobileMenuOpen(false);
                 openCart();
               }}
-              className="flex items-center justify-between px-3 py-2.5 rounded-lg text-zinc-300 hover:bg-zinc-900 w-full text-left transition-all active:scale-98"
+              className="flex items-center justify-between px-3 py-2.5 rounded-lg text-zinc-700 hover:bg-zinc-100 dark:text-zinc-300 dark:hover:bg-zinc-900 w-full text-left transition-all active:scale-98"
             >
               <span className="flex items-center space-x-2.5">
                 <ShoppingBag className="h-4 w-4 text-amber-500" />
@@ -285,7 +285,7 @@ export function Navbar() {
             </button>
           </nav>
 
-          <div className="pt-4 border-t border-zinc-800/80 flex flex-col gap-2.5">
+          <div className="pt-4 border-t border-zinc-200 dark:border-zinc-800/80 flex flex-col gap-2.5">
             <Link
               href="/book"
               onClick={() => setMobileMenuOpen(false)}
@@ -298,7 +298,7 @@ export function Navbar() {
               <Link
                 href="/account"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-center h-10 rounded-lg border border-zinc-700 bg-zinc-900 text-white text-xs font-semibold hover:bg-zinc-800 transition-all active:scale-98"
+                className="flex items-center justify-center h-10 rounded-lg border border-zinc-200 bg-zinc-100 text-zinc-900 hover:bg-zinc-200 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800 text-xs font-semibold transition-all active:scale-98"
               >
                 <User className="mr-1.5 h-4 w-4 text-amber-500" /> Manage My Account
               </Link>
@@ -306,7 +306,7 @@ export function Navbar() {
               <Link
                 href="/auth/login"
                 onClick={() => setMobileMenuOpen(false)}
-                className="flex items-center justify-center h-10 rounded-lg border border-zinc-700 bg-zinc-900 text-white text-xs font-medium hover:bg-zinc-800 transition-all active:scale-98"
+                className="flex items-center justify-center h-10 rounded-lg border border-zinc-200 bg-zinc-100 text-zinc-900 hover:bg-zinc-200 dark:border-zinc-700 dark:bg-zinc-900 dark:text-white dark:hover:bg-zinc-800 text-xs font-medium transition-all active:scale-98"
               >
                 Sign In / Register
               </Link>

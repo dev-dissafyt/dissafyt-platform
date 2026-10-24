@@ -33,7 +33,14 @@ export default function RootLayout({
 
   return (
     <html lang="en" className="dark" suppressHydrationWarning>
-      <body className="min-h-screen flex flex-col bg-black text-zinc-50 antialiased selection:bg-amber-500 selection:text-black">
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `(function(){try{var t=localStorage.getItem('dissafyt_theme');if(t==='light'){document.documentElement.classList.remove('dark');document.documentElement.classList.add('light');}else if(t==='dark'){document.documentElement.classList.remove('light');document.documentElement.classList.add('dark');}}catch(e){}})();`,
+          }}
+        />
+      </head>
+      <body className="min-h-screen flex flex-col bg-background text-foreground antialiased selection:bg-amber-500 selection:text-black">
         <ThemeProvider>
           <CartProvider>
             {/* Keyboard Accessibility Skip Link */}
@@ -65,9 +72,9 @@ export default function RootLayout({
 
             {/* High-End Editorial Footer */}
             {isCustomer && (
-              <footer className="border-t border-zinc-900 bg-black py-12 text-zinc-500">
+              <footer className="border-t border-zinc-200 dark:border-zinc-900 bg-zinc-50 dark:bg-black py-12 text-zinc-600 dark:text-zinc-500">
                 <div className="container mx-auto max-w-7xl px-4 sm:px-6">
-                  <div className="grid grid-cols-1 md:grid-cols-4 gap-8 pb-10 border-b border-zinc-900">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-8 pb-10 border-b border-zinc-200 dark:border-zinc-900">
                     <div className="md:col-span-2 space-y-4">
                       <Link href="/" className="inline-block transition-transform duration-200 hover:scale-[1.02] active:scale-95">
                         <Image
@@ -94,7 +101,7 @@ export default function RootLayout({
                     </div>
 
                     <div>
-                      <h4 className="text-xs font-bold uppercase tracking-widest text-white mb-3">Pillars</h4>
+                      <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-900 dark:text-white mb-3">Pillars</h4>
                       <ul className="space-y-2 text-xs">
                         <li>
                           <Link href="/book" className="hover:text-amber-400 transition-colors">
@@ -115,7 +122,7 @@ export default function RootLayout({
                     </div>
 
                     <div>
-                      <h4 className="text-xs font-bold uppercase tracking-widest text-white mb-3">Studio & Hub</h4>
+                      <h4 className="text-xs font-bold uppercase tracking-widest text-zinc-900 dark:text-white mb-3">Studio & Hub</h4>
                       <ul className="space-y-2 text-xs text-zinc-400">
                         <li>Dissafyt Studio, Cape Town Flagship</li>
                         <li>Western Cape, South Africa</li>
