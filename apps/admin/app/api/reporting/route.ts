@@ -15,7 +15,12 @@ export async function GET(request: NextRequest) {
   if (isAuthFailure(auth)) return auth;
 
   try {
-    const metrics = await ReportingService.getOperationalMetrics();
+    const isBranchScoped = auth.role === 'barbershop_manager' || auth.role === 'barber';
+    const targetLocationId = isBranchScoped
+      ? (auth.locationId || undefined)
+      : (request.nextUrl.searchParams.get('locationId') || undefined);
+
+    const metrics = await ReportingService.getOperationalMetrics(targetLocationId);
     return NextResponse.json(metrics);
   } catch (error: any) {
     console.error('Error fetching operational metrics:', error);

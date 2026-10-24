@@ -15,7 +15,12 @@ export async function GET(request: NextRequest) {
   if (isAuthFailure(auth)) return auth;
 
   try {
-    const records = await ReportingService.getPaymentAuditLog();
+    const isBranchScoped = auth.role === 'barbershop_manager' || auth.role === 'barber';
+    const targetLocationId = isBranchScoped
+      ? (auth.locationId || undefined)
+      : (request.nextUrl.searchParams.get('locationId') || undefined);
+
+    const records = await ReportingService.getPaymentAuditLog(targetLocationId);
     return NextResponse.json(records);
   } catch (error: any) {
     console.error('Error fetching payment audit records:', error);

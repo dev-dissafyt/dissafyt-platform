@@ -108,6 +108,11 @@ export async function requireAdminAuth(
     console.error('Failed to query staff location in auth-guard:', err);
   }
 
+  // Fallback to request header or cookie if not resolved from database
+  if (!locationId) {
+    locationId = request.headers.get('x-admin-location-id') || request.cookies.get('dissafyt_admin_location_id')?.value || null;
+  }
+
   // 5. Verify RBAC permission if requested
   if (requiredPermission && !RBACService.hasPermission(role, requiredPermission)) {
     return NextResponse.json(

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button } from '@dissafyt/ui';
 import { DollarSign, ShieldCheck, ArrowUpRight, Search, RefreshCw, CreditCard, ShoppingBag, Scissors } from 'lucide-react';
 import Link from 'next/link';
-import { adminFetch } from '@/lib/operator';
+import { adminFetch, getActiveOperator, AdminOperator, DEFAULT_OPERATOR } from '@/lib/operator';
 
 interface PaymentAuditRecord {
   id: string;
@@ -26,6 +26,8 @@ export default function FinancePage() {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [filterType, setFilterType] = useState<string>('all');
+  const [operator, setOperator] = useState<AdminOperator>(DEFAULT_OPERATOR);
+  const [mounted, setMounted] = useState(false);
 
   async function fetchPayments() {
     setLoading(true);
@@ -43,8 +45,12 @@ export default function FinancePage() {
   }
 
   useEffect(() => {
+    setOperator(getActiveOperator());
+    setMounted(true);
     fetchPayments();
   }, []);
+
+  const isBranchScoped = mounted && (operator.role === 'barbershop_manager' || operator.role === 'barber');
 
   const liveRecords = records.filter((r) => (r as any).is_test !== true);
 
@@ -75,13 +81,22 @@ export default function FinancePage() {
     .filter((r) => (r.status === 'paid' || r.status === 'completed') && r.related_type === 'booking')
     .reduce((acc, curr) => acc + Number(curr.amount || 0), 0);
 
+  const branchAdminFee = totalAudited * 0.05;
+  const branchNetPayout = totalAudited * 0.95;
+
   return (
     <div className="space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white">Finance & Payment Audit</h1>
+          <h1 className="text-3xl font-bold text-white">
+            {isBranchScoped
+              ? `Branch Payouts & Settlement ${operator.locationName ? `— ${operator.locationName}` : ''}`
+              : 'Finance & Payment Audit'}
+          </h1>
           <p className="text-sm text-stone-400">
-            Immutable transaction records and PayFast settlement logs across commerce and barbershop operations.
+            {isBranchScoped
+              ? 'Itemized appointment transactions, platform fee split (5%), and net branch payout.'
+              : 'Immutable transaction records and PayFast settlement logs across commerce and barbershop operations.'}
           </p>
         </div>
         <Button
@@ -97,46 +112,93 @@ export default function FinancePage() {
 
       {/* Metric Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-        <Card className="border-stone-800 bg-stone-900/60">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-stone-300">Audited Volume</CardTitle>
-            <DollarSign className="h-4 w-4 text-emerald-400" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              R {totalAudited.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
-            </div>
-            <div className="text-[11px] text-stone-400 mt-2 flex items-center justify-between border-t border-stone-800/80 pt-2">
-              <span>Subs: R {subscriptionTotal.toFixed(0)}</span>
-              <span>&bull;</span>
-              <span>Orders: R {orderTotal.toFixed(0)}</span>
-              <span>&bull;</span>
-              <span>Walk-in: R {bookingTotal.toFixed(0)}</span>
-            </div>
-          </CardContent>
-        </Card>
+        {isBranchScoped ? (
+          <>
+            <Card className="border-stone-800 bg-stone-900/60">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-stone-300">Gross Branch Revenue</CardTitle>
+                <DollarSign className="h-4 w-4 text-emerald-400" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-white">
+                  R {totalAudited.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                </div>
+                <p className="text-xs text-stone-400 mt-2 font-mono">
+                  {liveRecords.length} completed appointments
+                </p>
+              </CardContent>
+            </Card>
 
-        <Card className="border-stone-800 bg-stone-900/60">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-stone-300">Total Transactions</CardTitle>
-            <CreditCard className="h-4 w-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">{liveRecords.length}</div>
-            <p className="text-xs text-stone-500 mt-1">Verified settled transactions</p>
-          </CardContent>
-        </Card>
+            <Card className="border-stone-800 bg-stone-900/60">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-stone-300">Platform Split (5%)</CardTitle>
+                <Scissors className="h-4 w-4 text-amber-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-amber-400">
+                  R {branchAdminFee.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                </div>
+                <p className="text-xs text-stone-500 mt-2">Dissafyt infrastructure &amp; booking fee</p>
+              </CardContent>
+            </Card>
 
-        <Card className="border-stone-800 bg-stone-900/60">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-stone-300">Active Gateway</CardTitle>
-            <ShieldCheck className="h-4 w-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">PayFast</div>
-            <p className="text-xs text-emerald-400 mt-1 font-mono">Merchant 17675995 (Live)</p>
-          </CardContent>
-        </Card>
+            <Card className="border-stone-800 bg-stone-900/60">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-stone-300">Net Branch Payout (95%)</CardTitle>
+                <ShieldCheck className="h-4 w-4 text-emerald-400" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-emerald-400">
+                  R {branchNetPayout.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                </div>
+                <p className="text-xs text-emerald-400/80 mt-2 font-mono">Payable to branch account</p>
+              </CardContent>
+            </Card>
+          </>
+        ) : (
+          <>
+            <Card className="border-stone-800 bg-stone-900/60">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-stone-300">Audited Volume</CardTitle>
+                <DollarSign className="h-4 w-4 text-emerald-400" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-white">
+                  R {totalAudited.toLocaleString('en-ZA', { minimumFractionDigits: 2 })}
+                </div>
+                <div className="text-[11px] text-stone-400 mt-2 flex items-center justify-between border-t border-stone-800/80 pt-2">
+                  <span>Subs: R {subscriptionTotal.toFixed(0)}</span>
+                  <span>&bull;</span>
+                  <span>Orders: R {orderTotal.toFixed(0)}</span>
+                  <span>&bull;</span>
+                  <span>Walk-in: R {bookingTotal.toFixed(0)}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="border-stone-800 bg-stone-900/60">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-stone-300">Total Transactions</CardTitle>
+                <CreditCard className="h-4 w-4 text-amber-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-white">{liveRecords.length}</div>
+                <p className="text-xs text-stone-500 mt-1">Verified settled transactions</p>
+              </CardContent>
+            </Card>
+
+            <Card className="border-stone-800 bg-stone-900/60">
+              <CardHeader className="flex flex-row items-center justify-between pb-2">
+                <CardTitle className="text-sm font-medium text-stone-300">Active Gateway</CardTitle>
+                <ShieldCheck className="h-4 w-4 text-amber-500" />
+              </CardHeader>
+              <CardContent>
+                <div className="text-2xl font-bold text-white">PayFast</div>
+                <p className="text-xs text-emerald-400 mt-1 font-mono">Merchant 17675995 (Live)</p>
+              </CardContent>
+            </Card>
+          </>
+        )}
       </div>
 
       {/* Filter and Search Bar */}
@@ -152,21 +214,23 @@ export default function FinancePage() {
           />
         </div>
 
-        <div className="flex gap-2">
-          {['all', 'order', 'booking', 'subscription'].map((t) => (
-            <button
-              key={t}
-              onClick={() => setFilterType(t)}
-              className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-colors ${
-                filterType === t
-                  ? 'bg-amber-500 text-stone-950 font-bold'
-                  : 'bg-stone-900 border border-stone-800 text-stone-400 hover:text-white'
-              }`}
-            >
-              {t}
-            </button>
-          ))}
-        </div>
+        {!isBranchScoped && (
+          <div className="flex gap-2">
+            {['all', 'order', 'booking', 'subscription'].map((t) => (
+              <button
+                key={t}
+                onClick={() => setFilterType(t)}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium capitalize transition-colors ${
+                  filterType === t
+                    ? 'bg-amber-500 text-stone-950 font-bold'
+                    : 'bg-stone-900 border border-stone-800 text-stone-400 hover:text-white'
+                }`}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Transaction Records Table */}

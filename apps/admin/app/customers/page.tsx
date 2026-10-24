@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input } from '@dissafyt/ui';
 import { Users, Shield, UserCheck, RefreshCw, Search } from 'lucide-react';
-import { adminFetch } from '../../lib/operator';
+import { adminFetch, getActiveOperator, AdminOperator, DEFAULT_OPERATOR } from '../../lib/operator';
 
 interface UserItem {
   id: string;
@@ -19,6 +19,8 @@ export default function AdminCustomersPage() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusMsg, setStatusMsg] = useState<string | null>(null);
+  const [operator, setOperator] = useState<AdminOperator>(DEFAULT_OPERATOR);
+  const [mounted, setMounted] = useState(false);
 
   async function loadUsers() {
     setLoading(true);
@@ -33,8 +35,12 @@ export default function AdminCustomersPage() {
   }
 
   useEffect(() => {
+    setOperator(getActiveOperator());
+    setMounted(true);
     loadUsers();
   }, []);
+
+  const isPlatformAdmin = mounted && operator.role === 'admin';
 
   async function handleToggleRole(userId: string, role: string, currentlyHas: boolean) {
     setStatusMsg(null);
@@ -134,7 +140,7 @@ export default function AdminCustomersPage() {
                     <th className="py-3 px-4">User</th>
                     <th className="py-3 px-4">Contact</th>
                     <th className="py-3 px-4">Assigned Roles</th>
-                    <th className="py-3 px-4 text-right">Role Management</th>
+                    {isPlatformAdmin && <th className="py-3 px-4 text-right">Role Management</th>}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-stone-800">
@@ -171,31 +177,33 @@ export default function AdminCustomersPage() {
                             ))}
                           </div>
                         </td>
-                        <td className="py-3 px-4 text-right space-x-2">
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleToggleRole(user.id, 'admin', isAdmin)}
-                            className={`border-stone-700 text-xs ${
-                              isAdmin ? 'bg-red-500/20 text-red-300' : 'hover:bg-stone-800 text-stone-300'
-                            }`}
-                          >
-                            <Shield className="mr-1 h-3 w-3" />
-                            {isAdmin ? 'Revoke Admin' : 'Make Admin'}
-                          </Button>
+                        {isPlatformAdmin && (
+                          <td className="py-3 px-4 text-right space-x-2">
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleToggleRole(user.id, 'admin', isAdmin)}
+                              className={`border-stone-700 text-xs ${
+                                isAdmin ? 'bg-red-500/20 text-red-300' : 'hover:bg-stone-800 text-stone-300'
+                              }`}
+                            >
+                              <Shield className="mr-1 h-3 w-3" />
+                              {isAdmin ? 'Revoke Admin' : 'Make Admin'}
+                            </Button>
 
-                          <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => handleToggleRole(user.id, 'barber', isBarber)}
-                            className={`border-stone-700 text-xs ${
-                              isBarber ? 'bg-amber-500/20 text-amber-300' : 'hover:bg-stone-800 text-stone-300'
-                            }`}
-                          >
-                            <UserCheck className="mr-1 h-3 w-3" />
-                            {isBarber ? 'Revoke Barber' : 'Make Barber'}
-                          </Button>
-                        </td>
+                            <Button
+                              variant="outline"
+                              size="sm"
+                              onClick={() => handleToggleRole(user.id, 'barber', isBarber)}
+                              className={`border-stone-700 text-xs ${
+                                isBarber ? 'bg-amber-500/20 text-amber-300' : 'hover:bg-stone-800 text-stone-300'
+                              }`}
+                            >
+                              <UserCheck className="mr-1 h-3 w-3" />
+                              {isBarber ? 'Revoke Barber' : 'Make Barber'}
+                            </Button>
+                          </td>
+                        )}
                       </tr>
                     );
                   })}

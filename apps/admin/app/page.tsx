@@ -24,7 +24,7 @@ import {
   Sliders,
 } from 'lucide-react';
 import Link from 'next/link';
-import { adminFetch } from '@/lib/operator';
+import { adminFetch, getActiveOperator, AdminOperator, DEFAULT_OPERATOR } from '@/lib/operator';
 
 interface OperationalMetrics {
   overview: {
@@ -108,13 +108,17 @@ export default function AdminDashboardPage() {
   const [metrics, setMetrics] = useState<OperationalMetrics | null>(null);
   const [batchData, setBatchData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
+  const [operator, setOperator] = useState<AdminOperator>(DEFAULT_OPERATOR);
+  const [mounted, setMounted] = useState(false);
 
   async function fetchMetrics() {
     setLoading(true);
     try {
+      const activeOp = getActiveOperator();
+      const isScoped = activeOp.role === 'barbershop_manager' || activeOp.role === 'barber';
       const [reportingRes, batchRes] = await Promise.all([
         adminFetch('/api/reporting'),
-        adminFetch('/api/batches').catch(() => null),
+        isScoped ? Promise.resolve(null) : adminFetch('/api/batches').catch(() => null),
       ]);
       if (reportingRes.ok) {
         const data = await reportingRes.json();
@@ -132,17 +136,27 @@ export default function AdminDashboardPage() {
   }
 
   useEffect(() => {
+    setOperator(getActiveOperator());
+    setMounted(true);
     fetchMetrics();
   }, []);
+
+  const isBranchScoped = mounted && (operator.role === 'barbershop_manager' || operator.role === 'barber');
 
   return (
     <div className="space-y-8">
       {/* Page Header */}
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white">Operations & Executive Overview</h1>
+          <h1 className="text-3xl font-bold text-white">
+            {isBranchScoped
+              ? `${operator.locationName || 'Branch'} Daily Operations`
+              : 'Operations & Executive Overview'}
+          </h1>
           <p className="text-sm text-stone-400">
-            Real-time unified intelligence across Dissafyt Streetwear, Pre-order Drops, and Ace of Fyt Barbershop.
+            {isBranchScoped
+              ? 'Real-time appointment schedule, specialist roster, and branch gross volume.'
+              : 'Real-time unified intelligence across Dissafyt Streetwear, Pre-order Drops, and Ace of Fyt Barbershop.'}
           </p>
         </div>
         <Button
@@ -162,7 +176,9 @@ export default function AdminDashboardPage() {
         <Card className="border-stone-800 bg-stone-900/60 relative overflow-hidden">
           <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-amber-500 to-emerald-500" />
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-stone-300">Total Gross Volume</CardTitle>
+            <CardTitle className="text-sm font-medium text-stone-300">
+              {isBranchScoped ? 'Branch Gross Volume' : 'Total Gross Volume'}
+            </CardTitle>
             <DollarSign className="h-4 w-4 text-emerald-400" />
           </CardHeader>
           <CardContent>
@@ -175,61 +191,88 @@ export default function AdminDashboardPage() {
                 })}`
               )}
             </div>
-            <div className="text-[11px] text-stone-400 mt-2 flex flex-wrap items-center gap-1.5 border-t border-stone-800/80 pt-2 font-mono">
-              <span>In-Stock: R {(metrics?.overview.inStockCommerceRevenue ?? metrics?.overview.commerceRevenue ?? 0).toFixed(0)}</span>
-              <span>&bull;</span>
-              <span className="text-amber-400">Pre-orders: R {(metrics?.overview.preorderRevenue || 0).toFixed(0)}</span>
-              <span>&bull;</span>
-              <span>Barber: R {(metrics?.overview.barbershopRevenue || 0).toFixed(0)}</span>
-              {(metrics?.overview.founderPassRevenue || 0) > 0 && (
-                <>
-                  <span>&bull;</span>
-                  <span className="text-amber-500 font-bold">Founder: R {(metrics?.overview.founderPassRevenue || 0).toFixed(0)}</span>
-                </>
-              )}
-            </div>
+            {isBranchScoped ? (
+              <p className="text-xs text-stone-400 mt-2 font-mono">
+                {metrics?.overview.totalBookings || 0} total scheduled appointments
+              </p>
+            ) : (
+              <div className="text-[11px] text-stone-400 mt-2 flex flex-wrap items-center gap-1.5 border-t border-stone-800/80 pt-2 font-mono">
+                <span>In-Stock: R {(metrics?.overview.inStockCommerceRevenue ?? metrics?.overview.commerceRevenue ?? 0).toFixed(0)}</span>
+                <span>&bull;</span>
+                <span className="text-amber-400">Pre-orders: R {(metrics?.overview.preorderRevenue || 0).toFixed(0)}</span>
+                <span>&bull;</span>
+                <span>Barber: R {(metrics?.overview.barbershopRevenue || 0).toFixed(0)}</span>
+                {(metrics?.overview.founderPassRevenue || 0) > 0 && (
+                  <>
+                    <span>&bull;</span>
+                    <span className="text-amber-500 font-bold">Founder: R {(metrics?.overview.founderPassRevenue || 0).toFixed(0)}</span>
+                  </>
+                )}
+              </div>
+            )}
           </CardContent>
         </Card>
 
         {/* Total Customers */}
         <Card className="border-stone-800 bg-stone-900/60">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-stone-300">Registered Users</CardTitle>
+            <CardTitle className="text-sm font-medium text-stone-300">
+              {isBranchScoped ? 'Branch Clients' : 'Registered Users'}
+            </CardTitle>
             <Users className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">
               {loading ? '...' : metrics?.overview.totalCustomers ?? 0}
             </div>
-            <p className="text-xs text-stone-500 mt-1">Unified Dissafyt Profiles</p>
+            <p className="text-xs text-stone-500 mt-1">
+              {isBranchScoped ? 'Distinct clients at this branch' : 'Unified Dissafyt Profiles'}
+            </p>
           </CardContent>
         </Card>
 
-        {/* Commerce Orders & Pre-orders */}
-        <Card className="border-stone-800 bg-stone-900/60">
-          <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-stone-300">Commerce & Pre-orders</CardTitle>
-            <ShoppingBag className="h-4 w-4 text-amber-500" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold text-white">
-              {loading ? '...' : metrics?.overview.totalOrders ?? 0}
-            </div>
-            <div className="text-xs text-stone-400 mt-2 flex flex-wrap items-center gap-1.5">
-              <span className="text-amber-400 font-medium">
-                {metrics?.overview.preorderOrdersCount ?? 0} Pre-orders ({metrics?.overview.preorderUnitsCount ?? 0} pcs)
-              </span>
-              <span>&bull;</span>
-              <span className="text-emerald-400 font-medium">{metrics?.orders.paid ?? 0} Paid</span>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Card 3: Specialists (Branch) vs Commerce (Admin) */}
+        {isBranchScoped ? (
+          <Card className="border-stone-800 bg-stone-900/60">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-stone-300">Active Specialists</CardTitle>
+              <Scissors className="h-4 w-4 text-amber-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-white">
+                {loading ? '...' : metrics?.barberPerformance.length ?? 0}
+              </div>
+              <p className="text-xs text-stone-500 mt-1">Grooming specialists on roster</p>
+            </CardContent>
+          </Card>
+        ) : (
+          <Card className="border-stone-800 bg-stone-900/60">
+            <CardHeader className="flex flex-row items-center justify-between pb-2">
+              <CardTitle className="text-sm font-medium text-stone-300">Commerce &amp; Pre-orders</CardTitle>
+              <ShoppingBag className="h-4 w-4 text-amber-500" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold text-white">
+                {loading ? '...' : metrics?.overview.totalOrders ?? 0}
+              </div>
+              <div className="text-xs text-stone-400 mt-2 flex flex-wrap items-center gap-1.5">
+                <span className="text-amber-400 font-medium">
+                  {metrics?.overview.preorderOrdersCount ?? 0} Pre-orders ({metrics?.overview.preorderUnitsCount ?? 0} pcs)
+                </span>
+                <span>&bull;</span>
+                <span className="text-emerald-400 font-medium">{metrics?.orders.paid ?? 0} Paid</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Barbershop Bookings */}
         <Card className="border-stone-800 bg-stone-900/60">
           <CardHeader className="flex flex-row items-center justify-between pb-2">
-            <CardTitle className="text-sm font-medium text-stone-300">Ace of Fyt Appointments</CardTitle>
-            <Scissors className="h-4 w-4 text-amber-500" />
+            <CardTitle className="text-sm font-medium text-stone-300">
+              {isBranchScoped ? 'Appointments' : 'Ace of Fyt Appointments'}
+            </CardTitle>
+            <Calendar className="h-4 w-4 text-amber-500" />
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold text-white">
@@ -244,10 +287,48 @@ export default function AdminDashboardPage() {
         </Card>
       </div>
 
+      {/* Branch Quick Access Bar */}
+      {isBranchScoped && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <Link
+            href="/barbershop"
+            className="p-5 rounded-xl border border-stone-800 bg-stone-900/60 hover:bg-stone-800/80 transition-all flex items-center justify-between group"
+          >
+            <div className="space-y-1">
+              <div className="text-white font-bold text-base flex items-center gap-2">
+                <Scissors className="h-4 w-4 text-amber-500" />
+                Branch Operations &amp; Pricing
+              </div>
+              <p className="text-xs text-stone-400">
+                Manage appointment bookings, specialist schedules, and branch pricing overrides.
+              </p>
+            </div>
+            <ArrowRight className="h-5 w-5 text-stone-400 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
+          </Link>
+
+          <Link
+            href="/finance"
+            className="p-5 rounded-xl border border-stone-800 bg-stone-900/60 hover:bg-stone-800/80 transition-all flex items-center justify-between group"
+          >
+            <div className="space-y-1">
+              <div className="text-white font-bold text-base flex items-center gap-2">
+                <DollarSign className="h-4 w-4 text-emerald-400" />
+                Branch Payouts &amp; Commission
+              </div>
+              <p className="text-xs text-stone-400">
+                Review verified client payments, 5% platform fee split, and net earnings.
+              </p>
+            </div>
+            <ArrowRight className="h-5 w-5 text-stone-400 group-hover:text-amber-400 group-hover:translate-x-1 transition-all" />
+          </Link>
+        </div>
+      )}
+
       {/* ============================================================== */}
       {/* DUAL CAPITAL POOLS: PHYSICAL BUILDOUT VS WORKING CAPITAL       */}
       {/* ============================================================== */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
+      {!isBranchScoped && (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-stretch">
         {/* ============================================================== */}
         {/* LEFT: PHYSICAL BUILDOUT CAPITAL (Ace of Fyt Studio Buildout)   */}
         {/* ============================================================== */}
@@ -648,51 +729,54 @@ export default function AdminDashboardPage() {
           </div>
         </Card>
       </div>
+      )}
 
       {/* Operational Breakdown Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+      <div className={`grid grid-cols-1 ${isBranchScoped ? '' : 'lg:grid-cols-2'} gap-6`}>
         {/* Order Fulfillment Pipeline */}
-        <Card className="border-stone-800 bg-stone-900/40">
-          <CardHeader className="flex flex-row items-center justify-between">
-            <div>
-              <CardTitle className="text-lg text-white flex items-center">
-                <Package className="mr-2 h-5 w-5 text-amber-500" />
-                Commerce Fulfillment Pipeline
-              </CardTitle>
-              <CardDescription>Order processing stages with Courier Guy delivery</CardDescription>
-            </div>
-            <Link
-              href="/commerce/orders"
-              className="text-xs text-amber-500 hover:text-amber-400 flex items-center font-medium"
-            >
-              View Orders <ArrowRight className="ml-1 h-3 w-3" />
-            </Link>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              <div className="p-3 rounded-lg bg-stone-900/80 border border-stone-800 text-center">
-                <div className="text-xs text-stone-400 mb-1">Pending</div>
-                <div className="text-xl font-bold text-stone-200">{metrics?.orders.pending ?? 0}</div>
+        {!isBranchScoped && (
+          <Card className="border-stone-800 bg-stone-900/40">
+            <CardHeader className="flex flex-row items-center justify-between">
+              <div>
+                <CardTitle className="text-lg text-white flex items-center">
+                  <Package className="mr-2 h-5 w-5 text-amber-500" />
+                  Commerce Fulfillment Pipeline
+                </CardTitle>
+                <CardDescription>Order processing stages with Courier Guy delivery</CardDescription>
               </div>
-              <div className="p-3 rounded-lg bg-amber-950/20 border border-amber-800/40 text-center">
-                <div className="text-xs text-amber-400 mb-1">Pre-orders</div>
-                <div className="text-xl font-bold text-amber-300">{metrics?.orders.preorderCount ?? 0}</div>
+              <Link
+                href="/commerce/orders"
+                className="text-xs text-amber-500 hover:text-amber-400 flex items-center font-medium"
+              >
+                View Orders <ArrowRight className="ml-1 h-3 w-3" />
+              </Link>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className="p-3 rounded-lg bg-stone-900/80 border border-stone-800 text-center">
+                  <div className="text-xs text-stone-400 mb-1">Pending</div>
+                  <div className="text-xl font-bold text-stone-200">{metrics?.orders.pending ?? 0}</div>
+                </div>
+                <div className="p-3 rounded-lg bg-amber-950/20 border border-amber-800/40 text-center">
+                  <div className="text-xs text-amber-400 mb-1">Pre-orders</div>
+                  <div className="text-xl font-bold text-amber-300">{metrics?.orders.preorderCount ?? 0}</div>
+                </div>
+                <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-800/40 text-center">
+                  <div className="text-xs text-emerald-400 mb-1">Paid</div>
+                  <div className="text-xl font-bold text-emerald-300">{metrics?.orders.paid ?? 0}</div>
+                </div>
+                <div className="p-3 rounded-lg bg-blue-950/20 border border-blue-800/40 text-center">
+                  <div className="text-xs text-blue-400 mb-1">Processing</div>
+                  <div className="text-xl font-bold text-blue-300">{metrics?.orders.processing ?? 0}</div>
+                </div>
+                <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-800/40 text-center">
+                  <div className="text-xs text-emerald-400 mb-1">Shipped</div>
+                  <div className="text-xl font-bold text-emerald-300">{metrics?.orders.shipped ?? 0}</div>
+                </div>
               </div>
-              <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-800/40 text-center">
-                <div className="text-xs text-emerald-400 mb-1">Paid</div>
-                <div className="text-xl font-bold text-emerald-300">{metrics?.orders.paid ?? 0}</div>
-              </div>
-              <div className="p-3 rounded-lg bg-blue-950/20 border border-blue-800/40 text-center">
-                <div className="text-xs text-blue-400 mb-1">Processing</div>
-                <div className="text-xl font-bold text-blue-300">{metrics?.orders.processing ?? 0}</div>
-              </div>
-              <div className="p-3 rounded-lg bg-emerald-950/20 border border-emerald-800/40 text-center">
-                <div className="text-xs text-emerald-400 mb-1">Shipped</div>
-                <div className="text-xl font-bold text-emerald-300">{metrics?.orders.shipped ?? 0}</div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Master Barber Schedule Load */}
         <Card className="border-stone-800 bg-stone-900/40">
@@ -749,24 +833,26 @@ export default function AdminDashboardPage() {
       </div>
 
       {/* Live Activity Feed and Infrastructure Health */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className={`grid grid-cols-1 ${isBranchScoped ? '' : 'lg:grid-cols-3'} gap-6`}>
         {/* Live Unified Activity Feed */}
-        <Card className="border-stone-800 bg-stone-900/40 lg:col-span-2">
+        <Card className={`border-stone-800 bg-stone-900/40 ${isBranchScoped ? 'col-span-1' : 'lg:col-span-2'}`}>
           <CardHeader className="flex flex-row items-center justify-between">
             <div>
               <CardTitle className="text-lg text-white flex items-center">
                 <Activity className="mr-2 h-5 w-5 text-amber-500" />
-                Live Unified Activity Stream
+                {isBranchScoped ? 'Branch Appointments Stream' : 'Live Unified Activity Stream'}
               </CardTitle>
               <CardDescription>
-                Real-time chronological events across Commerce and Grooming
+                {isBranchScoped
+                  ? 'Real-time chronological appointment events for this branch'
+                  : 'Real-time chronological events across Commerce and Grooming'}
               </CardDescription>
             </div>
             <Link
               href="/finance"
               className="text-xs text-amber-500 hover:text-amber-400 flex items-center font-medium"
             >
-              Payment Audit <ArrowRight className="ml-1 h-3 w-3" />
+              {isBranchScoped ? 'Branch Payouts' : 'Payment Audit'} <ArrowRight className="ml-1 h-3 w-3" />
             </Link>
           </CardHeader>
           <CardContent>
@@ -774,7 +860,7 @@ export default function AdminDashboardPage() {
               <div className="py-12 text-center text-stone-500 text-sm">Loading activity stream...</div>
             ) : metrics?.recentActivity.length === 0 ? (
               <div className="py-12 text-center text-stone-500 text-sm">
-                No orders or appointments recorded yet. New activity will stream here in real-time.
+                No appointments recorded yet. New bookings will stream here in real-time.
               </div>
             ) : (
               <div className="space-y-3">
@@ -828,38 +914,40 @@ export default function AdminDashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Infrastructure & Gateway Status */}
-        <Card className="border-stone-800 bg-stone-900/40">
-          <CardHeader>
-            <CardTitle className="text-lg text-white flex items-center">
-              <Sparkles className="mr-2 h-5 w-5 text-amber-500" />
-              Platform Ecosystem
-            </CardTitle>
-            <CardDescription>Core microservices & cloud integrations</CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-3 text-xs">
-            <div className="flex items-center justify-between py-2 border-b border-stone-800">
-              <span className="text-stone-300">Dissafyt Sovereign Database</span>
-              <span className="text-emerald-400 font-mono">ONLINE (RLS Active)</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-stone-800">
-              <span className="text-stone-300">Decoupled Domain API</span>
-              <span className="text-emerald-400 font-mono">@dissafyt/api (200 OK)</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-stone-800">
-              <span className="text-stone-300">PayFast Gateway</span>
-              <span className="text-emerald-400 font-mono">Merchant 17675995</span>
-            </div>
-            <div className="flex items-center justify-between py-2 border-b border-stone-800">
-              <span className="text-stone-300">Courier Guy Logistics</span>
-              <span className="text-emerald-400 font-mono">Pudo / Lockers Ready</span>
-            </div>
-            <div className="flex items-center justify-between py-2">
-              <span className="text-stone-300">Monorepo Web Engines</span>
-              <span className="text-emerald-400 font-mono">Customer (3000) &bull; Admin (3001)</span>
-            </div>
-          </CardContent>
-        </Card>
+        {/* Infrastructure & Gateway Status - Only shown for Platform Administrators */}
+        {!isBranchScoped && (
+          <Card className="border-stone-800 bg-stone-900/40">
+            <CardHeader>
+              <CardTitle className="text-lg text-white flex items-center">
+                <Sparkles className="mr-2 h-5 w-5 text-amber-500" />
+                Platform Ecosystem
+              </CardTitle>
+              <CardDescription>Core microservices &amp; cloud integrations</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-3 text-xs">
+              <div className="flex items-center justify-between py-2 border-b border-stone-800">
+                <span className="text-stone-300">Dissafyt Sovereign Database</span>
+                <span className="text-emerald-400 font-mono">ONLINE (RLS Active)</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-stone-800">
+                <span className="text-stone-300">Decoupled Domain API</span>
+                <span className="text-emerald-400 font-mono">@dissafyt/api (200 OK)</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-stone-800">
+                <span className="text-stone-300">PayFast Gateway</span>
+                <span className="text-emerald-400 font-mono">Merchant 17675995</span>
+              </div>
+              <div className="flex items-center justify-between py-2 border-b border-stone-800">
+                <span className="text-stone-300">Courier Guy Logistics</span>
+                <span className="text-emerald-400 font-mono">Pudo / Lockers Ready</span>
+              </div>
+              <div className="flex items-center justify-between py-2">
+                <span className="text-stone-300">Monorepo Web Engines</span>
+                <span className="text-emerald-400 font-mono">Customer (3000) &bull; Admin (3001)</span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
       </div>
     </div>
   );
