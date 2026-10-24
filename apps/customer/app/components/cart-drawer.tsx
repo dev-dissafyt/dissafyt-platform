@@ -76,7 +76,7 @@ export function CartDrawer() {
         {/* Courier dispatch note */}
         <div className="bg-zinc-900/60 border-b border-zinc-800 px-6 py-2.5 flex items-center space-x-2 text-xs text-zinc-400">
           <Truck className="h-4 w-4 text-amber-500 flex-shrink-0" />
-          <span>Door-to-door express delivery across South Africa via The Courier Guy</span>
+          <span>Door-to-door express delivery across South Africa &bull; Free studio pickup</span>
         </div>
 
         {/* Cart items list */}
@@ -211,7 +211,7 @@ export function CartDrawer() {
               </div>
               <div className="flex justify-between text-[11px] text-zinc-500">
                 <span>Door-to-door Courier Delivery</span>
-                <span>The Courier Guy</span>
+                <span>Nationwide Express</span>
               </div>
             </div>
 

@@ -29,7 +29,7 @@ export default function CheckoutPage() {
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [fulfillmentChoice, setFulfillmentChoice] = useState<'courier' | 'studio_collection'>('courier');
 
-  // Shipping Address State (Courier Guy spec)
+  // Shipping Address State (Nationwide Courier spec)
   const [recipientName, setRecipientName] = useState('');
   const [recipientPhone, setRecipientPhone] = useState('');
   const [recipientEmail, setRecipientEmail] = useState('');
@@ -333,7 +333,7 @@ export default function CheckoutPage() {
                 )}
               </div>
 
-              {/* Courier Guy Delivery */}
+              {/* Door-to-Door Courier Delivery */}
               <div
                 onClick={() => setFulfillmentChoice('courier')}
                 className={`cursor-pointer rounded-lg border p-4 transition-all ${
@@ -348,7 +348,7 @@ export default function CheckoutPage() {
                     <span className="font-bold text-white text-sm">Door-to-Door Courier</span>
                   </div>
                   <span className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] font-bold uppercase text-zinc-300">
-                    The Courier Guy
+                    Express Delivery
                   </span>
                 </div>
                 <p className="mt-2 text-xs text-zinc-400">
@@ -356,7 +356,7 @@ export default function CheckoutPage() {
                 </p>
                 {hasPreorderItems && (
                   <p className="mt-2 text-[11px] text-amber-400/90 font-medium border-t border-zinc-800/80 pt-2">
-                    &bull; Pay 50% deposit today. Settle remaining balance online before final courier dispatch.
+                    &bull; Pre-order garments: R0.00 due today. Settle balance online before final courier dispatch.
                   </p>
                 )}
               </div>
@@ -382,7 +382,7 @@ export default function CheckoutPage() {
               <CardDescription>
                 {fulfillmentChoice === 'studio_collection'
                   ? 'We will contact you via SMS & Email when your order is ready for pickup at 1 Norwalk Way.'
-                  : 'Shipping fulfilled nationwide via The Courier Guy door-to-door.'}
+                  : 'Shipping fulfilled nationwide via express door-to-door courier.'}
               </CardDescription>
             </CardHeader>
 

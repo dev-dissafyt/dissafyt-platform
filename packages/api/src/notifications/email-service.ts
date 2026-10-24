@@ -547,13 +547,15 @@ export class EmailService {
   }
 
   /**
-   * 3. Order Dispatched & Tracking Notice (The Courier Guy)
+   * 3. Order Dispatched & Tracking Notice
    */
   static async sendShippingUpdate(payload: ShippingUpdatePayload) {
-    const courier = payload.courierName || 'The Courier Guy';
+    const courier = payload.courierName || 'Express Courier';
     const trackingUrl =
       payload.trackingUrl ||
-      `https://portal.thecourierguy.co.za/track?tracking_reference=${encodeURIComponent(payload.trackingNumber)}`;
+      (courier.toLowerCase().includes('courier guy')
+        ? `https://portal.thecourierguy.co.za/track?tracking_reference=${encodeURIComponent(payload.trackingNumber)}`
+        : `https://dissafyt.com/account?order=${encodeURIComponent(payload.orderNumber)}`);
 
     const content = `
       <div style="margin-bottom:24px;">

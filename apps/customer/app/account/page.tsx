@@ -1919,7 +1919,7 @@ export default function AccountPage() {
                           </div>
                         ) : isShipped ? (
                           <div
-                            title="Out for Delivery with Courier Guy"
+                            title="Out for Delivery / In Transit"
                             className="relative h-10 w-10 rounded-xl bg-sky-500/15 border border-sky-500/30 flex items-center justify-center flex-shrink-0 shadow-inner"
                           >
                             <Truck
@@ -2050,7 +2050,7 @@ export default function AccountPage() {
                 </div>
                 <div className="space-y-1.5">
                   <Label htmlFor="phone" className="text-xs text-zinc-300">
-                    Phone Number (Courier Guy SMS &amp; Booking Reminders)
+                    Phone Number (Order SMS &amp; Booking Reminders)
                   </Label>
                   <Input
                     id="phone"

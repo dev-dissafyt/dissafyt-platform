@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { CheckCircle2, Package, Truck, MessageSquare, ArrowRight, ShoppingBag, ShieldCheck } from 'lucide-react';
+import { CheckCircle2, Package, Truck, MessageSquare, ArrowRight, ShoppingBag, ShieldCheck, Store, MapPin } from 'lucide-react';
 import { useCart } from '../../context/cart-context';
 
 interface OrderItem {
@@ -21,6 +21,8 @@ interface OrderDetails {
   subtotal: number;
   total: number;
   created_at: string;
+  fulfillment_choice?: 'courier' | 'studio_collection' | string;
+  collection_location_id?: string;
   shipping_address?: {
     recipient_name?: string;
     recipient_phone?: string;
@@ -184,42 +186,90 @@ function SuccessContent() {
       <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
         {/* Main Details */}
         <div className="md:col-span-2 space-y-6">
-          {/* Dispatch Notice Card */}
+          {/* Dispatch / Collection Notice Card */}
           <div className="rounded-2xl border border-zinc-800 bg-zinc-950/80 p-6 space-y-4">
-            <div className="flex items-center space-x-3 text-white font-bold text-base">
-              <Truck className="h-5 w-5 text-amber-500" />
-              <span>Courier Guy Express Dispatch</span>
-            </div>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              Garments are prepped at our Cape Town studio and dispatched directly via The Courier Guy. You will receive an automated SMS and email notification with your tracking waybill once parcel inspection is complete.
-            </p>
+            {order?.fulfillment_choice === 'studio_collection' ? (
+              <>
+                <div className="flex items-center space-x-3 text-white font-bold text-base">
+                  <Store className="h-5 w-5 text-amber-500" />
+                  <span>Flagship Studio Collection</span>
+                </div>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Your garments are prepared at our Cape Town flagship studio. We will send you an automated SMS and email notification as soon as your order is packaged and ready for in-person collection.
+                </p>
 
-            {order?.shipping_address && (
-              <div className="pt-4 border-t border-zinc-900 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
-                <div>
-                  <span className="font-mono text-zinc-500 uppercase tracking-wider block text-[10px] mb-1">
-                    Delivering To
-                  </span>
-                  <p className="text-white font-semibold">
-                    {order.shipping_address.recipient_name || order.customer_name || 'Guest Customer'}
-                  </p>
-                  <p className="text-zinc-400">{order.shipping_address.recipient_phone}</p>
-                  <p className="text-zinc-400">{order.shipping_address.recipient_email}</p>
+                <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-4 space-y-2 text-xs">
+                  <div className="font-bold text-amber-400 flex items-center gap-1.5">
+                    <MapPin className="h-4 w-4" />
+                    <span>Flagship Studio Collection Point</span>
+                  </div>
+                  <div className="text-white font-medium">
+                    Dissafyt Studio &bull; 1 Norwalk Way, Bernadino Heights, Kraaifontein, 7570
+                  </div>
+                  <div className="text-zinc-400 text-[11px]">
+                    Operating Hours: Mon – Sat 08:30 – 18:00 &bull; Sun 09:00 – 14:00
+                  </div>
                 </div>
-                <div>
-                  <span className="font-mono text-zinc-500 uppercase tracking-wider block text-[10px] mb-1">
-                    Destination Address
-                  </span>
-                  <p className="text-zinc-300">{order.shipping_address.street_address}</p>
-                  <p className="text-zinc-400">
-                    {order.shipping_address.suburb ? `${order.shipping_address.suburb}, ` : ''}
-                    {order.shipping_address.city}
-                  </p>
-                  <p className="text-zinc-400">
-                    {order.shipping_address.province} {order.shipping_address.postal_code}
-                  </p>
+
+                <div className="pt-2 border-t border-zinc-900 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                  <div>
+                    <span className="font-mono text-zinc-500 uppercase tracking-wider block text-[10px] mb-1">
+                      Collector
+                    </span>
+                    <p className="text-white font-semibold">
+                      {order.shipping_address?.recipient_name || order.customer_name || 'Collector'}
+                    </p>
+                    <p className="text-zinc-400">{order.shipping_address?.recipient_phone}</p>
+                    <p className="text-zinc-400">{order.shipping_address?.recipient_email || order.customer_email}</p>
+                  </div>
+                  <div>
+                    <span className="font-mono text-zinc-500 uppercase tracking-wider block text-[10px] mb-1">
+                      Collection Instructions
+                    </span>
+                    <p className="text-zinc-300">
+                      Present your order reference #{orderNumber || order.order_number} upon arrival at studio reception.
+                    </p>
+                  </div>
                 </div>
-              </div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-center space-x-3 text-white font-bold text-base">
+                  <Truck className="h-5 w-5 text-amber-500" />
+                  <span>Door-to-Door Courier Delivery</span>
+                </div>
+                <p className="text-xs text-zinc-400 leading-relaxed">
+                  Garments are prepped at our Cape Town studio and dispatched directly to your door via express courier. You will receive automated SMS and email updates once your parcel is out for delivery.
+                </p>
+
+                {order?.shipping_address && (
+                  <div className="pt-4 border-t border-zinc-900 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+                    <div>
+                      <span className="font-mono text-zinc-500 uppercase tracking-wider block text-[10px] mb-1">
+                        Delivering To
+                      </span>
+                      <p className="text-white font-semibold">
+                        {order.shipping_address.recipient_name || order.customer_name || 'Guest Customer'}
+                      </p>
+                      <p className="text-zinc-400">{order.shipping_address.recipient_phone}</p>
+                      <p className="text-zinc-400">{order.shipping_address.recipient_email}</p>
+                    </div>
+                    <div>
+                      <span className="font-mono text-zinc-500 uppercase tracking-wider block text-[10px] mb-1">
+                        Destination Address
+                      </span>
+                      <p className="text-zinc-300">{order.shipping_address.street_address}</p>
+                      <p className="text-zinc-400">
+                        {order.shipping_address.suburb ? `${order.shipping_address.suburb}, ` : ''}
+                        {order.shipping_address.city}
+                      </p>
+                      <p className="text-zinc-400">
+                        {order.shipping_address.province} {order.shipping_address.postal_code}
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
 
@@ -256,8 +306,10 @@ function SuccessContent() {
                   <span className="font-mono text-white">R {Number(order.subtotal).toFixed(2)}</span>
                 </div>
                 <div className="flex justify-between text-zinc-400">
-                  <span>Nationwide Courier Guy</span>
-                  <span className="font-mono text-emerald-400">Included</span>
+                  <span>Fulfillment</span>
+                  <span className="font-mono text-emerald-400">
+                    {order.fulfillment_choice === 'studio_collection' ? 'Free Studio Collection' : 'Door-to-Door Courier (Included)'}
+                  </span>
                 </div>
                 <div className="flex justify-between text-white font-bold text-sm pt-2 border-t border-zinc-900">
                   <span>Total Paid (incl. VAT)</span>

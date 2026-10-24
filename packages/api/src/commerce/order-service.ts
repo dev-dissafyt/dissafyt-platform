@@ -1080,14 +1080,14 @@ export class OrderService {
       try {
         const recipientEmail = (order.shipping_address as any)?.recipient_email;
         const recipientName = (order.shipping_address as any)?.recipient_name || 'Customer';
-        const trackingNum = (order as any).tracking_number || (order as any).waybill_number || `TCG-${order.order_number}`;
+        const trackingNum = (order as any).tracking_number || (order as any).waybill_number || `EXP-${order.order_number}`;
 
         if (recipientEmail) {
           await EmailService.sendShippingUpdate({
             orderNumber: order.order_number,
             customerName: recipientName,
             customerEmail: recipientEmail,
-            courierName: 'The Courier Guy',
+            courierName: (order as any).courier_name || 'Express Courier',
             trackingNumber: trackingNum,
             destinationCity: (order.shipping_address as any)?.city || 'your door',
           });

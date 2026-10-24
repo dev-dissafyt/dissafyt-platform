@@ -194,7 +194,7 @@ export default async function HomePage() {
           </div>
           <div className="flex items-center gap-2">
             <Truck className="w-3.5 h-3.5 text-amber-500" />
-            <span>Courier Guy Door-to-Door</span>
+            <span>Nationwide Door-to-Door Delivery</span>
           </div>
           <div className="flex items-center gap-2">
             <ShieldCheck className="w-3.5 h-3.5 text-amber-500" />

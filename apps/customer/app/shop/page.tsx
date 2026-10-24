@@ -37,7 +37,7 @@ export default async function ShopPage() {
             The Streetwear Drop Room
           </h1>
           <p className="text-zinc-400 text-sm sm:text-base leading-relaxed">
-            High-density luxury streetwear engineered in Cape Town. 280GSM ring-spun cotton and French terry, printed with permanent direct-to-garment fidelity. Instant PayFast ZAR checkout and express Courier Guy door delivery.
+            High-density luxury streetwear engineered in Cape Town. 280GSM ring-spun cotton and French terry, printed with permanent direct-to-garment fidelity. Instant PayFast ZAR checkout and express door-to-door delivery.
           </p>
         </div>
 
@@ -60,8 +60,8 @@ export default async function ShopPage() {
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 flex items-center space-x-3">
             <Truck className="h-4 w-4 text-amber-500 flex-shrink-0" />
             <div>
-              <div className="text-xs font-bold text-white">Courier Guy</div>
-              <div className="text-[10px] text-zinc-500 font-mono">Nationwide Delivery</div>
+              <div className="text-xs font-bold text-white">Express Delivery</div>
+              <div className="text-[10px] text-zinc-500 font-mono">Nationwide Door-to-Door</div>
             </div>
           </div>
           <div className="rounded-xl border border-zinc-800 bg-zinc-900/60 p-3 flex items-center space-x-3">
