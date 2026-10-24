@@ -84,7 +84,7 @@ export function HaircutServicesSection({
   return (
     <section
       id="barbershop-section"
-      className="relative min-h-[85vh] flex flex-col justify-between container mx-auto max-w-7xl px-4 sm:px-6 pt-6 sm:pt-8 pb-4"
+      className="relative container mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8 flex flex-col justify-between"
     >
       {/* Ambient Top Glow */}
       <div className="absolute top-1/4 left-1/2 -translate-x-1/2 w-[600px] h-[300px] bg-amber-500/10 blur-[130px] rounded-full pointer-events-none" />
@@ -124,8 +124,8 @@ export function HaircutServicesSection({
         </div>
       </div>
 
-      {/* 2-Column Digestible Viewport (85vh) */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 flex-1 py-6 relative z-10 items-stretch">
+      {/* 2-Column Digestible Viewport */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-8 py-6 relative z-10 items-stretch">
         {/* ========================================================== */}
         {/* LEFT COLUMN: STRAIGHT BOOKINGS (ONCE-OFF SESSIONS)          */}
         {/* ========================================================== */}

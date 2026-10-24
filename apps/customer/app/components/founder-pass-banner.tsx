@@ -196,9 +196,9 @@ export function FounderPassBanner() {
       {/* ============================================================== */}
       {/* 1. FOUNDER PASS HERO LANDING CONTAINER (~85-90vh)             */}
       {/* ============================================================== */}
-      <section id="founders-pass" className="relative min-h-[85vh] lg:h-[88vh] flex flex-col justify-between container mx-auto max-w-7xl px-4 sm:px-6 pt-4 sm:pt-6 pb-4">
+      <section id="founders-pass" className="relative container mx-auto max-w-7xl px-4 sm:px-6 pt-4 sm:pt-6 pb-4 flex flex-col justify-between">
         {/* The Grand Hero Div with Glowing Voltage Orange Outline Stroke */}
-        <div className="relative flex-1 flex flex-col justify-between rounded-3xl border-2 border-[#ff5500]/60 p-6 sm:p-8 lg:p-10 overflow-hidden bg-gradient-to-br from-black via-zinc-950 to-black shadow-[0_0_60px_rgba(255,85,0,0.18),inset_0_0_40px_rgba(255,85,0,0.06)]">
+        <div className="relative w-full flex flex-col justify-between rounded-3xl border-2 border-[#ff5500]/60 p-6 sm:p-8 lg:p-10 overflow-hidden bg-gradient-to-br from-black via-zinc-950 to-black shadow-[0_0_60px_rgba(255,85,0,0.18),inset_0_0_40px_rgba(255,85,0,0.06)]">
           {/* Architectural Tech Corner Accent Crosshairs */}
           <div className="absolute top-2.5 left-2.5 w-4 h-4 border-t-2 border-l-2 border-[#ff5500] pointer-events-none" />
           <div className="absolute top-2.5 right-2.5 w-4 h-4 border-t-2 border-r-2 border-[#ff5500] pointer-events-none" />
@@ -239,7 +239,7 @@ export function FounderPassBanner() {
           </div>
 
           {/* Main 2-Column Content Stage */}
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center flex-1 my-auto py-4 relative z-10">
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 lg:gap-12 items-center py-6 relative z-10">
             {/* Left Column: Vision, Perks & Funding Progress */}
             <div className="lg:col-span-7 space-y-4">
               <div>

@@ -46,12 +46,12 @@ export default async function HomePage() {
   const maxSons = fatherSonService?.max_sons ? Number(fatherSonService.max_sons) : 3;
 
   return (
-    <div className="space-y-16 sm:space-y-24 pb-24 overflow-hidden bg-black text-white">
+    <div className="space-y-16 sm:space-y-24 pb-24 overflow-x-hidden bg-black text-white">
       {/* ============================================================== */}
       {/* 1. SECTION 1: THE FOUNDER'S PASS BANNER (Milestone Campaign)   */}
       {/* ============================================================== */}
       <FounderPassBanner />
-      <section id="streetwear-section" className="relative min-h-[85vh] lg:h-[88vh] flex flex-col justify-between container mx-auto max-w-7xl px-4 sm:px-6 pt-6 sm:pt-8 pb-4">
+      <section id="streetwear-section" className="relative container mx-auto max-w-7xl px-4 sm:px-6 py-6 sm:py-8 flex flex-col justify-between">
         {/* Ambient Orange Glow */}
         <div className="absolute top-1/3 right-1/4 w-[500px] h-[300px] bg-orange-600/10 blur-[130px] rounded-full pointer-events-none" />
 
@@ -82,7 +82,7 @@ export default async function HomePage() {
         </div>
 
         {/* 3-COLUMN GRID OF CLOTHES */}
-        <div className="flex-1 py-6 flex items-center relative z-10">
+        <div className="py-6 relative z-10">
           <div className="w-full grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {displayProducts.map((garment) => {
               const target = garment.preorder_target || 50;
@@ -100,7 +100,7 @@ export default async function HomePage() {
                 >
                   <div>
                     {/* Garment Image Container */}
-                    <Link href={productUrl} className="block relative aspect-[4/5] rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 mb-3.5">
+                    <Link href={productUrl} className="block relative aspect-[4/5] max-h-[380px] rounded-xl overflow-hidden bg-zinc-900 border border-zinc-800/80 mb-3.5">
                       {garment.images && garment.images.length > 0 ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
