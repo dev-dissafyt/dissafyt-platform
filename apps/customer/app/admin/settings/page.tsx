@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, Button, Input, Label } from '@dissafyt/ui';
-import { Settings, ShieldAlert, CheckCircle2, Key, History, RefreshCw, FileText } from 'lucide-react';
+import { Settings, ShieldAlert, CheckCircle2, Key, History, RefreshCw, FileText, Clock } from 'lucide-react';
 import { adminFetch } from '@/lib/operator';
 
 export default function AdminSettingsPage() {
@@ -143,30 +143,30 @@ export default function AdminSettingsPage() {
           <div className="flex items-center justify-between py-2 border-b border-stone-800">
             <div>
               <div className="font-medium text-stone-200">PayFast Gateway</div>
-              <div className="text-xs text-stone-500 font-mono">Merchant ID: 17675995 &bull; Key: Configured &bull; Passphrase: Set</div>
+              <div className="text-xs text-stone-500 font-mono">Merchant ID: 17675995 &bull; Key: Configured &bull; Passphrase: Set &bull; Production Active</div>
             </div>
             <span className="flex items-center text-xs text-emerald-400 font-mono">
-              <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> READY
+              <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> ACTIVE (LIVE)
             </span>
           </div>
 
           <div className="flex items-center justify-between py-2 border-b border-stone-800">
             <div>
               <div className="font-medium text-stone-200">The Courier Guy / Shiplogic</div>
-              <div className="text-xs text-stone-500 font-mono">API Key: a6008c96... &bull; Env: Sandbox</div>
+              <div className="text-xs text-stone-500 font-mono">Awaiting Live API Key &bull; Door-to-Door Courier Automation</div>
             </div>
-            <span className="flex items-center text-xs text-emerald-400 font-mono">
-              <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> CONFIGURED
+            <span className="flex items-center text-xs text-amber-400 font-mono">
+              <Clock className="mr-1 h-3.5 w-3.5" /> PENDING SETUP
             </span>
           </div>
 
           <div className="flex items-center justify-between py-2">
             <div>
               <div className="font-medium text-stone-200">Email Notifications (Resend)</div>
-              <div className="text-xs text-stone-500 font-mono">API Key: re_2gebtjeK...</div>
+              <div className="text-xs text-stone-500 font-mono">API Key: Configured (re_RAbGwm...) &bull; Receipts & Reminders</div>
             </div>
             <span className="flex items-center text-xs text-emerald-400 font-mono">
-              <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> CONFIGURED
+              <CheckCircle2 className="mr-1 h-3.5 w-3.5" /> ACTIVE
             </span>
           </div>
         </CardContent>

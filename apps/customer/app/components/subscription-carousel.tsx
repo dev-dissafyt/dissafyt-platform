@@ -88,7 +88,7 @@ export function SubscriptionCarousel({
   title = 'Ace of Fyt Barbershop Memberships',
   subtitle = 'Save on fresh cuts with monthly recurring memberships powered securely by PayFast. Guaranteed chair time, zero queues, and priority booking.',
   onSubscribed,
-  showDemoActivator = true,
+  showDemoActivator = false,
 }: SubscriptionCarouselProps) {
   const router = useRouter();
   const carouselRef = useRef<HTMLDivElement>(null);
@@ -363,17 +363,6 @@ export function SubscriptionCarousel({
                         ? `Subscribe with PayFast (R${plan.price}/mo)`
                         : `Sign Up to Subscribe (R${plan.price}/mo)`}
                     </Button>
-
-                    {/* Developer / Staging Instant Unlock */}
-                    {showDemoActivator && (
-                      <button
-                        type="button"
-                        onClick={() => handleSubscribe(plan.id, true)}
-                        className="w-full text-[10px] text-zinc-400 hover:text-amber-400 py-1 transition text-center"
-                      >
-                        ⚡ Test Sandbox: Activate 1-Click
-                      </button>
-                    )}
                   </div>
                 </CardContent>
               </Card>
