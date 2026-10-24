@@ -3,7 +3,7 @@
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { CheckCircle2, Package, Truck, MessageSquare, ArrowRight, ShoppingBag, ShieldCheck, Store, MapPin } from 'lucide-react';
+import { CheckCircle2, Package, Truck, MessageSquare, ArrowRight, ShoppingBag, ShieldCheck, Store, MapPin, Clock } from 'lucide-react';
 import { useCart } from '../../context/cart-context';
 
 interface OrderItem {
@@ -236,11 +236,21 @@ function SuccessContent() {
               <>
                 <div className="flex items-center space-x-3 text-white font-bold text-base">
                   <Truck className="h-5 w-5 text-amber-500" />
-                  <span>Door-to-Door Courier Delivery</span>
+                  <span>The Courier Guy Door-to-Door Delivery</span>
                 </div>
                 <p className="text-xs text-zinc-400 leading-relaxed">
-                  Garments are prepped at our Cape Town studio and dispatched directly to your door via express courier. You will receive automated SMS and email updates once your parcel is out for delivery.
+                  Garments are packaged and weighed at our Cape Town studio. Because courier delivery rates are calculated directly on The Courier Guy platform based on parcel dimensions and your delivery address, you will receive a separate payment link via SMS and email to settle the courier fee prior to dispatch.
                 </p>
+
+                <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 space-y-1.5 text-xs">
+                  <div className="font-bold text-amber-400 flex items-center gap-1.5">
+                    <Truck className="h-4 w-4" />
+                    <span>The Courier Guy &bull; Separate Payment Link Required</span>
+                  </div>
+                  <p className="text-zinc-300 leading-relaxed">
+                    The payment above settles your garment order. We are calculating the exact shipping rate directly on <strong>The Courier Guy platform</strong>. Once your package is sealed, we will send an SMS and email with a secure PayFast link to settle the courier fee before dispatch.
+                  </p>
+                </div>
 
                 {order?.shipping_address && (
                   <div className="pt-4 border-t border-zinc-900 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
@@ -307,10 +317,17 @@ function SuccessContent() {
                 </div>
                 <div className="flex justify-between text-zinc-400">
                   <span>Fulfillment</span>
-                  <span className="font-mono text-emerald-400">
-                    {order.fulfillment_choice === 'studio_collection' ? 'Free Studio Collection' : 'Door-to-Door Courier (Included)'}
+                  <span className={`font-mono ${order.fulfillment_choice === 'studio_collection' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                    {order.fulfillment_choice === 'studio_collection'
+                      ? 'Free Studio Collection'
+                      : 'The Courier Guy (Separate Link)'}
                   </span>
                 </div>
+                {order.fulfillment_choice !== 'studio_collection' && (
+                  <div className="text-[10px] text-zinc-500 text-right -mt-0.5">
+                    * Courier fee worked out on The Courier Guy platform &amp; billed separately
+                  </div>
+                )}
                 <div className="flex justify-between text-white font-bold text-sm pt-2 border-t border-zinc-900">
                   <span>Total Paid (incl. VAT)</span>
                   <span className="font-mono text-amber-400 text-base">R {Number(order.total).toFixed(2)}</span>
@@ -326,9 +343,21 @@ function SuccessContent() {
             <h3 className="font-display text-sm font-bold uppercase tracking-wider text-white">
               Next Steps
             </h3>
-            <p className="text-xs text-zinc-400 leading-relaxed">
-              Visiting Cape Town? Experience the flagship barbershop or browse more streetwear drops.
-            </p>
+            {order?.fulfillment_choice !== 'studio_collection' ? (
+              <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 p-3.5 space-y-1 text-xs">
+                <div className="font-semibold text-amber-400 flex items-center gap-1.5">
+                  <Clock className="h-3.5 w-3.5" />
+                  <span>Awaiting Courier Payment Link</span>
+                </div>
+                <p className="text-[11px] text-zinc-400 leading-normal">
+                  Watch for an SMS and email from Dissafyt with your PayFast payment link once we work out the shipping rate on The Courier Guy platform.
+                </p>
+              </div>
+            ) : (
+              <p className="text-xs text-zinc-400 leading-relaxed">
+                Visiting Cape Town? Experience the flagship barbershop or browse more streetwear drops.
+              </p>
+            )}
 
             <div className="space-y-3 pt-2">
               <Link

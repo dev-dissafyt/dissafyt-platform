@@ -292,9 +292,16 @@ export default function PreorderPaymentPage() {
               <div className="flex justify-between">
                 <span>Fulfillment</span>
                 <span className="text-zinc-300">
-                  {order.fulfillment_choice === 'studio_collection' ? 'Studio Pickup' : 'Courier Delivery'}
+                  {order.fulfillment_choice === 'studio_collection'
+                    ? 'Free Studio Pickup'
+                    : 'The Courier Guy (Separate Link)'}
                 </span>
               </div>
+              {order.fulfillment_choice !== 'studio_collection' && (
+                <div className="text-[10px] text-zinc-500 text-right -mt-0.5">
+                  * Courier fee worked out on The Courier Guy platform &amp; billed separately
+                </div>
+              )}
               {settlementOption === 'deposit_50' && (
                 <div className="flex justify-between text-amber-400 font-mono text-[11px] pt-1">
                   <span>Balance Due Later</span>

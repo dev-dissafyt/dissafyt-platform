@@ -20,9 +20,9 @@ const FAQ_ITEMS: FAQItem[] = [
       'Every piece is engineered from 280GSM ring-spun combed cotton or heavyweight French terry fleece. Garments feature pre-shrunk high-density knits, reinforced double-needle seam stitching, and direct-to-garment permanent prints cured for wash longevity.',
   },
   {
-    question: 'How does nationwide delivery and studio collection work?',
+    question: 'How does The Courier Guy nationwide delivery and payment work?',
     answer:
-      'All orders are processed out of our Cape Town fulfillment facility within 24–48 hours. We offer express door-to-door courier delivery across South Africa with real-time status and SMS updates, as well as free direct collection from our Bernadino Heights flagship studio.',
+      'We partner with The Courier Guy for nationwide door-to-door delivery. Because shipping rates depend on parcel weight, package dimensions, and your delivery zone, we work out the exact rate directly on The Courier Guy platform once your order is packaged. A separate, secure payment link is then sent to your mobile and email to settle the courier fee before dispatch. Alternatively, studio collection at our Cape Town flagship is always 100% free.',
   },
   {
     question: 'What payment methods do you accept at checkout?',

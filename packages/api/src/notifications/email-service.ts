@@ -324,11 +324,14 @@ export class EmailService {
 
     const addressHtml = payload.shippingAddress?.street_address
       ? `<div style="margin-top:20px;padding:16px;background-color:#18181b;border:1px solid #27272a;border-radius:6px;">
-          <div style="color:#a1a1aa;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:6px;">Delivery Destination</div>
+          <div style="color:#a1a1aa;font-size:11px;text-transform:uppercase;letter-spacing:1px;font-weight:700;margin-bottom:6px;">Delivery Destination (The Courier Guy)</div>
           <div style="color:#f4f4f5;font-size:13px;line-height:1.4;">
             ${payload.shippingAddress.recipient_name ? `<strong>${payload.shippingAddress.recipient_name}</strong><br/>` : ''}
             ${payload.shippingAddress.street_address}<br/>
             ${payload.shippingAddress.suburb ? `${payload.shippingAddress.suburb}, ` : ''}${payload.shippingAddress.city || ''} ${payload.shippingAddress.postal_code || ''}
+          </div>
+          <div style="margin-top:12px;padding:10px 12px;background-color:rgba(255,85,0,0.1);border-left:3px solid #ff5500;color:#d4d4d8;font-size:12px;line-height:1.4;border-radius:4px;">
+            <strong style="color:#ff5500;">Shipping Payment Notice:</strong> Because parcel pricing depends on weight and destination, courier rates are calculated directly on The Courier Guy platform once packaged. A separate, secure payment link will be sent via SMS and email to settle the courier fee before dispatch.
           </div>
         </div>`
       : '';
@@ -364,8 +367,8 @@ export class EmailService {
               <td align="right" style="padding-top:14px;color:#f4f4f5;font-size:13px;font-family:monospace;">R${payload.subtotal.toFixed(2)}</td>
             </tr>
             <tr>
-              <td colspan="2" align="left" style="padding-top:6px;color:#a1a1aa;font-size:13px;">Door-to-Door Courier</td>
-              <td align="right" style="padding-top:6px;color:#f4f4f5;font-size:13px;font-family:monospace;">R${payload.shippingCost.toFixed(2)}</td>
+              <td colspan="2" align="left" style="padding-top:6px;color:#a1a1aa;font-size:13px;">Fulfillment</td>
+              <td align="right" style="padding-top:6px;color:#f4f4f5;font-size:13px;font-family:monospace;">${payload.shippingCost > 0 ? `R${payload.shippingCost.toFixed(2)}` : (payload.shippingAddress?.street_address ? 'The Courier Guy (Billed Separately)' : 'Studio Collection (Free)')}</td>
             </tr>
             <tr>
               <td colspan="2" align="left" style="padding-top:12px;border-top:1px solid #3f3f46;color:#ffffff;font-size:15px;font-weight:800;">Total Settled</td>

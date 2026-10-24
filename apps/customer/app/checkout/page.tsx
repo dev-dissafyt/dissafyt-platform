@@ -333,7 +333,7 @@ export default function CheckoutPage() {
                 )}
               </div>
 
-              {/* Door-to-Door Courier Delivery */}
+              {/* The Courier Guy Door-to-Door Delivery */}
               <div
                 onClick={() => setFulfillmentChoice('courier')}
                 className={`cursor-pointer rounded-lg border p-4 transition-all ${
@@ -345,18 +345,21 @@ export default function CheckoutPage() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center space-x-2">
                     <Truck className={`h-5 w-5 ${fulfillmentChoice === 'courier' ? 'text-amber-400' : 'text-zinc-400'}`} />
-                    <span className="font-bold text-white text-sm">Door-to-Door Courier</span>
+                    <span className="font-bold text-white text-sm">The Courier Guy (Door-to-Door)</span>
                   </div>
-                  <span className="rounded bg-zinc-800 px-2 py-0.5 text-[10px] font-bold uppercase text-zinc-300">
-                    Express Delivery
+                  <span className="rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold uppercase text-amber-400 border border-amber-500/30">
+                    Billed Separately
                   </span>
                 </div>
                 <p className="mt-2 text-xs text-zinc-400">
-                  Nationwide secure courier delivery directly to your door.
+                  Nationwide delivery directly to your door.
+                </p>
+                <p className="mt-1 text-[11px] text-amber-300/90 leading-normal">
+                  &bull; Shipping fee is worked out on <strong className="text-white">The Courier Guy platform</strong> once packaged, and billed via a separate payment link.
                 </p>
                 {hasPreorderItems && (
                   <p className="mt-2 text-[11px] text-amber-400/90 font-medium border-t border-zinc-800/80 pt-2">
-                    &bull; Pre-order garments: R0.00 due today. Settle balance online before final courier dispatch.
+                    &bull; Pre-order garments: R0.00 due today. Settle garment balance online before final courier dispatch.
                   </p>
                 )}
               </div>
@@ -375,16 +378,31 @@ export default function CheckoutPage() {
                 ) : (
                   <>
                     <Truck className="mr-2 h-5 w-5 text-amber-500" />
-                    Delivery Information
+                    The Courier Guy Delivery Address
                   </>
                 )}
               </CardTitle>
               <CardDescription>
                 {fulfillmentChoice === 'studio_collection'
                   ? 'We will contact you via SMS & Email when your order is ready for pickup at 1 Norwalk Way.'
-                  : 'Shipping fulfilled nationwide via express door-to-door courier.'}
+                  : 'Delivered nationwide via The Courier Guy. Shipping is calculated & billed via separate link prior to dispatch.'}
               </CardDescription>
             </CardHeader>
+
+            {fulfillmentChoice === 'courier' && (
+              <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 space-y-1.5 text-xs">
+                <div className="font-bold text-amber-400 flex items-center gap-1.5">
+                  <Truck className="h-4 w-4" />
+                  <span>The Courier Guy &bull; Separate Payment Link Notice</span>
+                </div>
+                <p className="text-zinc-300 leading-relaxed">
+                  Courier fees are <strong>not charged at this checkout</strong>. Because parcel pricing depends on final package weight, dimensions, and your specific address, our team works out the rate directly on <strong>The Courier Guy platform</strong> once your garments are packed.
+                </p>
+                <p className="text-amber-300 font-medium text-[11px]">
+                  &bull; We will send you a separate, secure PayFast payment link via SMS &amp; email to settle courier shipping before dispatch.
+                </p>
+              </div>
+            )}
 
             {fulfillmentChoice === 'studio_collection' && (
               <div className="mb-6 rounded-lg border border-amber-500/30 bg-amber-500/10 p-4 space-y-1 text-xs">
@@ -682,10 +700,17 @@ export default function CheckoutPage() {
 
                 <div className="flex justify-between text-sm text-zinc-400">
                   <span>Fulfillment</span>
-                  <span className="text-emerald-400 font-medium">
-                    {fulfillmentChoice === 'studio_collection' ? 'Free Studio Pickup' : 'Door-to-door Courier'}
+                  <span className={fulfillmentChoice === 'studio_collection' ? 'text-emerald-400 font-medium' : 'text-amber-400 font-medium text-xs text-right'}>
+                    {fulfillmentChoice === 'studio_collection'
+                      ? 'Free Studio Pickup'
+                      : 'The Courier Guy (Separate Link)'}
                   </span>
                 </div>
+                {fulfillmentChoice === 'courier' && (
+                  <div className="text-[11px] text-zinc-500 text-right -mt-1 leading-tight">
+                    * Courier fee calculated on The Courier Guy platform &amp; billed via separate link
+                  </div>
+                )}
 
                 {promoDiscount > 0 && (
                   <div className="flex justify-between text-sm text-emerald-400 font-medium">
