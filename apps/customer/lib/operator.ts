@@ -4,6 +4,8 @@ export interface AdminOperator {
   email: string;
   role: AppRole;
   fullName?: string;
+  locationId?: string | null;
+  locationName?: string | null;
 }
 
 const STORAGE_KEY = 'dissafyt_admin_operator';
@@ -12,6 +14,8 @@ export const DEFAULT_OPERATOR: AdminOperator = {
   email: 'curtislee@dissafyt.com',
   role: 'admin',
   fullName: 'Curtis-Lee',
+  locationId: null,
+  locationName: null,
 };
 
 export function getActiveOperator(): AdminOperator {
@@ -19,6 +23,7 @@ export function getActiveOperator(): AdminOperator {
   try {
     const cookieEmail = getCookie('dissafyt_admin_email');
     const cookieRole = (getCookie('dissafyt_admin_role') as AppRole) || 'admin';
+    const cookieLocationId = getCookie('dissafyt_admin_location_id') || null;
     const raw = localStorage.getItem(STORAGE_KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
@@ -27,15 +32,22 @@ export function getActiveOperator(): AdminOperator {
           email: cookieEmail,
           role: cookieRole,
           fullName: cookieEmail.split('@')[0],
+          locationId: cookieLocationId,
+          locationName: parsed.locationName || null,
         };
       }
-      return parsed;
+      return {
+        ...parsed,
+        locationId: parsed.locationId || cookieLocationId,
+      };
     }
     if (cookieEmail) {
       return {
         email: cookieEmail,
         role: cookieRole,
         fullName: cookieEmail.split('@')[0],
+        locationId: cookieLocationId,
+        locationName: null,
       };
     }
   } catch {
@@ -78,11 +90,13 @@ export async function logoutAdmin(): Promise<void> {
   document.cookie = `dissafyt_admin_token=; path=/; expires=${expired}; max-age=0; SameSite=Lax${domainPart}`;
   document.cookie = `dissafyt_admin_email=; path=/; expires=${expired}; max-age=0; SameSite=Lax${domainPart}`;
   document.cookie = `dissafyt_admin_role=; path=/; expires=${expired}; max-age=0; SameSite=Lax${domainPart}`;
+  document.cookie = `dissafyt_admin_location_id=; path=/; expires=${expired}; max-age=0; SameSite=Lax${domainPart}`;
 
   // Also clear without domain in case host-only cookies were set
   document.cookie = `dissafyt_admin_token=; path=/; expires=${expired}; max-age=0; SameSite=Lax`;
   document.cookie = `dissafyt_admin_email=; path=/; expires=${expired}; max-age=0; SameSite=Lax`;
   document.cookie = `dissafyt_admin_role=; path=/; expires=${expired}; max-age=0; SameSite=Lax`;
+  document.cookie = `dissafyt_admin_location_id=; path=/; expires=${expired}; max-age=0; SameSite=Lax`;
 
   try {
     localStorage.removeItem(STORAGE_KEY);
@@ -159,6 +173,9 @@ export async function adminFetch(input: RequestInfo | URL, init?: RequestInit): 
   }
   if (!headers.has('x-admin-email')) {
     headers.set('x-admin-email', operator.email);
+  }
+  if (operator.locationId && !headers.has('x-admin-location-id')) {
+    headers.set('x-admin-location-id', operator.locationId);
   }
 
   let res = await fetch(input, {

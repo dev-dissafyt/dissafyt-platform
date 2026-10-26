@@ -19,11 +19,21 @@ export interface UserRole {
   id: string;
   user_id: string;
   role: AppRole;
+  location_id?: string | null;
   created_at: string;
+}
+
+export interface UserBranchRole {
+  role: AppRole;
+  location_id?: string | null;
+  location_name?: string | null;
 }
 
 export interface UserWithProfile extends Profile {
   roles: AppRole[];
+  branch_roles?: UserBranchRole[];
+  assigned_location_id?: string | null;
+  assigned_location_name?: string | null;
 }
 
 // Commerce types
@@ -382,6 +392,13 @@ export interface BarbershopLocation {
   longitude?: number | null;
   pos_terminal_id?: string | null;
   admin_fee_pct?: number;
+  payfast_merchant_id?: string | null;
+  payfast_merchant_key?: string | null;
+  payfast_passphrase?: string | null;
+  use_custom_payfast?: boolean;
+  payout_bank_name?: string | null;
+  payout_account_number?: string | null;
+  payout_branch_code?: string | null;
   created_at?: string;
   updated_at?: string;
 }

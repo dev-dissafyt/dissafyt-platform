@@ -16,6 +16,13 @@ export async function PATCH(
   const auth = await requireAdminAuth(request, 'location:edit');
   if (isAuthFailure(auth)) return auth;
 
+  if (auth.role === 'barbershop_manager' && auth.locationId && auth.locationId !== params.id) {
+    return NextResponse.json(
+      { error: 'Forbidden: Branch managers can only update their assigned branch location.' },
+      { status: 403 }
+    );
+  }
+
   try {
     const body = await request.json();
     const result = await BarbershopService.updateLocation(params.id, body, {

@@ -160,9 +160,26 @@ export async function POST(request: NextRequest) {
     let payfast: any = null;
     if (payment_choice === 'payfast' && result.booking.status === 'pending' && Number(result.booking.total_amount) > 0) {
       const siteUrl = getCanonicalSiteUrl();
-      const merchantId = process.env.PAYFAST_MERCHANT_ID || process.env.NEXT_PUBLIC_PAYFAST_MERCHANT_ID || '17675995';
 
       const admin = getSupabaseAdminClient();
+      const targetLocId = location_id || result.booking.location_id || 'loc-cpt-flagship';
+      const { data: locData } = await admin
+        .from('locations')
+        .select('payfast_merchant_id, payfast_merchant_key, payfast_passphrase, use_custom_payfast')
+        .eq('id', targetLocId)
+        .maybeSingle();
+
+      const useCustom = Boolean(locData?.use_custom_payfast && locData?.payfast_merchant_id);
+      const merchantId = useCustom
+        ? locData!.payfast_merchant_id!
+        : (process.env.PAYFAST_MERCHANT_ID || process.env.NEXT_PUBLIC_PAYFAST_MERCHANT_ID || '17675995');
+      const merchantKey = useCustom && locData!.payfast_merchant_key
+        ? locData!.payfast_merchant_key!
+        : (process.env.PAYFAST_MERCHANT_KEY || 'c08hjtdezifi4');
+      const passphrase = useCustom && locData!.payfast_passphrase
+        ? locData!.payfast_passphrase!
+        : (process.env.PAYFAST_PASSPHRASE || 'Diss_fyt_Wat07081');
+
       const { data: profile } = await admin
         .from('profiles')
         .select('full_name, email, phone')
@@ -181,7 +198,7 @@ export async function POST(request: NextRequest) {
 
       const payfastData: Record<string, string> = {
         merchant_id: merchantId,
-        merchant_key: process.env.PAYFAST_MERCHANT_KEY || 'c08hjtdezifi4',
+        merchant_key: merchantKey,
         return_url: `${siteUrl}/book?confirmed_booking=${result.booking.id}&paid=1`,
         cancel_url: `${siteUrl}/book?cancelled_booking=${result.booking.id}`,
         notify_url: `${siteUrl}/api/payments/payfast-notify`,
@@ -200,9 +217,10 @@ export async function POST(request: NextRequest) {
         custom_str1: result.booking.id,
         custom_str2: authCtx.userId,
         custom_str3: 'booking',
+        ...(useCustom ? { custom_str4: targetLocId } : {}),
       };
 
-      payfast = PayfastService.createTransactionPayload(payfastData);
+      payfast = PayfastService.createTransactionPayload(payfastData, passphrase);
     }
 
     return NextResponse.json({
