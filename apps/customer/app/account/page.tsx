@@ -29,6 +29,7 @@ import {
   AlertTriangle,
   Ban,
   PackageCheck,
+  CreditCard,
 } from 'lucide-react';
 import Link from 'next/link';
 
@@ -126,6 +127,7 @@ export default function AccountPage() {
   const [isCancelSubOpen, setIsCancelSubOpen] = useState(false);
   const [subActionLoading, setSubActionLoading] = useState(false);
   const [syncingSub, setSyncingSub] = useState(false);
+  const [retryingPayment, setRetryingPayment] = useState(false);
   const [selectedChangePlanCode, setSelectedChangePlanCode] = useState<string | null>(null);
 
   // Notification Preferences
@@ -438,6 +440,49 @@ export default function AccountPage() {
       setStatusMsg(e.message || 'Error syncing subscription with PayFast');
     } finally {
       setSyncingSub(false);
+    }
+  }
+
+  async function handleRetrySubscriptionPayment() {
+    if (!token || !subscription) return;
+    setRetryingPayment(true);
+    setStatusMsg(null);
+    try {
+      const res = await fetch('/api/subscriptions/subscribe', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          planCode: subscription.plan_code || 'twice',
+        }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        throw new Error(data.error || 'Failed to initialize retry payment');
+      }
+      if (data.payfast) {
+        const form = document.createElement('form');
+        form.method = 'POST';
+        form.action = data.payfast.action;
+        for (const [key, value] of Object.entries(data.payfast.fields)) {
+          if (value !== undefined && value !== null) {
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = String(value);
+            form.appendChild(input);
+          }
+        }
+        document.body.appendChild(form);
+        form.submit();
+      }
+    } catch (err: any) {
+      console.error('Subscription retry error:', err);
+      alert(err.message || 'Error initializing payment retry');
+    } finally {
+      setRetryingPayment(false);
     }
   }
 
@@ -1603,21 +1648,37 @@ export default function AccountPage() {
           {/* Right Column (5 cols): VIP Membership Pass Directly In Sync */}
           <div className="lg:col-span-5 space-y-5">
             {subscription ? (
-              <Card className="border-amber-500/40 bg-gradient-to-b from-zinc-900 via-zinc-950 to-zinc-950 shadow-lg shadow-amber-500/5">
+              <Card
+                className={`${
+                  subscription.status === 'past_due'
+                    ? 'border-red-500/50 shadow-lg shadow-red-500/10'
+                    : 'border-amber-500/40 shadow-lg shadow-amber-500/5'
+                } bg-gradient-to-b from-zinc-900 via-zinc-950 to-zinc-950`}
+              >
                 <CardHeader className="pb-3">
                   <div className="flex items-center justify-between">
                     <CardTitle className="text-base text-white flex items-center">
-                      <Sparkles className="mr-2 h-4 w-4 text-amber-500" />
+                      <Sparkles
+                        className={`mr-2 h-4 w-4 ${
+                          subscription.status === 'past_due' ? 'text-red-400' : 'text-amber-500'
+                        }`}
+                      />
                       VIP Membership Pass
                     </CardTitle>
                     <span
                       className={`rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider border ${
-                        subscription.status === 'cancelled'
+                        subscription.status === 'past_due'
+                          ? 'bg-red-500/15 text-red-400 border-red-500/30'
+                          : subscription.status === 'cancelled'
                           ? 'bg-amber-500/10 text-amber-400 border-amber-500/30'
                           : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
                       }`}
                     >
-                      {subscription.status === 'cancelled' ? 'Cancelled (Active Period)' : 'Active'}
+                      {subscription.status === 'past_due'
+                        ? 'Payment Bounced (Past Due)'
+                        : subscription.status === 'cancelled'
+                        ? 'Cancelled (Active Period)'
+                        : 'Active'}
                     </span>
                   </div>
                   <CardDescription className="text-xs">
@@ -1630,12 +1691,46 @@ export default function AccountPage() {
                     <span className="font-bold text-white text-sm">
                       {subscriptionQuota?.plan_name || subscription.plan_name || 'VIP Membership'}
                     </span>
-                    <span className="font-mono font-bold text-amber-400 text-sm">
+                    <span
+                      className={`font-mono font-bold text-sm ${
+                        subscription.status === 'past_due' ? 'text-red-400' : 'text-amber-400'
+                      }`}
+                    >
                       R {Number(subscription.price || 100).toFixed(2)}/mo
                     </span>
                   </div>
 
-                  {subscriptionQuota ? (
+                  {subscription.status === 'past_due' ? (
+                    <div className="rounded-xl bg-red-950/30 border border-red-800/40 p-3.5 space-y-3">
+                      <div className="flex items-start gap-2.5">
+                        <AlertTriangle className="h-5 w-5 text-red-400 shrink-0 mt-0.5" />
+                        <div className="space-y-1">
+                          <p className="font-semibold text-red-200 text-xs">
+                            Debit Renewal Bounced
+                          </p>
+                          <p className="text-[11px] text-zinc-300 leading-relaxed">
+                            Your monthly debit order for R {Number(subscription.price || 100).toFixed(2)} failed or was declined by your bank. Your included cut allotment is paused until payment is settled.
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="pt-1">
+                        <Button
+                          size="sm"
+                          onClick={handleRetrySubscriptionPayment}
+                          disabled={retryingPayment}
+                          className="w-full bg-red-600 hover:bg-red-500 text-white font-bold text-xs h-9 shadow-md shadow-red-600/20 flex items-center justify-center gap-1.5"
+                        >
+                          <CreditCard className="h-3.5 w-3.5" />
+                          <span>
+                            {retryingPayment
+                              ? 'Connecting to PayFast...'
+                              : `Pay Now & Reactivate (R ${Number(subscription.price || 100).toFixed(2)})`}
+                          </span>
+                        </Button>
+                      </div>
+                    </div>
+                  ) : subscriptionQuota ? (
                     <div className="rounded-xl bg-zinc-900/90 border border-zinc-800 p-3.5 space-y-2.5">
                       <div className="flex items-center justify-between">
                         <span className="text-zinc-400 font-medium text-[11px]">
@@ -1693,7 +1788,22 @@ export default function AccountPage() {
                   )}
 
                   <div className="pt-1">
-                    {subscriptionQuota && subscriptionQuota.available_cuts <= 0 ? (
+                    {subscription.status === 'past_due' ? (
+                      <div className="space-y-1.5">
+                        <Link href="/book">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="w-full border-zinc-700 bg-zinc-900/80 hover:bg-zinc-800 text-zinc-200 text-xs h-9"
+                          >
+                            Book Standard Rate Appointment
+                          </Button>
+                        </Link>
+                        <p className="text-[10px] text-center text-zinc-500">
+                          Settle your membership renewal above to restore included R0.00 cuts.
+                        </p>
+                      </div>
+                    ) : subscriptionQuota && subscriptionQuota.available_cuts <= 0 ? (
                       <div className="space-y-1.5">
                         <Link href="/book">
                           <Button
@@ -1765,6 +1875,16 @@ export default function AccountPage() {
                         className="text-zinc-500 hover:text-red-400 hover:bg-red-500/10 text-[11px] h-7 px-2"
                       >
                         Cancel
+                      </Button>
+                    ) : subscription.status === 'past_due' ? (
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => setIsCancelSubOpen(true)}
+                        className="text-zinc-500 hover:text-red-400 hover:bg-red-500/10 text-[11px] h-7 px-2"
+                      >
+                        Cancel Plan
                       </Button>
                     ) : (
                       <span className="text-[10px] font-mono text-zinc-500">

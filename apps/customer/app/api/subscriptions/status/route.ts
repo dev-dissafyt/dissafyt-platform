@@ -25,8 +25,24 @@ export async function GET(request: NextRequest) {
     const quota = await BarbershopService.getCustomerSubscriptionQuota(authCtx.userId);
 
     if (!quota.hasActiveSubscription || !quota.subscription) {
+      if (quota.isPastDue && quota.subscription) {
+        return NextResponse.json({
+          hasActiveSubscription: false,
+          isPastDue: true,
+          subscription: quota.subscription,
+          quota: null,
+          billingIssue: quota.billingIssue || {
+            type: 'past_due',
+            message: 'Your monthly renewal payment bounced or was not received.',
+            price: Number(quota.subscription.price || 190),
+            periodEnd: quota.subscription.current_period_end,
+          },
+        });
+      }
+
       return NextResponse.json({
         hasActiveSubscription: false,
+        isPastDue: false,
         subscription: null,
         quota: null,
       });
@@ -34,6 +50,7 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       hasActiveSubscription: true,
+      isPastDue: false,
       subscription: quota.subscription,
       quota: {
         total_cuts: quota.totalCuts,

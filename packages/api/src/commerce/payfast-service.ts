@@ -562,6 +562,37 @@ export class PayfastService {
               updated_at: new Date().toISOString(),
             })
             .eq('id', orderId);
+        } else if (isSubscription) {
+          if (resolvedSub?.id) {
+            await admin
+              .from('subscriptions')
+              .update({
+                status: 'past_due',
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', resolvedSub.id);
+
+            try {
+              await AuditService.recordLog({
+                actor_email: payload.email_address || 'payfast-webhook@dissafyt.com',
+                actor_role: 'system',
+                action: 'subscription.payment_failed',
+                entity_type: 'subscription',
+                entity_id: resolvedSub.id,
+                entity_name: `Subscription ${resolvedSub.plan_name || resolvedSub.plan_code}`,
+                changes: {
+                  status: 'past_due',
+                  payment_status: 'FAILED',
+                  amount,
+                  reason: 'Recurring subscription payment bounced or declined',
+                },
+              });
+            } catch (auditErr) {
+              console.warn('Subscription failure audit log warning:', auditErr);
+            }
+
+            console.warn(`[PayFast Webhook] Subscription ${resolvedSub.id} marked past_due after payment bounce.`);
+          }
         }
       }
 

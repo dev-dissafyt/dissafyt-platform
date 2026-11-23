@@ -136,6 +136,13 @@ export interface SubscriptionQuota {
   periodStart: string | null;
   periodEnd: string | null;
   canBookCovered: boolean;
+  isPastDue?: boolean;
+  billingIssue?: {
+    type: 'past_due' | 'payment_failed' | 'renewal_bounced';
+    message: string;
+    price?: number;
+    periodEnd?: string;
+  } | null;
 }
 
 export class BarbershopService {
@@ -884,7 +891,48 @@ export class BarbershopService {
         }
       }
 
-      if (!activeSub) return emptyResult;
+      if (!activeSub) {
+        // Check if user has an existing subscription that is past_due or whose renewal period ended
+        const { data: latestSubs } = await admin
+          .from('subscriptions')
+          .select('*')
+          .eq('user_id', userId)
+          .order('created_at', { ascending: false })
+          .limit(1);
+
+        if (latestSubs && latestSubs.length > 0) {
+          const lastSub = latestSubs[0];
+          const isExpired = new Date(lastSub.current_period_end).getTime() < Date.now();
+          const isPastDue = lastSub.status === 'past_due' || (lastSub.status === 'active' && isExpired);
+
+          if (isPastDue) {
+            return {
+              hasActiveSubscription: false,
+              subscription: {
+                ...lastSub,
+                status: 'past_due',
+              },
+              planCode: lastSub.plan_code,
+              planName: lastSub.plan_name,
+              totalCuts: (lastSub.plan_code === 'twice' || lastSub.plan_code === 'executive') ? 2 : 1,
+              usedCuts: 0,
+              availableCuts: 0,
+              periodStart: lastSub.current_period_start,
+              periodEnd: lastSub.current_period_end,
+              canBookCovered: false,
+              isPastDue: true,
+              billingIssue: {
+                type: 'renewal_bounced',
+                message: `Your monthly renewal payment for ${lastSub.plan_name || 'membership'} bounced or was not received. Please settle your payment to restore your included haircut allowance.`,
+                price: Number(lastSub.price || 190),
+                periodEnd: lastSub.current_period_end,
+              },
+            };
+          }
+        }
+
+        return emptyResult;
+      }
 
       const planCode = activeSub.plan_code || 'solo';
       const planName =

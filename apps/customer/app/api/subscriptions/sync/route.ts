@@ -97,6 +97,18 @@ export async function POST(request: NextRequest) {
 
             synced = true;
             syncSource = 'payfast_api';
+          } else if (pfStatus) {
+            const newStatus = pfStatus === 'cancelled' ? 'cancelled' : 'past_due';
+            await admin
+              .from('subscriptions')
+              .update({
+                status: newStatus,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', sub.id);
+
+            synced = true;
+            syncSource = 'payfast_api_bounced';
           }
         }
       } catch (apiErr) {
@@ -139,6 +151,18 @@ export async function POST(request: NextRequest) {
           synced = true;
           syncSource = 'payments_audit';
         }
+      } else if (new Date(sub.current_period_end).getTime() < Date.now()) {
+        // Period expired without confirmed payment - mark past_due
+        await admin
+          .from('subscriptions')
+          .update({
+            status: 'past_due',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', sub.id);
+
+        synced = true;
+        syncSource = 'period_expired_past_due';
       }
     }
 
@@ -151,10 +175,13 @@ export async function POST(request: NextRequest) {
       .eq('id', sub.id)
       .single();
 
+    const isPastDue = updatedSub?.status === 'past_due' || quota.isPastDue;
+
     return NextResponse.json({
       success: true,
       synced,
       syncSource,
+      isPastDue,
       subscription: updatedSub || sub,
       quota: quota.hasActiveSubscription ? {
         total_cuts: quota.totalCuts,
@@ -166,7 +193,9 @@ export async function POST(request: NextRequest) {
         period_end: quota.periodEnd,
         can_book_covered: quota.canBookCovered,
       } : null,
-      message: synced
+      message: isPastDue
+        ? 'Membership renewal payment was not received or has bounced. Status marked as Past Due.'
+        : synced
         ? 'Subscription successfully synchronized with latest billing cycle!'
         : 'Subscription is already up-to-date.',
     });

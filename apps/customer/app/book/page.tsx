@@ -22,6 +22,7 @@ import {
   Lock,
   Navigation,
   Compass,
+  AlertTriangle,
 } from 'lucide-react';
 import Link from 'next/link';
 import Image from 'next/image';
@@ -153,6 +154,8 @@ function BookContent() {
   const [activeSubscription, setActiveSubscription] = useState<any>(null);
   const [subscriptionQuota, setSubscriptionQuota] = useState<any>(null);
   const [customerProfile, setCustomerProfile] = useState<any>(null);
+  const [isPastDue, setIsPastDue] = useState(false);
+  const [pastDueSubscription, setPastDueSubscription] = useState<any>(null);
 
   // Helper to determine if service is covered by subscription and quota
   function isServiceCovered(service: Service | null): { covered: boolean; reason?: string } {
@@ -220,6 +223,8 @@ function BookContent() {
       setHasActiveSubscription(false);
       setActiveSubscription(null);
       setSubscriptionQuota(null);
+      setIsPastDue(false);
+      setPastDueSubscription(null);
       setCheckingSubscription(false);
       return;
     }
@@ -242,10 +247,14 @@ function BookContent() {
         setHasActiveSubscription(Boolean(data.hasActiveSubscription));
         setActiveSubscription(data.subscription || null);
         setSubscriptionQuota(data.quota || null);
+        setIsPastDue(Boolean(data.isPastDue));
+        setPastDueSubscription(data.isPastDue ? data.subscription : null);
       } else {
         setHasActiveSubscription(false);
         setActiveSubscription(null);
         setSubscriptionQuota(null);
+        setIsPastDue(false);
+        setPastDueSubscription(null);
       }
     } catch (err: any) {
       if (err.name !== 'AbortError') {
@@ -253,6 +262,8 @@ function BookContent() {
       }
       setHasActiveSubscription(false);
       setSubscriptionQuota(null);
+      setIsPastDue(false);
+      setPastDueSubscription(null);
     } finally {
       clearTimeout(timeoutId);
       setCheckingSubscription(false);
@@ -992,6 +1003,35 @@ function BookContent() {
           <p className="text-xs text-zinc-300">
             Subscription checkout was cancelled. You can continue booking below or choose a membership at any time.
           </p>
+        </div>
+      )}
+
+      {/* Payment Bounced / Past Due Warning Banner */}
+      {isPastDue && (
+        <div className="rounded-xl border border-red-500/40 bg-red-950/20 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-lg shadow-red-950/30">
+          <div className="flex items-start sm:items-center space-x-3">
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-red-500/20 text-red-400">
+              <AlertTriangle className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-sm font-bold text-white">
+                  Membership Renewal Bounced
+                </span>
+                <span className="rounded-full bg-red-500/20 px-2 py-0.5 text-[10px] font-bold text-red-300 uppercase tracking-wider border border-red-500/30">
+                  Payment Past Due
+                </span>
+              </div>
+              <p className="text-xs text-zinc-300 mt-0.5">
+                Your monthly renewal for {pastDueSubscription?.plan_name || 'VIP Membership'} was declined or bounced. Your R0.00 cuts are paused until payment is settled.
+              </p>
+            </div>
+          </div>
+          <Link href="/account" className="shrink-0 w-full sm:w-auto">
+            <Button size="sm" className="w-full bg-red-600 hover:bg-red-500 text-white font-semibold text-xs h-9">
+              Settle &amp; Reactivate in Account &rarr;
+            </Button>
+          </Link>
         </div>
       )}
 
